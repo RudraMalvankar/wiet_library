@@ -385,6 +385,36 @@ function logActivity($pdo, $userId, $action, $details = '') {
 }
 
 /**
+ * Log audit event (admin-focused, entity-aware)
+ *
+ * Contract:
+ * - Inputs: $adminId (nullable INT), $action (string), $entityType (string|null), $entityId (string|int|null), $metadata (array|string|null)
+ * - Side-effects: Inserts a row into AuditLog capturing IP and User-Agent
+ * - Resilience: Never throws; on failure writes to error_log
+ */
+function logAudit($pdo, $adminId, $action, $entityType = null, $entityId = null, $metadata = null) {
+    try {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+        $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
+        // Encode metadata safely if it's an array/object
+        if (is_array($metadata) || is_object($metadata)) {
+            $metaJson = json_encode(
+                $metadata,
+                JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE
+            );
+        } else {
+            $metaJson = $metadata; // allow raw string/null
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO AuditLog (admin_id, action, entity_type, entity_id, metadata, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $entityIdStr = isset($entityId) ? (string)$entityId : null;
+        $stmt->execute([$adminId, $action, $entityType, $entityIdStr, $metaJson, $ip, $ua]);
+    } catch (Exception $e) {
+        error_log('Audit logging failed: ' . $e->getMessage());
+    }
+}
+
+/**
  * Send JSON response
  */
 function sendJson($data, $statusCode = 200) {

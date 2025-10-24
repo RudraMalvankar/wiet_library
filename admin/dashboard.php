@@ -101,31 +101,53 @@ if ($quick_stats['books_overdue'] > 0) {
     ];
 }
 
-// Recent Activities - Based on actual database operations
-$recent_activities = [
-    ['type' => 'circulation', 'action' => 'Book Issued', 'details' => 'Operating Systems Concepts', 'member' => 'STU2024089', 'time' => '2024-12-19 14:30:00', 'status' => 'success'],
-    ['type' => 'circulation', 'action' => 'Book Returned', 'details' => 'Database Management Systems', 'member' => 'STU2024034', 'time' => '2024-12-19 13:45:00', 'status' => 'success'],
-    ['type' => 'dropbox', 'action' => 'DropBox Return', 'details' => 'Digital Signal Processing', 'member' => 'STU2024156', 'time' => '2024-12-19 12:20:00', 'status' => 'pending'],
-    ['type' => 'member', 'action' => 'New Member', 'details' => 'Student Registration', 'member' => 'STU2024234', 'time' => '2024-12-19 11:15:00', 'status' => 'success'],
-    ['type' => 'acquisition', 'action' => 'Book Acquired', 'details' => 'Machine Learning Fundamentals', 'member' => 'System', 'time' => '2024-12-19 10:30:00', 'status' => 'success'],
-    ['type' => 'analytics', 'action' => 'Report Generated', 'details' => 'Monthly Circulation Report', 'member' => 'ADM001', 'time' => '2024-12-19 09:00:00', 'status' => 'success']
-];
+// Note: recent activities and critical alerts should come from the database.
+// We previously attempted to populate them above; do not overwrite with static/dummy arrays here.
 
-// Critical Alerts - Things that need immediate attention
-$critical_alerts = [
-    ['type' => 'overdue', 'title' => '67 Overdue Books', 'description' => 'Books not returned past due date', 'priority' => 'high', 'count' => 67, 'action' => 'circulation'],
-    ['type' => 'dropbox', 'title' => '12 Pending DropBox Returns', 'description' => 'Returns awaiting manual verification', 'priority' => 'medium', 'count' => 12, 'action' => 'dropbox_monitor'],
-    ['type' => 'acquisition', 'title' => '8 Pending Acquisitions', 'description' => 'Orders awaiting processing', 'priority' => 'low', 'count' => 8, 'action' => 'books_management'],
-    ['type' => 'member', 'title' => '15 Membership Renewals', 'description' => 'Memberships expiring this week', 'priority' => 'medium', 'count' => 15, 'action' => 'student_management']
-];
+// Popular Books - Most circulated (fetch from DB)
+try {
+    $stmt = $pdo->prepare("
+        SELECT b.Title, b.Author1, COUNT(c.CirculationID) as circulation_count,
+               COUNT(h.HoldID) as total_copies,
+               SUM(CASE WHEN h.Status = 'Available' THEN 1 ELSE 0 END) as available_copies
+        FROM Circulation c
+        JOIN Holding h ON c.AccNo = h.AccNo
+        JOIN Books b ON h.CatNo = b.CatNo
+        GROUP BY b.CatNo
+        ORDER BY circulation_count DESC
+        LIMIT 4
+    ");
+    $stmt->execute();
+    $popular_books = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $popular_books[] = [
+            'title' => $row['Title'],
+            'author' => $row['Author1'] ?? 'Unknown',
+            'circulation_count' => (int)$row['circulation_count'],
+            'available_copies' => (int)($row['available_copies'] ?? 0),
+            'total_copies' => (int)($row['total_copies'] ?? 1)
+        ];
+    }
+} catch (Exception $e) {
+    $popular_books = [];
+}
 
-// Popular Books - Most circulated
-$popular_books = [
-    ['title' => 'Clean Code', 'author' => 'Robert C. Martin', 'circulation_count' => 45, 'available_copies' => 2, 'total_copies' => 5],
-    ['title' => 'Design Patterns', 'author' => 'Gang of Four', 'circulation_count' => 38, 'available_copies' => 1, 'total_copies' => 4],
-    ['title' => 'Database Systems', 'author' => 'Elmasri & Navathe', 'circulation_count' => 34, 'available_copies' => 3, 'total_copies' => 6],
-    ['title' => 'Computer Networks', 'author' => 'Andrew S. Tanenbaum', 'circulation_count' => 29, 'available_copies' => 0, 'total_copies' => 3]
-];
+// Active Borrowers
+try {
+    $stmt = $pdo->prepare("
+        SELECT m.MemberNo, m.MemberName, m.BooksIssued, COUNT(c.CirculationID) as TotalIssues
+        FROM Member m
+        LEFT JOIN Circulation c ON m.MemberNo = c.MemberNo
+        WHERE m.Status = 'Active' AND m.BooksIssued > 0
+        GROUP BY m.MemberNo
+        ORDER BY m.BooksIssued DESC
+        LIMIT 4
+    ");
+    $stmt->execute();
+    $active_borrowers = $stmt->fetchAll();
+} catch (Exception $e) {
+    $active_borrowers = [];
+}
 
 // System Health Metrics
 $system_health = [
@@ -665,17 +687,17 @@ $system_health = [
 
         <div class="header-stats">
             <div class="header-stat">
-                <div class="header-stat-number"><?php echo number_format($quick_stats['footfall_today']); ?></div>
-                <div class="header-stat-label">Today's Footfall</div>
-            </div>
-            <div class="header-stat">
-                <div class="header-stat-number"><?php echo number_format($quick_stats['books_issued']); ?></div>
-                <div class="header-stat-label">Books Currently Out</div>
-            </div>
-            <div class="header-stat">
-                <div class="header-stat-number"><?php echo $quick_stats['dropbox_active']; ?></div>
-                <div class="header-stat-label">Active DropBoxes</div>
-            </div>
+                    <div id="footfall_today" class="header-stat-number"><?php echo number_format($quick_stats['footfall_today']); ?></div>
+                    <div class="header-stat-label">Today's Footfall</div>
+                </div>
+                <div class="header-stat">
+                    <div id="books_issued" class="header-stat-number"><?php echo number_format($quick_stats['books_issued']); ?></div>
+                    <div class="header-stat-label">Books Currently Out</div>
+                </div>
+                <div class="header-stat">
+                    <div id="dropbox_active" class="header-stat-number"><?php echo $quick_stats['dropbox_active']; ?></div>
+                    <div class="header-stat-label">Active DropBoxes</div>
+                </div>
         </div>
     </div>
 
@@ -683,38 +705,38 @@ $system_health = [
     <div class="stats-grid">
         <div class="stat-card"> <!-- Default golden for total books -->
             <!-- <i class="stat-icon fas fa-book"></i> -->
-            <span class="stat-number"><?php echo number_format($quick_stats['total_books']); ?></span>
+            <span id="total_books" class="stat-number"><?php echo number_format($quick_stats['total_books']); ?></span>
             <div class="stat-label">Total Books</div>
         </div>
 
         <div class="stat-card"> <!-- Default golden for total copies -->
             <!-- <i class="stat-icon fas fa-layer-group"></i> -->
-            <span class="stat-number"><?php echo number_format($quick_stats['total_copies']); ?></span>
+            <span id="total_copies" class="stat-number"><?php echo number_format($quick_stats['total_copies']); ?></span>
             <div class="stat-label">Total Copies</div>
         </div>
 
         <div class="stat-card success"> <!-- Green for active members (positive metric) -->
             <!-- <i class="stat-icon fas fa-users"></i> -->
-            <span class="stat-number"><?php echo number_format($quick_stats['active_members']); ?></span>
+            <span id="active_members" class="stat-number"><?php echo number_format($quick_stats['active_members']); ?></span>
             <div class="stat-label">Active Members</div>
         </div>
 
         <div class="stat-card"> <!-- Default golden for books issued -->
             <!-- <i class="stat-icon fas fa-exchange-alt"></i> -->
-            <span class="stat-number"><?php echo number_format($quick_stats['books_issued']); ?></span>
+            <span id="books_issued_card" class="stat-number"><?php echo number_format($quick_stats['books_issued']); ?></span>
             <div class="stat-label">Books Issued</div>
         </div>
 
         <div class="stat-card danger"> <!-- Red for overdue books (critical metric) -->
             <!-- <i class="stat-icon fas fa-exclamation-triangle"></i> -->
-            <span class="stat-number"><?php echo $quick_stats['books_overdue']; ?></span>
+            <span id="books_overdue" class="stat-number"><?php echo $quick_stats['books_overdue']; ?></span>
             <div class="stat-label">Overdue Books</div>
 
         </div>
 
         <div class="stat-card info"> <!-- Blue for e-resources (informational) -->
             <!-- <i class="stat-icon fas fa-cloud"></i> -->
-            <span class="stat-number"><?php echo number_format($quick_stats['e_resources']); ?></span>
+            <span id="e_resources" class="stat-number"><?php echo number_format($quick_stats['e_resources']); ?></span>
             <div class="stat-label">E-Resources</div>
 
         </div>
@@ -827,20 +849,61 @@ $system_health = [
                 <a href="#" class="section-action" data-page="books-management">View Catalog</a>
             </div>
             <div class="section-content">
-                <?php foreach ($popular_books as $book): ?>
-                    <div class="book-item">
-                        <div class="book-info">
-                            <div class="book-title"><?php echo htmlspecialchars($book['title']); ?></div>
-                            <div class="book-author">by <?php echo htmlspecialchars($book['author']); ?></div>
-                        </div>
-                        <div class="book-stats">
-                            <div class="book-circulation"><?php echo $book['circulation_count']; ?> issues</div>
-                            <div class="book-availability">
-                                <?php echo $book['available_copies']; ?>/<?php echo $book['total_copies']; ?> available
+                <?php if (!empty($popular_books)): ?>
+                    <?php foreach ($popular_books as $book): ?>
+                        <div class="book-item">
+                            <div class="book-info">
+                                <div class="book-title"><?php echo htmlspecialchars($book['title']); ?></div>
+                                <div class="book-author">by <?php echo htmlspecialchars($book['author']); ?></div>
+                            </div>
+                            <div class="book-stats">
+                                <div class="book-circulation"><?php echo $book['circulation_count']; ?> issues</div>
+                                <div class="book-availability">
+                                    <?php echo $book['available_copies']; ?>/<?php echo $book['total_copies']; ?> available
+                                </div>
                             </div>
                         </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div style="text-align:center; padding:20px; color:#6c757d;">
+                        <i class="fas fa-book-open" style="font-size:32px; margin-bottom:10px;"></i>
+                        <p>No circulation data yet</p>
                     </div>
-                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Active Borrowers -->
+        <div class="dashboard-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <i class="fas fa-users"></i>
+                    Active Borrowers
+                </h3>
+                <a href="#" class="section-action" data-page="members">View All</a>
+            </div>
+            <div class="section-content">
+                <?php if (!empty($active_borrowers)): ?>
+                    <?php foreach ($active_borrowers as $borrower): ?>
+                        <div class="book-item" style="cursor:pointer;">
+                            <div class="book-info">
+                                <div class="book-title"><?php echo htmlspecialchars($borrower['MemberName']); ?></div>
+                                <div class="book-author">ID: <?php echo htmlspecialchars($borrower['MemberNo']); ?></div>
+                            </div>
+                            <div class="book-stats">
+                                <div class="book-circulation"><?php echo $borrower['BooksIssued']; ?> books</div>
+                                <div class="book-availability">
+                                    <span class="status-badge status-available">Active</span>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div style="text-align:center; padding:20px; color:#6c757d;">
+                        <i class="fas fa-user-clock" style="font-size:32px; margin-bottom:10px;"></i>
+                        <p>No active borrowers</p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -888,8 +951,8 @@ $system_health = [
                 // Animate stat numbers on load
                 animateNumbers();
 
-                // Auto-refresh dashboard data every 30 seconds
-                setInterval(refreshDashboardData, 30000);
+                    // Auto-refresh dashboard data every 30 seconds
+                    setInterval(refreshDashboardData, 30000);
             });
 
             function animateNumbers() {
@@ -912,11 +975,92 @@ $system_health = [
             }
 
             function refreshDashboardData() {
-                // This will be implemented to fetch real-time data
-                console.log('Refreshing dashboard data...');
+                    // Fetch live dashboard stats from API and update the DOM
+                    fetch('api/dashboard.php')
+                        .then(resp => resp.json())
+                        .then(json => {
+                            if (!json.success) throw new Error(json.message || 'API returned failure');
+                            const d = json.data;
 
-                // Update timestamp
-                const now = new Date();
-                console.log(`Dashboard refreshed at ${now.toLocaleTimeString()}`);
+                            updateNumber('#footfall_today', d.footfall_today);
+                            updateNumber('#books_issued', d.books_issued);
+                            updateNumber('#dropbox_active', d.dropbox_active);
+
+                            updateNumber('#total_books', d.total_books);
+                            updateNumber('#total_copies', d.total_copies);
+                            updateNumber('#active_members', d.active_members);
+                            updateNumber('#books_issued_card', d.books_issued);
+                            updateNumber('#books_overdue', d.books_overdue);
+                            updateNumber('#e_resources', d.e_resources);
+
+                            // Rebuild critical alerts for overdue if applicable
+                            try {
+                                const alertsGrid = document.querySelector('.alerts-grid');
+                                if (alertsGrid) {
+                                    // If overdue books exist, show a single alert — keep it simple
+                                    alertsGrid.innerHTML = '';
+                                    if (d.books_overdue && d.books_overdue > 0) {
+                                        const div = document.createElement('div');
+                                        div.className = 'alert-card alert-high';
+                                        div.innerHTML = `
+                                            <div class="alert-header">
+                                                <div class="alert-title">${d.books_overdue} Overdue Books</div>
+                                                <div class="alert-count">${d.books_overdue}</div>
+                                            </div>
+                                            <div class="alert-description">Books not returned past due date</div>
+                                        `;
+                                        alertsGrid.appendChild(div);
+                                    } else {
+                                        const div = document.createElement('div');
+                                        div.className = 'alert-card alert-low';
+                                        div.innerHTML = `
+                                            <div class="alert-header">
+                                                <div class="alert-title">No Critical Alerts</div>
+                                                <div class="alert-count">0</div>
+                                            </div>
+                                            <div class="alert-description">All systems normal</div>
+                                        `;
+                                        alertsGrid.appendChild(div);
+                                    }
+                                }
+                            } catch (err) {
+                                console.warn('Failed to rebuild alerts', err);
+                            }
+
+                        })
+                        .catch(err => {
+                            console.warn('Dashboard refresh failed:', err);
+                        });
+
+                    // Update timestamp
+                    const now = new Date();
+                    console.log(`Dashboard refreshed at ${now.toLocaleTimeString()}`);
             }
+
+                function updateNumber(selector, value) {
+                    try {
+                        const el = document.querySelector(selector);
+                        if (!el) return;
+                        const final = Number(value) || 0;
+                        // Smoothly animate from current to final
+                        const current = Number(el.textContent.replace(/,/g, '')) || 0;
+                        const duration = 600;
+                        const frames = Math.max(6, Math.round(duration / 16));
+                        const step = (final - current) / frames;
+                        let i = 0;
+                        const t = setInterval(() => {
+                            i++;
+                            const v = Math.round(current + step * i);
+                            el.textContent = v.toLocaleString();
+                            if (i >= frames) {
+                                el.textContent = final.toLocaleString();
+                                clearInterval(t);
+                            }
+                        }, 16);
+                    } catch (e) {
+                        // fallback: set raw value
+                        const el = document.querySelector(selector);
+                        if (el) el.textContent = (Number(value) || 0).toLocaleString();
+                    }
+                }
         </script>

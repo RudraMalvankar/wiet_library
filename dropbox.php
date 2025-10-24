@@ -1,7 +1,7 @@
 <?php
 // Dropbox Book Return Page
 // Students scan Book QR, then Student QR to return a book
-
+// returns are recorded in DropReturn table as per ER model yea babe 
 ?>
 <!DOCTYPE html>
 <html lang="en">

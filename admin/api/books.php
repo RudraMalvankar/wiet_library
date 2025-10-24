@@ -9,6 +9,128 @@ require_once '../../includes/functions.php';
 
 header('Content-Type: application/json');
 
+// Helper: generate QR file and return filename; uses phpqrcode if available
+function generate_qr_file($text) {
+    $baseDir = realpath(__DIR__ . '/../../storage');
+    if (!$baseDir) { $baseDir = __DIR__ . '/../../storage'; }
+    $dir = $baseDir . '/qrcodes';
+    if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
+    $safe = preg_replace('/[^A-Za-z0-9_\-]/', '_', (string)$text);
+    $filename = $dir . '/qr_' . $safe . '.png';
+    // Prefer phpqrcode
+    $phpqrcode = __DIR__ . '/../../libs/phpqrcode/phpqrcode.php';
+    if (file_exists($phpqrcode)) {
+        try {
+            require_once $phpqrcode;
+            QRcode::png($text, $filename, 'L', 4, 2);
+            return $filename;
+        } catch (Exception $e) {
+            // fallthrough to fallback
+        }
+    }
+    // Fallback simple generator
+    if (function_exists('imagecreatetruecolor')) {
+        $size = 320;
+        $img = imagecreatetruecolor($size, $size);
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $black = imagecolorallocate($img, 0, 0, 0);
+        imagefilledrectangle($img, 0, 0, $size, $size, $white);
+        $hash = md5((string)$text, true);
+        $grid = 21;
+        $cell = (int)floor(($size - 20) / $grid);
+        $offset = 10;
+        $bitIndex = 0;
+        for ($y = 0; $y < $grid; $y++) {
+            for ($x = 0; $x < $grid; $x++) {
+                $byte = ord($hash[(int)floor($bitIndex / 8)] ?? "\0");
+                $bit = ($byte >> ($bitIndex % 8)) & 1;
+                if ($bit) {
+                    imagefilledrectangle(
+                        $img,
+                        $offset + $x * $cell,
+                        $offset + $y * $cell,
+                        $offset + ($x + 1) * $cell - 2,
+                        $offset + ($y + 1) * $cell - 2,
+                        $black
+                    );
+                }
+                $bitIndex++;
+            }
+        }
+        if (function_exists('imagestring')) {
+            imagestring($img, 3, 10, $size - 18, (string)$text, $black);
+        }
+        imagepng($img, $filename);
+        imagedestroy($img);
+        return $filename;
+    }
+    // last resort
+    $txt = $filename . '.txt';
+    file_put_contents($txt, (string)$text);
+    return $txt;
+}
+
+// Helper: generate QR PNG binary and return raw bytes (no filesystem)
+function generate_qr_png($text) {
+    // Prefer phpqrcode if available and can output to stdout
+    $phpqrcode = __DIR__ . '/../../libs/phpqrcode/phpqrcode.php';
+    if (file_exists($phpqrcode)) {
+        try {
+            ob_start();
+            require_once $phpqrcode;
+            // QRcode::png outputs PNG when second param is false
+            QRcode::png((string)$text, false, 'L', 4, 2);
+            $png = ob_get_clean();
+            if ($png !== false && strlen($png) > 0) {
+                return $png;
+            }
+        } catch (Exception $e) {
+            if (ob_get_level()) { @ob_end_clean(); }
+        }
+    }
+
+    // Fallback: use GD to draw a pseudo-QR and return binary
+    if (function_exists('imagecreatetruecolor')) {
+        $size = 320;
+        $img = imagecreatetruecolor($size, $size);
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $black = imagecolorallocate($img, 0, 0, 0);
+        imagefilledrectangle($img, 0, 0, $size, $size, $white);
+        $hash = md5((string)$text, true);
+        $grid = 21;
+        $cell = (int)floor(($size - 20) / $grid);
+        $offset = 10;
+        $bitIndex = 0;
+        for ($y = 0; $y < $grid; $y++) {
+            for ($x = 0; $x < $grid; $x++) {
+                $byte = ord($hash[(int)floor($bitIndex / 8)] ?? "\0");
+                $bit = ($byte >> ($bitIndex % 8)) & 1;
+                if ($bit) {
+                    imagefilledrectangle(
+                        $img,
+                        $offset + $x * $cell,
+                        $offset + $y * $cell,
+                        $offset + ($x + 1) * $cell - 2,
+                        $offset + ($y + 1) * $cell - 2,
+                        $black
+                    );
+                }
+                $bitIndex++;
+            }
+        }
+        if (function_exists('imagestring')) {
+            imagestring($img, 3, 10, $size - 18, (string)$text, $black);
+        }
+        ob_start();
+        imagepng($img);
+        $png = ob_get_clean();
+        imagedestroy($img);
+        return $png;
+    }
+
+    return null;
+}
+
 // Quick debug entry log
 file_put_contents(__DIR__ . '/api_debug.log', "\n[ENTRY] " . date('c') . " REQUEST: " . ($_SERVER['REQUEST_URI'] ?? '') . "\n", FILE_APPEND);
 
@@ -105,21 +227,30 @@ try {
         case 'get':
             // Get single book details with all holdings
             $catNo = $_GET['catNo'] ?? 0;
-            
+
             // Get book details
             $stmt = $pdo->prepare("SELECT * FROM Books WHERE CatNo = ?");
             $stmt->execute([$catNo]);
             $book = $stmt->fetch();
-            
+
             if (!$book) {
                 sendJson(['success' => false, 'message' => 'Book not found'], 404);
             }
-            
+
             // Get all holdings for this book
             $stmt = $pdo->prepare("SELECT * FROM Holding WHERE CatNo = ? ORDER BY AccNo");
             $stmt->execute([$catNo]);
-            $book['holdings'] = $stmt->fetchAll();
-            // If there is binary image data for QR/Barcode, return it as base64 to keep JSON valid
+            $holdings = $stmt->fetchAll();
+            // Convert any binary QR blob per holding to base64 for JSON
+            foreach ($holdings as &$h) {
+                if (isset($h['QrCodeImg']) && $h['QrCodeImg'] !== null) {
+                    $h['QrCodeBase64'] = base64_encode($h['QrCodeImg']);
+                    unset($h['QrCodeImg']);
+                }
+            }
+            $book['holdings'] = $holdings;
+
+            // If there is binary image data for book-level QR/Barcode, return it as base64
             if (isset($book['QrCodeImg']) && $book['QrCodeImg'] !== null) {
                 $book['QrCodeBase64'] = base64_encode($book['QrCodeImg']);
                 unset($book['QrCodeImg']);
@@ -131,84 +262,294 @@ try {
 
             sendJson(['success' => true, 'data' => $book]);
             break;
-            
+
         case 'add':
-            // Add new book and holdings
+            // Add new book and holdings (accepts JSON or form-encoded/FormData)
+                if ($method !== 'POST') {
+                    sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
+                }
+
+                // Accept JSON body or fall back to form-encoded POST
+                $raw = file_get_contents('php://input');
+                $data = json_decode($raw, true);
+                if (empty($data) && !empty($_POST)) {
+                    $data = $_POST;
+                }
+                if (empty($data) && !empty($_REQUEST)) {
+                    $data = $_REQUEST;
+                }
+
+                if (empty($data['Title'])) {
+                    sendJson(['success' => false, 'message' => 'Title is required'], 400);
+                }
+
+                $adminId = $_SESSION['AdminID'] ?? null;
+
+                $pdo->beginTransaction();
+
+                // Insert book
+                $stmt = $pdo->prepare("
+                    INSERT INTO Books (Title, SubTitle, Author1, Author2, Author3, Publisher, 
+                                      Place, Year, Edition, Vol, Pages, ISBN, Subject, Language, 
+                                      DocumentType, CreatedBy)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+
+                $stmt->execute([
+                    $data['Title'],
+                    $data['SubTitle'] ?? null,
+                    $data['Author1'] ?? null,
+                    $data['Author2'] ?? null,
+                    $data['Author3'] ?? null,
+                    $data['Publisher'] ?? null,
+                    $data['Place'] ?? null,
+                    $data['Year'] ?? null,
+                    $data['Edition'] ?? null,
+                    $data['Vol'] ?? null,
+                    $data['Pages'] ?? null,
+                    $data['ISBN'] ?? null,
+                    $data['Subject'] ?? null,
+                    $data['Language'] ?? 'English',
+                    $data['DocumentType'] ?? 'BK',
+                    $adminId
+                ]);
+
+                $catNo = $pdo->lastInsertId();
+
+                // If Holdings table doesn't have QRCode column, add it (safe check)
+                try {
+                    $colCheck = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Holding' AND COLUMN_NAME = 'QRCode'");
+                    $colCheck->execute();
+                    $hasCol = $colCheck->fetch();
+                    if (!$hasCol) {
+                        $pdo->exec("ALTER TABLE Holding ADD COLUMN QRCode VARCHAR(255) NULL AFTER Collection");
+                    }
+                } catch (Exception $e) {
+                    // Non-fatal: if ALTER fails (permissions), continue without storing path in DB
+                }
+
+                // Helper to generate QR PNG binary (in-memory) using generate_qr_png()
+                $generateQrBinary = function($text) {
+                    return generate_qr_png($text);
+                };
+
+                // Insert holdings if provided
+                if (!empty($data['holdings']) && is_array($data['holdings'])) {
+                    $insertSql = "INSERT INTO Holding (AccNo, CatNo, AccDate, ClassNo, BookNo, Status, Location, Section, Collection, QRCode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    $stmt = $pdo->prepare($insertSql);
+
+                    foreach ($data['holdings'] as $idx => $holding) {
+                        // Determine AccNo (use provided or generate)
+                        $accNo = $holding['AccNo'] ?? null;
+                        if (empty($accNo)) {
+                            // Try to generate using helper in includes/functions.php
+                            if (function_exists('generateAccNo')) {
+                                $accNo = generateAccNo($catNo, $idx + 1);
+                            } else {
+                                $accNo = $catNo . '-' . str_pad(($idx + 1), 3, '0', STR_PAD_LEFT);
+                            }
+                        }
+
+                        $accDate = $holding['AccDate'] ?? date('Y-m-d');
+                        $classNo = $holding['ClassNo'] ?? null;
+                        $bookNo = $holding['BookNo'] ?? null;
+                        $status = 'Available';
+                        $location = $holding['Location'] ?? null;
+                        $section = $holding['Section'] ?? null;
+                        $collection = $holding['Collection'] ?? null;
+
+                        // Generate QR binary and insert as BLOB if available
+                        $qrBinary = $generateQrBinary($accNo);
+
+                        // Attempt to store blob when column exists, else store null path
+                        $qrPath = null;
+                        if ($qrBinary !== null) {
+                            try {
+                                // Check for QrCodeImg column
+                                $colCheck2 = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Holding' AND COLUMN_NAME = 'QrCodeImg'");
+                                $colCheck2->execute();
+                                $hasBlobCol = $colCheck2->fetch();
+                                if ($hasBlobCol) {
+                                    $ins = $pdo->prepare("INSERT INTO Holding (AccNo, CatNo, AccDate, ClassNo, BookNo, Status, Location, Section, Collection, QrCodeImg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                    $ins->bindParam(1, $accNo);
+                                    $ins->bindParam(2, $catNo);
+                                    $ins->bindParam(3, $accDate);
+                                    $ins->bindParam(4, $classNo);
+                                    $ins->bindParam(5, $bookNo);
+                                    $ins->bindParam(6, $status);
+                                    $ins->bindParam(7, $location);
+                                    $ins->bindParam(8, $section);
+                                    $ins->bindParam(9, $collection);
+                                    $ins->bindParam(10, $qrBinary, PDO::PARAM_LOB);
+                                    $ins->execute();
+                                    // We've inserted including blob; skip the later insert
+                                    continue;
+                                }
+                            } catch (Exception $e) {
+                                // ignore and fall back to path storage
+                            }
+                        }
+
+                        // Fallback: insert record without blob (store null QRCode path)
+                        $stmt->execute([
+                            $accNo,
+                            $catNo,
+                            $accDate,
+                            $classNo,
+                            $bookNo,
+                            $status,
+                            $location,
+                            $section,
+                            $collection,
+                            $qrPath
+                        ]);
+                    }
+                }
+
+                $pdo->commit();
+
+                // Activity and Audit logs
+                logActivity($pdo, $adminId, 'BOOK_ADD', "Added book: {$data['Title']} (CatNo: {$catNo})");
+                logAudit($pdo, $adminId, 'BOOK_ADD', 'Books', $catNo, [
+                    'Title' => $data['Title'],
+                    'CatNo' => (int)$catNo
+                ]);
+
+                sendJson([
+                    'success' => true,
+                    'message' => 'Book added successfully',
+                    'catNo' => $catNo
+                ]);
+                break;
+
+            case 'lookup':
+                // Lookup holding and book details by Accession Number (AccNo)
+                $accNo = $_GET['accNo'] ?? '';
+                if (!$accNo) {
+                    sendJson(['success' => false, 'message' => 'accNo is required'], 400);
+                }
+                // Use helper to fetch holding with book details
+                $holding = getHoldingByAccNo($pdo, $accNo);
+                if (!$holding) {
+                    sendJson(['success' => false, 'message' => 'Accession not found'], 404);
+                }
+                // If QRCode is a path, attempt to return a web-relative path
+                if (!empty($holding['QRCode']) && is_string($holding['QRCode'])) {
+                    $subjectPath = realpath($holding['QRCode']);
+                    if ($subjectPath === false) { $subjectPath = $holding['QRCode']; }
+                    $holding['QRCodePath'] = str_replace('\\', '/', preg_replace('#^' . preg_quote(realpath(__DIR__ . '/../../'), '#') . '#', '', $subjectPath));
+                }
+                sendJson(['success' => true, 'data' => $holding]);
+                break;
+
+        case 'generate-qr':
+            // Generate QR for a holding (by AccNo) or for a CatNo+copy index
             if ($method !== 'POST') {
                 sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
             }
-            
-            $data = json_decode(file_get_contents('php://input'), true);
-            
-            if (empty($data['Title'])) {
-                sendJson(['success' => false, 'message' => 'Title is required'], 400);
-            }
-            
-            $adminId = $_SESSION['AdminID'] ?? null;
-            
-            $pdo->beginTransaction();
-            
-            // Insert book
-            $stmt = $pdo->prepare("
-                INSERT INTO Books (Title, SubTitle, Author1, Author2, Author3, Publisher, 
-                                  Place, Year, Edition, Vol, Pages, ISBN, Subject, Language, 
-                                  DocumentType, CreatedBy)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            
-            $stmt->execute([
-                $data['Title'],
-                $data['SubTitle'] ?? null,
-                $data['Author1'] ?? null,
-                $data['Author2'] ?? null,
-                $data['Author3'] ?? null,
-                $data['Publisher'] ?? null,
-                $data['Place'] ?? null,
-                $data['Year'] ?? null,
-                $data['Edition'] ?? null,
-                $data['Vol'] ?? null,
-                $data['Pages'] ?? null,
-                $data['ISBN'] ?? null,
-                $data['Subject'] ?? null,
-                $data['Language'] ?? 'English',
-                $data['DocumentType'] ?? 'BK',
-                $adminId
-            ]);
-            
-            $catNo = $pdo->lastInsertId();
-            
-            // Insert holdings if provided
-            if (!empty($data['holdings']) && is_array($data['holdings'])) {
-                $stmt = $pdo->prepare("
-                    INSERT INTO Holding (AccNo, CatNo, AccDate, ClassNo, BookNo, 
-                                        Status, Location, Section, Collection)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                
-                foreach ($data['holdings'] as $holding) {
-                    $stmt->execute([
-                        $holding['AccNo'],
-                        $catNo,
-                        $holding['AccDate'] ?? date('Y-m-d'),
-                        $holding['ClassNo'] ?? null,
-                        $holding['BookNo'] ?? null,
-                        'Available',
-                        $holding['Location'] ?? null,
-                        $holding['Section'] ?? null,
-                        $holding['Collection'] ?? null
-                    ]);
+
+            // Accept JSON or form data
+            $raw = file_get_contents('php://input');
+            $payload = json_decode($raw, true);
+            if (empty($payload) && !empty($_POST)) $payload = $_POST;
+
+            $accNo = $payload['AccNo'] ?? null;
+            $catNo = $payload['CatNo'] ?? null;
+            $copyIndex = $payload['CopyIndex'] ?? null;
+
+            if (!$accNo) {
+                if ($catNo && $copyIndex) {
+                    if (function_exists('generateAccNo')) {
+                        $accNo = generateAccNo($catNo, $copyIndex);
+                    } else {
+                        $accNo = $catNo . '-' . str_pad($copyIndex, 3, '0', STR_PAD_LEFT);
+                    }
+                } else {
+                    sendJson(['success' => false, 'message' => 'AccNo or (CatNo and CopyIndex) required'], 400);
                 }
             }
-            
-            $pdo->commit();
-            
-            logActivity($pdo, $adminId, 'BOOK_ADD', "Added book: {$data['Title']} (CatNo: {$catNo})");
-            
-            sendJson([
-                'success' => true, 
-                'message' => 'Book added successfully',
-                'catNo' => $catNo
+
+            // Generate QR binary in-memory and store into DB (no filesystem dependency)
+            $png = generate_qr_png($accNo);
+            $base64 = $png ? base64_encode($png) : null;
+
+            // Try to update Holding record and write blob
+            $stmt = $pdo->prepare("SELECT * FROM Holding WHERE AccNo = ?");
+            $stmt->execute([$accNo]);
+            $holding = $stmt->fetch();
+            $blobWritten = false;
+            if ($holding && $png !== null) {
+                try {
+                    $colCheck = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Holding' AND COLUMN_NAME = 'QrCodeImg'");
+                    $colCheck->execute();
+                    $hasCol = $colCheck->fetch();
+                    if ($hasCol) {
+                        $upd = $pdo->prepare("UPDATE Holding SET QrCodeImg = ? WHERE AccNo = ?");
+                        $upd->bindParam(1, $png, PDO::PARAM_LOB);
+                        $upd->bindParam(2, $accNo, PDO::PARAM_STR);
+                        $upd->execute();
+                        $blobWritten = true;
+                    }
+                } catch (Exception $e) {
+                    // ignore blob write failures
+                }
+            }
+
+            $adminId = $_SESSION['AdminID'] ?? null;
+            logAudit($pdo, $adminId, 'QR_GENERATE', 'Holding', $accNo, [
+                'blobWritten' => $blobWritten,
+                'hasPng' => $png !== null
             ]);
+
+            sendJson(['success' => true, 'AccNo' => $accNo, 'qrBase64' => $base64]);
+            break;
+
+        case 'qr':
+            // Stream QR binary for download by AccNo (or CatNo+CopyIndex)
+            $accNo = $_GET['accNo'] ?? null;
+            $catNo = $_GET['catNo'] ?? null;
+            $copyIndex = $_GET['copyIndex'] ?? null;
+            if (!$accNo) {
+                if ($catNo && $copyIndex) {
+                    if (function_exists('generateAccNo')) {
+                        $accNo = generateAccNo($catNo, $copyIndex);
+                    } else {
+                        $accNo = $catNo . '-' . str_pad($copyIndex, 3, '0', STR_PAD_LEFT);
+                    }
+                }
+            }
+            if (!$accNo) {
+                sendJson(['success' => false, 'message' => 'accNo is required'], 400);
+            }
+
+            // Try to fetch blob from DB
+            $stmt = $pdo->prepare("SELECT QrCodeImg, QRCode FROM Holding WHERE AccNo = ?");
+            $stmt->execute([$accNo]);
+            $row = $stmt->fetch();
+            if ($row) {
+                if (!empty($row['QrCodeImg'])) {
+                    // Stream binary
+                    $adminId = $_SESSION['AdminID'] ?? null;
+                    logAudit($pdo, $adminId, 'QR_DOWNLOAD', 'Holding', $accNo, ['source' => 'blob']);
+                    header_remove();
+                    header('Content-Type: image/png');
+                    header('Content-Disposition: attachment; filename="qr_' . basename($accNo) . '.png"');
+                    echo $row['QrCodeImg'];
+                    exit;
+                }
+                // Fallback to file path if available
+                if (!empty($row['QRCode']) && file_exists($row['QRCode'])) {
+                    $adminId = $_SESSION['AdminID'] ?? null;
+                    logAudit($pdo, $adminId, 'QR_DOWNLOAD', 'Holding', $accNo, ['source' => 'file']);
+                    header_remove();
+                    header('Content-Type: image/png');
+                    header('Content-Disposition: attachment; filename="qr_' . basename($accNo) . '.png"');
+                    readfile($row['QRCode']);
+                    exit;
+                }
+            }
+
+            sendJson(['success' => false, 'message' => 'QR not found'], 404);
             break;
             
         case 'update':
@@ -217,9 +558,19 @@ try {
                 sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
             }
             
-            $data = json_decode(file_get_contents('php://input'), true);
+            // Accept JSON body or form-encoded/FormData POSTs
+            $raw = file_get_contents('php://input');
+            $data = json_decode($raw, true);
+            if (empty($data) && !empty($_POST)) {
+                // If the client sent FormData (multipart/form-data) or application/x-www-form-urlencoded
+                $data = $_POST;
+            }
+            if (empty($data) && !empty($_REQUEST)) {
+                $data = $_REQUEST;
+            }
+
             $catNo = $data['CatNo'] ?? 0;
-            
+
             if (!$catNo) {
                 sendJson(['success' => false, 'message' => 'Catalog number is required'], 400);
             }
@@ -233,7 +584,7 @@ try {
             ");
             
             $stmt->execute([
-                $data['Title'],
+                $data['Title'] ?? null,
                 $data['SubTitle'] ?? null,
                 $data['Author1'] ?? null,
                 $data['Author2'] ?? null,
@@ -248,6 +599,10 @@ try {
                 $data['Subject'] ?? null,
                 $data['Language'] ?? 'English',
                 $catNo
+            ]);
+            $adminId = $_SESSION['AdminID'] ?? null;
+            logAudit($pdo, $adminId, 'BOOK_UPDATE', 'Books', $catNo, [
+                'updatedFields' => array_keys($data ?? [])
             ]);
             
             sendJson(['success' => true, 'message' => 'Book updated successfully']);
@@ -277,6 +632,11 @@ try {
                 $data['Location'] ?? null,
                 $data['Section'] ?? null,
                 $data['Collection'] ?? null
+            ]);
+
+            $adminId = $_SESSION['AdminID'] ?? null;
+            logAudit($pdo, $adminId, 'HOLDING_ADD', 'Holding', $data['AccNo'] ?? null, [
+                'CatNo' => $data['CatNo'] ?? null
             ]);
             
             sendJson(['success' => true, 'message' => 'Holding added successfully']);
@@ -325,7 +685,7 @@ try {
             $accNo = $data['accNo'] ?? '';
             $status = $data['status'] ?? '';
             
-            $validStatuses = ['Available', 'Issued', 'Damaged', 'Lost', 'Repair'];
+            $validStatuses = ['Available', 'Issued', 'Damaged', 'Lost', 'Repair', 'Reserved'];
             
             if (!in_array($status, $validStatuses)) {
                 sendJson(['success' => false, 'message' => 'Invalid status'], 400);
@@ -333,8 +693,69 @@ try {
             
             $stmt = $pdo->prepare("UPDATE Holding SET Status = ? WHERE AccNo = ?");
             $stmt->execute([$status, $accNo]);
+
+            $adminId = $_SESSION['AdminID'] ?? null;
+            logAudit($pdo, $adminId, 'HOLDING_STATUS_UPDATE', 'Holding', $accNo, [
+                'status' => $status
+            ]);
             
             sendJson(['success' => true, 'message' => 'Status updated successfully']);
+            break;
+
+        case 'update-holding':
+            // Update holding details including AccNo, status, location, section
+            if ($method !== 'POST') {
+                sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
+            }
+            
+            $data = json_decode(file_get_contents('php://input'), true);
+            $originalAccNo = $data['originalAccNo'] ?? '';
+            $newAccNo = $data['newAccNo'] ?? '';
+            $status = $data['status'] ?? '';
+            $location = $data['location'] ?? '';
+            $section = $data['section'] ?? '';
+            
+            if (!$originalAccNo || !$newAccNo) {
+                sendJson(['success' => false, 'message' => 'AccNo is required'], 400);
+            }
+
+            $validStatuses = ['Available', 'Issued', 'Damaged', 'Lost', 'Repair', 'Reserved'];
+            if ($status && !in_array($status, $validStatuses)) {
+                sendJson(['success' => false, 'message' => 'Invalid status'], 400);
+            }
+
+            try {
+                $pdo->beginTransaction();
+
+                // Check if new AccNo already exists (if changed)
+                if ($newAccNo !== $originalAccNo) {
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM Holding WHERE AccNo = ?");
+                    $stmt->execute([$newAccNo]);
+                    if ($stmt->fetchColumn() > 0) {
+                        throw new Exception('AccNo already exists. Please use a unique value.');
+                    }
+                }
+
+                // Update holding
+                $stmt = $pdo->prepare("UPDATE Holding SET AccNo = ?, Status = ?, Location = ?, Section = ? WHERE AccNo = ?");
+                $stmt->execute([$newAccNo, $status, $location, $section, $originalAccNo]);
+
+                $pdo->commit();
+
+                $adminId = $_SESSION['AdminID'] ?? null;
+                logAudit($pdo, $adminId, 'HOLDING_UPDATE', 'Holding', $newAccNo, [
+                    'originalAccNo' => $originalAccNo,
+                    'newAccNo' => $newAccNo,
+                    'status' => $status,
+                    'location' => $location,
+                    'section' => $section
+                ]);
+
+                sendJson(['success' => true, 'message' => 'Holding updated successfully']);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                sendJson(['success' => false, 'message' => $e->getMessage()], 400);
+            }
             break;
             
         case 'delete':
@@ -357,6 +778,9 @@ try {
             
             $stmt = $pdo->prepare("DELETE FROM Books WHERE CatNo = ?");
             $stmt->execute([$catNo]);
+
+            $adminId = $_SESSION['AdminID'] ?? null;
+            logAudit($pdo, $adminId, 'BOOK_DELETE', 'Books', $catNo, null);
             
             sendJson(['success' => true, 'message' => 'Book deleted successfully']);
             break;

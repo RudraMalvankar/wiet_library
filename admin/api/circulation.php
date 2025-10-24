@@ -215,29 +215,38 @@ try {
             break;
             
         case 'stats':
-            // Get circulation statistics
-            $stats = [];
+            // Get circulation statistics for dashboard cards
+            $today = date('Y-m-d');
             
-            // Today's issues
-            $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM Circulation WHERE DATE(DateAdded) = CURDATE()");
+            // Books Currently Issued (Active Circulations)
+            $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM Circulation WHERE Status = 'Active'");
             $stmt->execute();
-            $stats['todayIssues'] = $stmt->fetch()['count'];
+            $totalIssued = (int)$stmt->fetchColumn();
             
-            // Today's returns
-            $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM `Return` WHERE ReturnDate = CURDATE()");
-            $stmt->execute();
-            $stats['todayReturns'] = $stmt->fetch()['count'];
+            // Due Today
+            $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM Circulation WHERE Status = 'Active' AND DueDate = ?");
+            $stmt->execute([$today]);
+            $dueToday = (int)$stmt->fetchColumn();
             
-            // Active circulations
-            $stmt = $pdo->query("SELECT COUNT(*) as count FROM Circulation WHERE Status = 'Active'");
-            $stats['activeCirculations'] = $stmt->fetch()['count'];
+            // Overdue Books
+            $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM Circulation WHERE Status = 'Active' AND DueDate < ?");
+            $stmt->execute([$today]);
+            $overdue = (int)$stmt->fetchColumn();
             
-            // Overdue books
-            $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM Circulation WHERE Status = 'Active' AND DueDate < CURDATE()");
-            $stmt->execute();
-            $stats['overdueBooks'] = $stmt->fetch()['count'];
+            // Today's Returns
+            $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM `Return` WHERE ReturnDate = ?");
+            $stmt->execute([$today]);
+            $todayReturns = (int)$stmt->fetchColumn();
             
-            sendJson(['success' => true, 'data' => $stats]);
+            sendJson([
+                'success' => true,
+                'data' => [
+                    'totalIssued' => $totalIssued,
+                    'dueToday' => $dueToday,
+                    'overdue' => $overdue,
+                    'todayReturns' => $todayReturns
+                ]
+            ]);
             break;
             
         default:

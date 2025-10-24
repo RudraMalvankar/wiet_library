@@ -588,6 +588,10 @@ $sampleReturns = [
             <i class="fas fa-exchange-alt"></i>
             Circulation Management
         </h1>
+        <button class="btn btn-success" onclick="openQuickScan()" style="padding:10px 20px;">
+            <i class="fas fa-qrcode"></i>
+            Quick Scan (Ctrl+K)
+        </button>
     </div>
 
     <!-- Statistics Cards -->
@@ -613,19 +617,19 @@ $sampleReturns = [
     <!-- Tabs -->
     <div class="tabs-container">
         <div class="tab-buttons">
-            <button class="tab-btn active" onclick="showTab('issue')">
+            <button class="tab-btn active" data-tab="issue" onclick="showTab('issue')">
                 <i class="fas fa-plus-circle"></i>
                 Issue Books
             </button>
-            <button class="tab-btn" onclick="showTab('return')">
+            <button class="tab-btn" data-tab="return" onclick="showTab('return')">
                 <i class="fas fa-undo"></i>
                 Return Books
             </button>
-            <button class="tab-btn" onclick="showTab('active')">
+            <button class="tab-btn" data-tab="active" onclick="showTab('active')">
                 <i class="fas fa-list"></i>
                 Active Circulations
             </button>
-            <button class="tab-btn" onclick="showTab('history')">
+            <button class="tab-btn" data-tab="history" onclick="showTab('history')">
                 <i class="fas fa-history"></i>
                 Return History
             </button>
@@ -1060,54 +1064,40 @@ $sampleReturns = [
         let selectedBook = null;
         let returnBookData = null;
 
-        // Tab functionality
+        // Tab switching function
         function showTab(tabName) {
-            console.log('Switching to tab:', tabName); // Debug log
-            
-            // Hide all tab contents
-            var tabContents = document.getElementsByClassName('tab-content');
-            for (var i = 0; i < tabContents.length; i++) {
-                tabContents[i].classList.remove('active');
+            // Hide all tabs
+            var tabs = document.querySelectorAll('.tab-content');
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].style.display = 'none';
+                tabs[i].classList.remove('active');
             }
             
-            // Remove active class from all tab buttons
-            var tabButtons = document.getElementsByClassName('tab-btn');
-            for (var i = 0; i < tabButtons.length; i++) {
-                tabButtons[i].classList.remove('active');
+            // Remove active from all buttons
+            var buttons = document.querySelectorAll('.tab-btn');
+            for (var i = 0; i < buttons.length; i++) {
+                buttons[i].classList.remove('active');
             }
-
-            // Show selected tab content
+            
+            // Show selected tab
             var selectedTab = document.getElementById(tabName);
             if (selectedTab) {
+                selectedTab.style.display = 'block';
                 selectedTab.classList.add('active');
-                console.log('Tab content activated:', tabName);
-            } else {
-                console.log('Tab not found:', tabName);
             }
             
-            // Add active class to clicked button based on tabName
-            var buttonToActivate = null;
-            switch(tabName) {
-                case 'issue':
-                    buttonToActivate = document.querySelector('button[onclick="showTab(\'issue\')"]');
-                    break;
-                case 'return':
-                    buttonToActivate = document.querySelector('button[onclick="showTab(\'return\')"]');
-                    break;
-                case 'active':
-                    buttonToActivate = document.querySelector('button[onclick="showTab(\'active\')"]');
-                    break;
-                case 'history':
-                    buttonToActivate = document.querySelector('button[onclick="showTab(\'history\')"]');
-                    break;
+            // Activate button
+            var activeButton = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
+            if (activeButton) {
+                activeButton.classList.add('active');
             }
             
-            if (buttonToActivate) {
-                buttonToActivate.classList.add('active');
-                console.log('Button activated for tab:', tabName);
+            // Load content
+            if (tabName === 'active') {
+                loadActiveCirculations();
+            } else if (tabName === 'history') {
+                loadReturnHistory();
             }
-
-            loadTabContent(tabName);
         }
 
         function loadTabContent(tabName) {
@@ -1131,29 +1121,36 @@ $sampleReturns = [
         }
 
         async function searchMember() {
-            const memberNo = document.getElementById('memberNo').value;
+            const memberNo = document.getElementById('memberNo').value.trim();
+            
+            if (!memberNo) {
+                showScanError('memberScanError', 'Please enter a Member Number');
+                return;
+            }
             
             try {
-                const response = await fetch(`api/members.php?action=get&id=${memberNo}`);
+                const response = await fetch(`api/members.php?action=get&memberNo=${encodeURIComponent(memberNo)}`);
                 const result = await response.json();
 
                 if (result.success && result.data) {
                     const member = result.data;
                     selectedMember = member;
-                    document.getElementById('memberName').textContent = member.MemberName;
+                    document.getElementById('memberName').textContent = member.MemberName || 'N/A';
                     document.getElementById('memberNumber').textContent = member.MemberNo;
-                    document.getElementById('memberGroup').textContent = member.Group;
+                    document.getElementById('memberGroup').textContent = member.Group || 'N/A';
                     document.getElementById('memberBooks').textContent = member.BooksIssued || 0;
                     document.getElementById('memberInfo').classList.add('show');
+                    showScanResult('memberScanResult', `✓ Member found: ${member.MemberName}`);
                     checkIssueFormComplete();
                 } else {
-                    alert('Member not found!');
+                    showScanError('memberScanError', `Member ${memberNo} not found!`);
                     selectedMember = null;
                     document.getElementById('memberInfo').classList.remove('show');
                 }
             } catch (error) {
                 console.error('Error searching member:', error);
-                alert('Error searching member. Please try again.');
+                showScanError('memberScanError', 'Error searching member. Please try again.');
+                document.getElementById('memberInfo').classList.remove('show');
             }
         }
 
@@ -1166,10 +1163,15 @@ $sampleReturns = [
         }
 
         async function searchBook() {
-            const accNo = document.getElementById('accNo').value;
+            const accNo = document.getElementById('accNo').value.trim();
+            
+            if (!accNo) {
+                showScanError('bookScanError', 'Please enter an Accession Number');
+                return;
+            }
             
             try {
-                const response = await fetch(`api/books.php?action=get&acc_no=${accNo}`);
+                const response = await fetch(`api/books.php?action=lookup&accNo=${encodeURIComponent(accNo)}`);
                 const result = await response.json();
 
                 if (result.success && result.data) {
@@ -1177,25 +1179,27 @@ $sampleReturns = [
                     
                     if (book.Status === 'Available') {
                         selectedBook = book;
-                        document.getElementById('bookTitle').textContent = book.Title;
-                        document.getElementById('bookAuthor').textContent = book.Author1;
+                        document.getElementById('bookTitle').textContent = book.Title || 'Unknown';
+                        document.getElementById('bookAuthor').textContent = book.Author1 || 'N/A';
                         document.getElementById('bookAccNo').textContent = book.AccNo;
                         document.getElementById('bookLocation').textContent = book.Location || 'Library';
                         document.getElementById('bookInfo').classList.add('show');
+                        showScanResult('bookScanResult', `✓ Book available: ${book.Title}`);
                         checkIssueFormComplete();
                     } else {
-                        alert('Book is not available for issue!');
+                        showScanError('bookScanError', `Book is not available for issue! Current status: ${book.Status}`);
                         selectedBook = null;
                         document.getElementById('bookInfo').classList.remove('show');
                     }
                 } else {
-                    alert('Book not found!');
+                    showScanError('bookScanError', `Book with AccNo ${accNo} not found!`);
                     selectedBook = null;
                     document.getElementById('bookInfo').classList.remove('show');
                 }
             } catch (error) {
                 console.error('Error searching book:', error);
-                alert('Error searching book. Please try again.');
+                showScanError('bookScanError', 'Error searching book. Please try again.');
+                document.getElementById('bookInfo').classList.remove('show');
             }
         }
 
@@ -1209,24 +1213,34 @@ $sampleReturns = [
         }
 
         async function issueBook() {
-            if (!selectedMember || !selectedBook) return;
+            if (!selectedMember || !selectedBook) {
+                alert('Please select both a member and a book');
+                return;
+            }
 
             const issueDate = document.getElementById('issueDate').value;
             const dueDate = document.getElementById('dueDate').value;
             const remarks = document.getElementById('remarks').value;
 
+            if (!issueDate || !dueDate) {
+                alert('Please enter issue date and due date');
+                return;
+            }
+
             // Call API to issue book
             try {
-                const formData = new FormData();
-                formData.append('member_no', selectedMember.MemberNo);
-                formData.append('acc_no', selectedBook.AccNo);
-                formData.append('issue_date', issueDate);
-                formData.append('due_date', dueDate);
-                formData.append('remarks', remarks);
-
                 const response = await fetch('api/circulation.php?action=issue', {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        memberNo: selectedMember.MemberNo,
+                        accNo: selectedBook.AccNo,
+                        issueDate: issueDate,
+                        dueDate: dueDate,
+                        remarks: remarks
+                    })
                 });
 
                 const result = await response.json();
@@ -1234,6 +1248,7 @@ $sampleReturns = [
                 if (result.success) {
                     alert(`Book issued successfully!\n\nMember: ${selectedMember.MemberName}\nBook: ${selectedBook.Title}\nDue Date: ${dueDate}`);
                     resetIssueForm();
+                    loadStatistics(); // Refresh stats
                     loadActiveCirculations(); // Refresh the list
                 } else {
                     alert('Error: ' + result.message);
@@ -1265,7 +1280,12 @@ $sampleReturns = [
         }
 
         async function searchReturnBook() {
-            const accNo = document.getElementById('returnAccNo').value;
+            const accNo = document.getElementById('returnAccNo').value.trim();
+            
+            if (!accNo) {
+                showScanError('returnScanError', 'Please enter an Accession Number');
+                return;
+            }
             
             try {
                 // Get active circulation for this accession number
@@ -1277,8 +1297,8 @@ $sampleReturns = [
 
                     if (circulation) {
                         returnBookData = circulation;
-                        document.getElementById('returnBookTitle').textContent = circulation.Title;
-                        document.getElementById('returnMemberName').textContent = circulation.MemberName;
+                        document.getElementById('returnBookTitle').textContent = circulation.Title || 'Unknown';
+                        document.getElementById('returnMemberName').textContent = circulation.MemberName || 'N/A';
                         document.getElementById('returnIssueDate').textContent = circulation.IssueDate;
                         document.getElementById('returnDueDate').textContent = circulation.DueDate;
 
@@ -1296,57 +1316,68 @@ $sampleReturns = [
                             document.getElementById('fineOverdueDays').textContent = overdueDays;
                             document.getElementById('totalFine').textContent = totalFine.toFixed(2);
                             document.getElementById('fineCalculator').classList.add('show');
+                            showScanError('returnScanError', `⚠️ Book is overdue by ${overdueDays} days. Fine: ₹${totalFine.toFixed(2)}`);
                         } else {
                             document.getElementById('fineCalculator').classList.remove('show');
+                            showScanResult('returnScanResult', `✓ Circulation found: ${circulation.Title}`);
                         }
 
                         document.getElementById('returnBtn').disabled = false;
                     } else {
-                        alert('No active circulation found for this book!');
+                        showScanError('returnScanError', `No active circulation found for AccNo: ${accNo}`);
                         returnBookData = null;
-                        document.getElementById('returnBookInfo').classList.remove('show');
+                        returnBookInfo.classList.remove('show');
                         document.getElementById('fineCalculator').classList.remove('show');
                         document.getElementById('returnBtn').disabled = true;
                     }
                 } else {
-                    alert('No active circulation found for this book!');
+                    showScanError('returnScanError', 'Unable to fetch active circulations. Please try again.');
                     returnBookData = null;
-                    document.getElementById('returnBookInfo').classList.remove('show');
+                    returnBookInfo.classList.remove('show');
                     document.getElementById('fineCalculator').classList.remove('show');
                     document.getElementById('returnBtn').disabled = true;
                 }
             } catch (error) {
                 console.error('Error searching return book:', error);
-                alert('Error searching for book circulation. Please try again.');
+                showScanError('returnScanError', 'Error searching for book circulation. Please try again.');
+                returnBookInfo.classList.remove('show');
+                document.getElementById('fineCalculator').classList.remove('show');
+                document.getElementById('returnBtn').disabled = true;
             }
         }
 
         async function returnBook() {
-            if (!returnBookData) return;
+            if (!returnBookData) {
+                alert('Please scan a book to return');
+                return;
+            }
 
             const condition = document.getElementById('returnCondition').value;
             const remarks = document.getElementById('returnRemarks').value;
-            const fineAmount = document.getElementById('totalFine').textContent || '0';
+            const fineAmount = parseFloat(document.getElementById('totalFine').textContent || '0');
 
             // Call API to return book
             try {
-                const formData = new FormData();
-                formData.append('circulation_id', returnBookData.CirculationID);
-                formData.append('return_date', new Date().toISOString().split('T')[0]);
-                formData.append('condition', condition);
-                formData.append('remarks', remarks);
-                formData.append('fine_amount', fineAmount);
-
                 const response = await fetch('api/circulation.php?action=return', {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        circulationId: returnBookData.CirculationID,
+                        returnDate: new Date().toISOString().split('T')[0],
+                        condition: condition,
+                        remarks: remarks,
+                        fineAmount: fineAmount
+                    })
                 });
 
                 const result = await response.json();
 
                 if (result.success) {
-                    alert(`Book returned successfully!\n\nBook: ${returnBookData.Title}\nMember: ${returnBookData.MemberName}\nFine: ₹${fineAmount}`);
+                    alert(`Book returned successfully!\n\nBook: ${returnBookData.Title}\nMember: ${returnBookData.MemberName}\nFine: ₹${fineAmount.toFixed(2)}`);
                     resetReturnForm();
+                    loadStatistics(); // Refresh stats
                     loadActiveCirculations(); // Refresh the list
                     loadReturnHistory(); // Refresh returns
                 } else {
@@ -1491,19 +1522,23 @@ $sampleReturns = [
             loadReturnHistory();
         }
 
-        // Load Statistics
+        // Load Statistics from API
         function loadStatistics() {
-            const circulations = <?php echo json_encode($sampleCirculations); ?>;
-            const totalIssued = circulations.length;
-            const dueToday = circulations.filter(c => c.DaysLeft === 0).length;
-            const overdue = circulations.filter(c => c.Status === 'Overdue').length;
-            const todayReturns = <?php echo json_encode($sampleReturns); ?>.filter(r =>
-                new Date(r.ReturnDate).toDateString() === new Date().toDateString()
-            ).length;
-
-            document.getElementById('totalIssued').textContent = totalIssued;
-            document.getElementById('dueToday').textContent = dueToday;
-            document.getElementById('overdue').textContent = overdue;
+            fetch('api/circulation.php?action=stats')
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success && result.data) {
+                        document.getElementById('totalIssued').textContent = result.data.totalIssued || 0;
+                        document.getElementById('dueToday').textContent = result.data.dueToday || 0;
+                        document.getElementById('overdue').textContent = result.data.overdue || 0;
+                        document.getElementById('todayReturns').textContent = result.data.todayReturns || 0;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading circulation stats:', err);
+                    document.getElementById('totalIssued').textContent = '0';
+                    document.getElementById('dueToday').textContent = '0';
+                    document.getElementById('overdue').textContent = '0';
             document.getElementById('todayReturns').textContent = todayReturns;
         }
 
@@ -1831,19 +1866,18 @@ $sampleReturns = [
         }
 
         // Clean up streams when tab changes
-        function showTab(tabName) {
-            // Stop all active streams when switching tabs
-            stopMemberScan();
-            stopBookScan();
-            stopReturnScan();
-
-            // ...existing code...
-        }
-
         // Initialize everything when page loads
         document.addEventListener('DOMContentLoaded', function() {
             // Initialize code readers
             initializeCodeReaders();
+
+            // Load statistics and data
+            loadStatistics();
+            loadActiveCirculations();
+            loadReturnHistory();
+
+            // Refresh stats every 30 seconds
+            setInterval(loadStatistics, 30000);
 
             // ...existing code...
         });
@@ -1856,6 +1890,158 @@ $sampleReturns = [
         });
 
         // ...existing code...
+    </script>
+
+    <!-- Quick Scan Modal -->
+    <div id="quickScanModal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-qrcode"></i>
+                    Quick Scan Lookup
+                </h3>
+                <button class="close" onclick="closeQuickScan()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="quickScanInput">Scan or Enter Accession Number (AccNo)</label>
+                    <input type="text" id="quickScanInput" class="form-control" placeholder="Scan QR or enter AccNo..." 
+                           style="font-size:18px; padding:12px;" autofocus>
+                    <small style="color:#6c757d; display:block; margin-top:8px;">
+                        <i class="fas fa-info-circle"></i> Focus this field and scan the QR code, or type manually
+                    </small>
+                </div>
+                
+                <div id="quickScanResult" style="margin-top:20px; display:none;">
+                    <div class="info-header" style="background:#f8f9fa; padding:12px; border-radius:8px; margin-bottom:12px;">
+                        <strong style="color:#263c79;">Holding Details</strong>
+                    </div>
+                    <div id="quickScanDetails" style="padding:0 12px;"></div>
+                    <div style="margin-top:20px; text-align:right;">
+                        <button type="button" class="btn btn-secondary" onclick="closeQuickScan()">Close</button>
+                        <button type="button" class="btn btn-success" onclick="quickIssue()" id="quickIssueBtn" style="display:none;">
+                            <i class="fas fa-check"></i> Issue Book
+                        </button>
+                        <button type="button" class="btn btn-warning" onclick="quickReturn()" id="quickReturnBtn" style="display:none;">
+                            <i class="fas fa-undo"></i> Return Book
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="quickScanError" style="margin-top:20px; padding:12px; background:#f8d7da; color:#721c24; border-radius:8px; display:none;">
+                    <i class="fas fa-exclamation-triangle"></i> <span id="quickScanErrorText"></span>
+                </div>
+                
+                <div id="quickScanLoading" style="text-align:center; margin-top:20px; display:none;">
+                    <i class="fas fa-spinner fa-spin" style="font-size:24px; color:#263c79;"></i>
+                    <p style="margin-top:10px; color:#6c757d;">Looking up...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Quick Scan Modal Functions
+        function openQuickScan() {
+            document.getElementById('quickScanModal').style.display = 'flex';
+            document.getElementById('quickScanInput').value = '';
+            document.getElementById('quickScanResult').style.display = 'none';
+            document.getElementById('quickScanError').style.display = 'none';
+            document.getElementById('quickScanInput').focus();
+        }
+
+        function closeQuickScan() {
+            document.getElementById('quickScanModal').style.display = 'none';
+        }
+
+        // Listen for Enter key or barcode scanner input
+        document.addEventListener('DOMContentLoaded', function() {
+            const input = document.getElementById('quickScanInput');
+            if (input) {
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        lookupAccNo();
+                    }
+                });
+            }
+        });
+
+        function lookupAccNo() {
+            const accNo = document.getElementById('quickScanInput').value.trim();
+            if (!accNo) return;
+
+            document.getElementById('quickScanLoading').style.display = 'block';
+            document.getElementById('quickScanResult').style.display = 'none';
+            document.getElementById('quickScanError').style.display = 'none';
+
+            fetch(`api/books.php?action=lookup&accNo=${encodeURIComponent(accNo)}`)
+                .then(res => res.json())
+                .then(result => {
+                    document.getElementById('quickScanLoading').style.display = 'none';
+                    
+                    if (result.success && result.data) {
+                        const h = result.data;
+                        let html = `
+                            <div style="margin-bottom:10px;"><strong>AccNo:</strong> ${escapeHtml(h.AccNo || '')}</div>
+                            <div style="margin-bottom:10px;"><strong>Book:</strong> ${escapeHtml(h.Title || 'Unknown')}</div>
+                            <div style="margin-bottom:10px;"><strong>Author:</strong> ${escapeHtml(h.Author1 || 'Unknown')}</div>
+                            <div style="margin-bottom:10px;"><strong>Publisher:</strong> ${escapeHtml(h.Publisher || 'N/A')} (${h.Year || 'N/A'})</div>
+                            <div style="margin-bottom:10px;"><strong>Status:</strong> <span class="status-badge status-${(h.Status || 'available').toLowerCase()}">${escapeHtml(h.Status || 'Unknown')}</span></div>
+                            <div style="margin-bottom:10px;"><strong>Location:</strong> ${escapeHtml(h.Location || 'N/A')}</div>
+                        `;
+                        
+                        document.getElementById('quickScanDetails').innerHTML = html;
+                        document.getElementById('quickScanResult').style.display = 'block';
+                        
+                        // Show action buttons based on status
+                        document.getElementById('quickIssueBtn').style.display = (h.Status === 'Available') ? 'inline-block' : 'none';
+                        document.getElementById('quickReturnBtn').style.display = (h.Status === 'Issued') ? 'inline-block' : 'none';
+                        
+                        // Store for quick actions
+                        window.currentQuickAccNo = accNo;
+                        window.currentQuickHolding = h;
+                    } else {
+                        document.getElementById('quickScanError').style.display = 'block';
+                        document.getElementById('quickScanErrorText').textContent = result.message || 'Accession number not found';
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('quickScanLoading').style.display = 'none';
+                    document.getElementById('quickScanError').style.display = 'block';
+                    document.getElementById('quickScanErrorText').textContent = 'Error: ' + err.message;
+                });
+        }
+
+        function quickIssue() {
+            closeQuickScan();
+            // Switch to Issue tab and pre-fill AccNo
+            showTab('issue');
+            document.getElementById('accNo').value = window.currentQuickAccNo || '';
+            searchBook();
+        }
+
+        function quickReturn() {
+            closeQuickScan();
+            // Switch to Return tab and pre-fill AccNo
+            showTab('return');
+            document.getElementById('returnAccNo').value = window.currentQuickAccNo || '';
+            searchReturnBook();
+        }
+
+        function escapeHtml(text) {
+            if (typeof text !== 'string' && typeof text !== 'number') return '';
+            return String(text).replace(/[&<>"']/g, function (c) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c];
+            });
+        }
+
+        // Global keyboard shortcut: Ctrl+K to open quick scan
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'k') {
+                e.preventDefault();
+                openQuickScan();
+            }
+        });
     </script>
 </body>
 

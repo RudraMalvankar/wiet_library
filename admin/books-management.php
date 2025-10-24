@@ -453,30 +453,35 @@ if (!function_exists('generateQR')) {
             color: #721c24;
         }
 
-        /* Modal Styles */
+        /* Modal Styles (improved: centered, fits viewport, accessible) */
         .modal {
-            display: none;
+            display: none; /* shown by JS by setting display:block */
             position: fixed;
-            z-index: 1000;
+            z-index: 110000;
             left: 0;
             top: 0;
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            box-sizing: border-box;
+            overflow: auto;
         }
 
         .modal-content {
             background-color: white;
-            margin: 5% auto;
             padding: 0;
             border-radius: 8px;
-            width: 90%;
-            max-width: 800px;
-            max-height: 85vh;
+            width: 100%;
+            max-width: 900px;
+            max-height: calc(100vh - 120px);
             overflow-y: auto;
-            margin-top: 160px;
             position: relative;
-            z-index: 1001;
+            z-index: 110001;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
         }
 
         .modal-header {
@@ -766,6 +771,35 @@ if (!function_exists('generateQR')) {
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
+        /* QR Lightbox */
+        .qr-lightbox {
+            display: none;
+            position: fixed;
+            z-index: 120000;
+            left: 0; top: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            align-items: center;
+            justify-content: center;
+        }
+        .qr-lightbox.open { display:flex; }
+        .qr-lightbox-content {
+            max-width: 90vw;
+            max-height: 90vh;
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            display:flex; align-items:center; justify-content:center;
+        }
+        .qr-lightbox-content img { max-width: 100%; max-height: 80vh; }
+        .qr-lightbox-close {
+            position: absolute; top: 14px; right: 20px; color: white; font-size: 24px; cursor: pointer;
+        }
+
+        /* Small spinner for inline status */
+        .inline-spinner { display:inline-block; width:18px; height:18px; border:3px solid rgba(0,0,0,0.1); border-top-color:#263c79; border-radius:50%; animation:spin 0.8s linear infinite; vertical-align:middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         .section-title {
             font-size: 18px;
             font-weight: 600;
@@ -867,192 +901,11 @@ if (!function_exists('generateQR')) {
     </div>
 
     <!-- Inline Add Book Form (Advanced) -->
-    <div class="form-section" style="margin-bottom:30px;">
-        <form id="addBookForm" onsubmit="saveBook(); return false;">
-            <div class="section-title">Add New Book</div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="bookTitle">Title <span class="required">*</span></label>
-                    <input type="text" id="bookTitle" name="Title" required>
-                </div>
-                <div class="form-group-modal">
-                    <label for="bookSubTitle">Sub Title</label>
-                    <input type="text" id="bookSubTitle" name="SubTitle">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="bookVarTitle">Variant Title</label>
-                    <input type="text" id="bookVarTitle" name="VarTitle">
-                </div>
-                <div class="form-group-modal">
-                    <label for="bookFormat">Format</label>
-                    <select id="bookFormat" name="Format">
-                        <option value="Book">Book</option>
-                        <option value="Journal">Journal</option>
-                        <option value="Magazine">Magazine</option>
-                        <option value="Thesis">Thesis</option>
-                        <option value="Report">Report</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="bookAuthor1">Primary Author <span class="required">*</span></label>
-                    <input type="text" id="bookAuthor1" name="Author1" required>
-                </div>
-                <div class="form-group-modal">
-                    <label for="bookAuthor2">Secondary Author</label>
-                    <input type="text" id="bookAuthor2" name="Author2">
-                </div>
-                <div class="form-group-modal">
-                    <label for="bookAuthor3">Third Author</label>
-                    <input type="text" id="bookAuthor3" name="Author3">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="bookCorpAuthor">Corporate Author</label>
-                    <input type="text" id="bookCorpAuthor" name="CorpAuthor">
-                </div>
-                <div class="form-group-modal">
-                    <label for="bookEditors">Editors</label>
-                    <input type="text" id="bookEditors" name="Editors">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="bookISBN">ISBN</label>
-                    <input type="text" id="bookISBN" name="ISBN" placeholder="978-0-123456-78-9">
-                </div>
-                <div class="form-group-modal">
-                    <label for="bookLanguage">Language</label>
-                    <select id="bookLanguage" name="Language">
-                        <option value="English">English</option>
-                        <option value="Hindi">Hindi</option>
-                        <option value="Marathi">Marathi</option>
-                        <option value="Sanskrit">Sanskrit</option>
-                        <option value="French">French</option>
-                        <option value="German">German</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="bookPublisher">Publisher</label>
-                    <input type="text" id="bookPublisher" name="Publisher">
-                </div>
-                <div class="form-group-modal">
-                    <label for="bookPlace">Place of Publication</label>
-                    <input type="text" id="bookPlace" name="Place">
-                </div>
-                <div class="form-group-modal">
-                    <label for="bookYear">Publication Year</label>
-                    <input type="number" id="bookYear" name="Year" min="1900" max="2030">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="bookSubject">Subject</label>
-                    <input type="text" id="bookSubject" name="Subject">
-                </div>
-                <div class="form-group-modal">
-                    <label for="bookEdition">Edition</label>
-                    <input type="text" id="bookEdition" name="Edition">
-                </div>
-                <div class="form-group-modal">
-                    <label for="bookVol">Volume</label>
-                    <input type="text" id="bookVol" name="Vol">
-                </div>
-                <div class="form-group-modal">
-                    <label for="bookPages">Pages</label>
-                    <input type="number" id="bookPages" name="Pages" min="1">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="numCopies">Number of Copies</label>
-                    <input type="number" id="numCopies" name="numCopies" min="1" value="1" onchange="renderHoldingsSection()">
-                </div>
-            </div>
-            <div id="holdingsSection"></div>
-            <div class="form-row">
-                <button type="button" class="btn btn-link" onclick="toggleAcquisitionSection()">Acquisition Details</button>
-            </div>
-            <div id="acquisitionSection" style="display:none; border:1px solid #eee; padding:15px; margin-bottom:10px; border-radius:6px; background:#faf9f6;">
-                <div class="form-row">
-                    <div class="form-group-modal">
-                        <label for="acqSupplier">Supplier</label>
-                        <input type="text" id="acqSupplier" name="Supplier">
-                    </div>
-                    <div class="form-group-modal">
-                        <label for="acqInvoiceNo">Invoice No</label>
-                        <input type="text" id="acqInvoiceNo" name="InvoiceNo">
-                    </div>
-                    <div class="form-group-modal">
-                        <label for="acqInvoiceDate">Invoice Date</label>
-                        <input type="date" id="acqInvoiceDate" name="InvoiceDate">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group-modal">
-                        <label for="acqOrderNo">Order No</label>
-                        <input type="text" id="acqOrderNo" name="OrderNo">
-                    </div>
-                    <div class="form-group-modal">
-                        <label for="acqOrderDate">Order Date</label>
-                        <input type="date" id="acqOrderDate" name="OrderDate">
-                    </div>
-                    <div class="form-group-modal">
-                        <label for="acqReceivedDate">Received Date</label>
-                        <input type="date" id="acqReceivedDate" name="ReceivedDate">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group-modal">
-                        <label for="acqQuantity">Quantity</label>
-                        <input type="number" id="acqQuantity" name="Quantity" min="1">
-                    </div>
-                    <div class="form-group-modal">
-                        <label for="acqTotalCost">Total Cost</label>
-                        <input type="number" id="acqTotalCost" name="TotalCost" min="0" step="0.01">
-                    </div>
-                </div>
-            </div>
-            <div class="form-actions" style="justify-content:flex-start;">
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-paper-plane"></i>
-                    Add New Book
-                </button>
-            </div>
-        </form>
-    </div>
+    
 
     <!-- Remove duplicate tabs-container and content blocks -->
 
-    <!-- Add Book Modal -->
-    <!-- Tabs -->
-    
-    <div id="addBookModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">Add New Book</h3>
-                <button class="close" onclick="closeModal('addBookModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="addBookForm">
-                    <div class="form-row">
-                        <div class="form-group-modal">
-                            <label for="bookTitle">Title *</label>
-                            <input type="text" id="bookTitle" name="Title" required>
-                        </div>
-                        <div class="form-group-modal">
-                            <label for="bookSubTitle">Sub Title</label>
-                            <input type="text" id="bookSubTitle" name="SubTitle">
-                        </div>
-                    </div>
-
+    <!-- duplicate Add Book modal removed (inline form is used) -->
                     <div class="form-row">
                         <div class="form-group-modal">
                             <label for="bookVarTitle">Variant Title</label>
@@ -1306,8 +1159,8 @@ if (!function_exists('generateQR')) {
         </div>
     </div>
 
-    <!-- Add Book Modal -->
-    <div id="addBookModal" class="modal">
+                <!-- Add Book Modal -->
+    <div id="addBookModal" class="modal" style="display:none;">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title">Add New Book</h3>
@@ -1481,7 +1334,7 @@ if (!function_exists('generateQR')) {
                 </form>
             </div>
         </div>
-    </div>
+    </div> 
 
     <!-- Book Details/Edit Modal -->
             <div id="bookDetailsModal" class="modal" style="display:none; align-items:center; justify-content:center; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1000; background:rgba(0,0,0,0.5);">
@@ -1556,6 +1409,17 @@ if (!function_exists('generateQR')) {
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('bulkImportModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Lightbox -->
+    <div id="qrLightbox" class="qr-lightbox" onclick="closeQrLightbox(event)">
+        <div class="qr-lightbox-close" onclick="closeQrLightbox(event)">&times;</div>
+        <div class="qr-lightbox-content">
+            <img id="qrLightboxImg" src="" alt="QR code" />
+            <div style="margin-top:10px; text-align:center;">
+                <a id="qrLightboxDownload" class="btn btn-sm btn-success" href="#" download>Download</a>
             </div>
         </div>
     </div>
@@ -1875,10 +1739,42 @@ if (!function_exists('generateQR')) {
             document.getElementById('reportsContent').innerHTML = reportsHTML;
         }
 
-        // Modal functions
+        // Modal / UI functions
+        // The Add Book form exists inline on the page; don't open a modal for adding.
         function openAddBookModal() {
-            document.getElementById('addBookModal').style.display = 'block';
+            // Scroll to the inline Add Book form and focus the first input
+            const inlineForm = document.getElementById('addBookForm');
+            if (inlineForm) {
+                inlineForm.scrollIntoView({behavior:'smooth', block:'center'});
+                const firstInput = inlineForm.querySelector('input, select, textarea, button');
+                if (firstInput) firstInput.focus();
+            } else {
+                // fallback to modal if inline not present
+                const m = document.getElementById('addBookModal');
+                if (m) m.style.display = 'flex';
+            }
         }
+
+        // Toggle acquisition details for the inline form
+        function toggleAcquisitionSection() {
+            const sec = document.getElementById('acquisitionSection');
+            if (!sec) return;
+            if (sec.style.display === 'none' || sec.style.display === '') {
+                sec.style.display = 'block';
+                // focus first field
+                const f = sec.querySelector('input, select, textarea');
+                if (f) f.focus();
+            } else {
+                sec.style.display = 'none';
+            }
+        }
+
+        // Ensure any stray modals are hidden on load (prevents broken state where modals remain visible)
+        document.addEventListener('DOMContentLoaded', function(){
+            document.querySelectorAll('.modal').forEach(m => {
+                try { m.style.display = 'none'; } catch(e){}
+            });
+        });
 
         function openBulkImportModal() {
             // Redirect to bulk import section instead of opening modal
@@ -1898,68 +1794,74 @@ if (!function_exists('generateQR')) {
         }
 
         function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
+            // delegate to the global helper defined at the end of file
+            if (typeof window.closeModal === 'function') {
+                window.closeModal(modalId);
+                return;
+            }
+            try { document.getElementById(modalId).style.display = 'none'; } catch(e){}
         }
 
         function saveBook() {
             // Collect form data
             const form = document.getElementById('addBookForm');
-            const formData = new FormData(form);
-            const bookData = {};
-            formData.forEach((value, key) => {
-                bookData[key] = value;
-            });
+            // Build FormData with backend-friendly keys (lowercase underscore style)
+            const fd = new FormData();
+            // map main fields (form uses PascalCase names)
+            fd.append('title', form.querySelector('[name="Title"]')?.value || '');
+            fd.append('subtitle', form.querySelector('[name="SubTitle"]')?.value || '');
+            fd.append('author1', form.querySelector('[name="Author1"]')?.value || '');
+            fd.append('author2', form.querySelector('[name="Author2"]')?.value || '');
+            fd.append('author3', form.querySelector('[name="Author3"]')?.value || '');
+            fd.append('publisher', form.querySelector('[name="Publisher"]')?.value || '');
+            fd.append('year', form.querySelector('[name="Year"]')?.value || '');
+            fd.append('isbn', form.querySelector('[name="ISBN"]')?.value || '');
+            fd.append('edition', form.querySelector('[name="Edition"]')?.value || '');
+            fd.append('language', form.querySelector('[name="Language"]')?.value || '');
+            fd.append('subject', form.querySelector('[name="Subject"]')?.value || '');
+            fd.append('keywords', form.querySelector('[name="Keywords"]')?.value || '');
+            fd.append('pages', form.querySelector('[name="Pages"]')?.value || '');
+            fd.append('price', form.querySelector('[name="Price"]')?.value || '');
+            // normalized copies field name expected by backend
+            const numCopies = parseInt(form.querySelector('[name="numCopies"]')?.value || '1', 10) || 1;
+            fd.append('num_copies', numCopies);
 
-            // Collect holdings
-            const numCopies = parseInt(document.getElementById('numCopies').value) || 1;
-            const holdings = [];
-            for (let i = 1; i <= numCopies; i++) {
-                const accNo = document.getElementById('holdingAccNo_' + i)?.value || '';
-                const accDate = document.getElementById('holdingAccDate_' + i)?.value || '';
-                const classNo = document.getElementById('holdingClassNo_' + i)?.value || '';
-                const bookNo = document.getElementById('holdingBookNo_' + i)?.value || '';
-                const location = document.getElementById('holdingLocation_' + i)?.value || '';
-                const section = document.getElementById('holdingSection_' + i)?.value || '';
-                const collection = document.getElementById('holdingCollection_' + i)?.value || '';
-                holdings.push({
-                    AccNo: accNo,
-                    AccDate: accDate,
-                    ClassNo: classNo,
-                    BookNo: bookNo,
-                    Location: location,
-                    Section: section,
-                    Collection: collection
-                });
-            }
-            bookData['holdings'] = holdings;
+            // Map holdings - send the first holding fields (backend expects simple fields per copy)
+            const firstHoldingIndex = 1;
+            fd.append('book_no', document.getElementById('holdingBookNo_' + firstHoldingIndex)?.value || '');
+            fd.append('acc_date', document.getElementById('holdingAccDate_' + firstHoldingIndex)?.value || '');
+            fd.append('class_no', document.getElementById('holdingClassNo_' + firstHoldingIndex)?.value || '');
+            fd.append('location', document.getElementById('holdingLocation_' + firstHoldingIndex)?.value || '');
+            fd.append('section', document.getElementById('holdingSection_' + firstHoldingIndex)?.value || '');
+            fd.append('collection', document.getElementById('holdingCollection_' + firstHoldingIndex)?.value || '');
+            fd.append('binding', document.getElementById('holdingBinding_' + firstHoldingIndex)?.value || '');
+            fd.append('remarks', document.getElementById('holdingRemarks_' + firstHoldingIndex)?.value || '');
 
-            // Acquisition
-            const acquisition = {
-                Supplier: document.getElementById('acqSupplier')?.value || '',
-                InvoiceNo: document.getElementById('acqInvoiceNo')?.value || '',
-                InvoiceDate: document.getElementById('acqInvoiceDate')?.value || '',
-                OrderNo: document.getElementById('acqOrderNo')?.value || '',
-                OrderDate: document.getElementById('acqOrderDate')?.value || '',
-                ReceivedDate: document.getElementById('acqReceivedDate')?.value || '',
-                Quantity: document.getElementById('acqQuantity')?.value || '',
-                TotalCost: document.getElementById('acqTotalCost')?.value || ''
-            };
-            bookData['acquisition'] = acquisition;
+            // Acquisition mapping (backend expects snake_case lowercase keys)
+            fd.append('supplier', document.getElementById('acqSupplier')?.value || '');
+            fd.append('invoice_no', document.getElementById('acqInvoiceNo')?.value || '');
+            fd.append('invoice_date', document.getElementById('acqInvoiceDate')?.value || '');
+            fd.append('order_no', document.getElementById('acqOrderNo')?.value || '');
+            fd.append('order_date', document.getElementById('acqOrderDate')?.value || '');
+            fd.append('received_date', document.getElementById('acqReceivedDate')?.value || '');
+            fd.append('quantity', document.getElementById('acqQuantity')?.value || '');
+            fd.append('total_cost', document.getElementById('acqTotalCost')?.value || '');
 
-            // Send to API
+            // Submit as form POST so PHP populates $_POST
             fetch('api/books.php?action=add', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(bookData)
+                body: fd
             })
             .then(res => res.json())
             .then(result => {
-                if (result.success) {
+                if (result && result.success) {
                     alert('Book added successfully!');
-                    closeModal('addBookModal');
+                    // close modal if present and reset inline form
+                    try { closeModal('addBookModal'); } catch (e) {}
+                    form.reset();
                     loadBooksTable();
                 } else {
-                    alert('Error: ' + (result.message || 'Failed to add book.'));
+                    alert('Error: ' + (result && result.message ? result.message : 'Failed to add book.'));
                 }
             })
             .catch(err => {
@@ -1974,12 +1876,18 @@ if (!function_exists('generateQR')) {
         function editBook(catNo) {
           openBookDetailsModal(catNo, true);
         }
-        function openBookDetailsModal(catNo, editable) {
-                    document.getElementById('bookDetailsModal').style.display = 'block';
-                    document.getElementById('bookDetailsModalTitle').textContent = editable ? 'Edit Book' : 'Book Details';
-                    document.getElementById('bookDetailsModalBody').innerHTML = '<div style="text-align:center; color:#6c757d; padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:28px;"></i><p>Loading book details...</p></div>';
-                    document.getElementById('bookDetailsModalFooter').style.display = 'flex';
-                    document.getElementById('saveBookEditBtn').style.display = editable ? 'inline-block' : 'none';
+    function openBookDetailsModal(catNo, editable) {
+            const modalEl = document.getElementById('bookDetailsModal');
+            openModal('bookDetailsModal');
+            // store context so other functions (generateHoldingQr) can reload correctly
+            if (modalEl) {
+                modalEl.setAttribute('data-catno', String(catNo));
+                modalEl.setAttribute('data-editable', editable ? '1' : '0');
+            }
+            document.getElementById('bookDetailsModalTitle').textContent = editable ? 'Edit Book' : 'Book Details';
+            document.getElementById('bookDetailsModalBody').innerHTML = '<div style="text-align:center; color:#6c757d; padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:28px;"></i><p>Loading book details...</p></div>';
+            document.getElementById('bookDetailsModalFooter').style.display = 'flex';
+            document.getElementById('saveBookEditBtn').style.display = editable ? 'inline-block' : 'none';
                                         console.log('openBookDetailsModal called with catNo:', catNo, 'editable:', editable);
                     fetch(`api/books.php?action=get&catNo=${encodeURIComponent(catNo)}`)
                         .then(res => {
@@ -2020,7 +1928,59 @@ if (!function_exists('generateQR')) {
                                                 <div class='form-group-modal'><label>Cat No</label><input type='text' name='CatNo' value='${escapeHtml(book.CatNo)}' readonly></div>
                                             </div>
                                         </form>`;
-                                        document.getElementById('bookDetailsModalBody').innerHTML = html;
+
+                                        // Holdings table with inline edit
+                                        let holdingsHtml = `<div style='margin-top:14px;'><h4>Holdings <button type='button' class='btn btn-sm btn-success' onclick='addNewHolding(${book.CatNo})' style='float:right;'><i class='fas fa-plus'></i> Add Copy</button></h4><table style='width:100%; border-collapse:collapse;'><thead><tr><th style='text-align:left; padding:6px;'>AccNo</th><th style='text-align:left; padding:6px;'>Status</th><th style='text-align:left; padding:6px;'>Location</th><th style='text-align:left; padding:6px;'>Section</th><th style='text-align:left; padding:6px;'>QR</th><th style='text-align:left; padding:6px;'>Actions</th></tr></thead><tbody>`;
+                                        if (Array.isArray(book.holdings) && book.holdings.length) {
+                                            book.holdings.forEach(function(h, idx) {
+                                                    const safeAcc = escapeHtml(h.AccNo || '');
+                                                    const qrBase64 = h.QrCodeBase64 || null;
+                                                    const qrPath = h.QRCode || null;
+                                                    const holdingId = 'holding_' + idx;
+                                                    
+                                                    holdingsHtml += `<tr id='${holdingId}' style='border-top:1px solid #eee;' data-accno='${safeAcc}' data-original-accno='${safeAcc}'>
+                                                        <td style='padding:6px;'>
+                                                            <input type='text' class='holding-accno-input' data-original='${safeAcc}' value='${safeAcc}' 
+                                                                   style='width:100%; padding:4px 8px; border:1px solid #ddd; border-radius:4px; font-weight:bold;' 
+                                                                   title='Edit AccNo (unique identifier)'>
+                                                            <small style='color:#6c757d; font-size:10px;'>Original: ${safeAcc}</small>
+                                                        </td>
+                                                        <td style='padding:6px;'>
+                                                            <select class='holding-status-select' data-accno='${safeAcc}' style='padding:4px 8px; border:1px solid #ddd; border-radius:4px;'>
+                                                                <option value='Available' ${h.Status === 'Available' ? 'selected' : ''}>Available</option>
+                                                                <option value='Issued' ${h.Status === 'Issued' ? 'selected' : ''}>Issued</option>
+                                                                <option value='Reserved' ${h.Status === 'Reserved' ? 'selected' : ''}>Reserved</option>
+                                                                <option value='Damaged' ${h.Status === 'Damaged' ? 'selected' : ''}>Damaged</option>
+                                                                <option value='Lost' ${h.Status === 'Lost' ? 'selected' : ''}>Lost</option>
+                                                                <option value='Repair' ${h.Status === 'Repair' ? 'selected' : ''}>Repair</option>
+                                                            </select>
+                                                        </td>
+                                                        <td style='padding:6px;'><input type='text' class='holding-location-input' data-accno='${safeAcc}' value='${escapeHtml(h.Location || '')}' style='width:100%; padding:4px 8px; border:1px solid #ddd; border-radius:4px;'></td>
+                                                        <td style='padding:6px;'><input type='text' class='holding-section-input' data-accno='${safeAcc}' value='${escapeHtml(h.Section || '')}' style='width:100%; padding:4px 8px; border:1px solid #ddd; border-radius:4px;'></td>
+                                                        <td style='padding:6px;'>`;
+                                                    if (qrBase64) {
+                                                        const dataUri = 'data:image/png;base64,' + qrBase64;
+                                                        holdingsHtml += `<img class='holding-qr-thumb' data-full='${dataUri}' src='${dataUri}' alt='QR' style='width:48px;height:48px;object-fit:contain;border:1px solid #ddd;padding:2px;cursor:pointer;'> <a href='${dataUri}' download='qr_${safeAcc}.png' class='btn btn-sm' style='margin-left:4px; font-size:11px;'>↓</a>`;
+                                                    } else if (qrPath) {
+                                                        const streamUrl = `api/books.php?action=qr&accNo=${encodeURIComponent(h.AccNo)}`;
+                                                        holdingsHtml += `<img class='holding-qr-thumb' data-full='${streamUrl}' src='${streamUrl}' alt='QR' style='width:48px;height:48px;object-fit:contain;border:1px solid #ddd;padding:2px;cursor:pointer;'> <a href='${streamUrl}' class='btn btn-sm' style='margin-left:4px; font-size:11px;' download>↓</a>`;
+                                                    } else {
+                                                        const btnId = 'generate-qr-' + safeAcc;
+                                                        const statusId = 'qr_status_' + safeAcc;
+                                                        holdingsHtml += `<button type='button' data-accno='${escapeHtml(h.AccNo)}' data-catno='${escapeHtml(book.CatNo)}' data-copy='${idx+1}' class='btn btn-sm generate-qr-btn' id='${btnId}' style='font-size:11px;'>Gen QR</button> <span id='${statusId}' class='qr-status' data-accno='${escapeHtml(h.AccNo)}'></span>`;
+                                                    }
+                                                    holdingsHtml += `</td>
+                                                        <td style='padding:6px;'>
+                                                            <button type='button' class='btn btn-sm btn-primary save-holding-btn' data-accno='${safeAcc}' title='Save changes'><i class='fas fa-save'></i></button>
+                                                            <button type='button' class='btn btn-sm btn-danger delete-holding-btn' data-accno='${safeAcc}' title='Delete holding'><i class='fas fa-trash'></i></button>
+                                                        </td>
+                                                    </tr>`;
+                                                });
+                                        } else {
+                                            holdingsHtml += `<tr><td colspan='6' style='padding:6px;color:#666;'>No holdings found.</td></tr>`;
+                                        }
+                                        holdingsHtml += `</tbody></table></div>`;
+                                        document.getElementById('bookDetailsModalBody').innerHTML = html + holdingsHtml;
                                     } catch (e) {
                                         document.getElementById('bookDetailsModalBody').innerHTML = `<div style='color:#dc3545; padding:20px;'>Error rendering form: ${e.message}<br><pre>${JSON.stringify(book, null, 2)}</pre></div>`;
                                     }
@@ -2067,6 +2027,287 @@ if (!function_exists('generateQR')) {
                         return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c];
                     });
         }
+    // Lightbox handlers
+    function onQrThumbClick(e){
+        e.stopPropagation();
+        const src = e.currentTarget.getAttribute('data-full') || e.currentTarget.src;
+        openQrLightbox(src);
+    }
+
+    function openQrLightbox(src){
+        const lb = document.getElementById('qrLightbox');
+        const img = document.getElementById('qrLightboxImg');
+        img.src = src;
+        lb.classList.add('open');
+    }
+
+    function closeQrLightbox(e){
+        if(e && e.target && (e.target.id === 'qrLightbox' || e.target.classList.contains('qr-lightbox-close'))){
+            document.getElementById('qrLightbox').classList.remove('open');
+            document.getElementById('qrLightboxImg').src = '';
+        }
+    }
+
+    // Delegated handlers: handle clicks on generate buttons and QR thumbnails
+    document.addEventListener('click', function(e){
+        // Generate QR button
+        const gen = e.target.closest && e.target.closest('.generate-qr-btn');
+        if (gen) {
+            e.preventDefault();
+            const accNo = gen.getAttribute('data-accno');
+            const catNo = gen.getAttribute('data-catno');
+            const copyIndex = gen.getAttribute('data-copy');
+            if (accNo) generateHoldingQr(accNo, catNo, copyIndex);
+            return;
+        }
+
+        // Thumbnail click (delegated) - allow clicks on img or its container
+        const thumb = e.target.closest && e.target.closest('.holding-qr-thumb');
+        if (thumb) {
+            e.preventDefault();
+            const src = thumb.getAttribute('data-full') || thumb.src;
+            if (src) openQrLightbox(src);
+            return;
+        }
+    });
+
+    // Generate QR for a holding with spinner and immediate lightbox preview
+    function generateHoldingQr(accNo, catNo, copyIndex) {
+        // find the button and status span using data-accno
+        const btn = document.querySelector(".generate-qr-btn[data-accno='" + CSS.escape(accNo) + "']");
+        const statusSpan = document.querySelector(".qr-status[data-accno='" + CSS.escape(accNo) + "']");
+        if (statusSpan) statusSpan.textContent = '';
+        // show spinner next to button
+        let spinner = null;
+        if (btn) {
+            btn.disabled = true;
+            spinner = document.createElement('span');
+            spinner.className = 'inline-spinner';
+            btn.insertAdjacentElement('afterend', spinner);
+        }
+
+        const payload = new FormData();
+        payload.append('AccNo', accNo);
+        payload.append('CatNo', catNo);
+        payload.append('CopyIndex', copyIndex);
+
+        fetch('api/books.php?action=generate-qr', {
+            method: 'POST',
+            body: payload
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (btn) btn.disabled = false;
+            if (spinner) spinner.remove();
+            if (result && result.success) {
+                const imgData = result.qrBase64 ? ('data:image/png;base64,' + result.qrBase64) : null;
+                if (imgData) {
+                    // show immediate preview in lightbox
+                    openQrLightbox(imgData);
+                    // update status span to include a small thumbnail + download link
+                    if (statusSpan) {
+                        statusSpan.innerHTML = `<img src='${imgData}' style='width:64px;height:64px;border:1px solid #ddd;padding:4px;vertical-align:middle;margin-right:8px;'> <a href='${imgData}' download='qr_${accNo}.png' class='btn btn-sm btn-success'>Download</a>`;
+                    }
+                }
+                // refresh modal so the holdings show embedded blob next time
+                const modal = document.getElementById('bookDetailsModal');
+                const cat = modal.getAttribute('data-catno');
+                const editable = modal.getAttribute('data-editable') === '1';
+                setTimeout(()=> openBookDetailsModal(cat, editable), 350);
+            } else {
+                if (statusSpan) statusSpan.textContent = 'Failed';
+                alert('QR generation failed: ' + (result && result.error ? result.error : 'unknown'));
+            }
+        })
+        .catch(err => {
+            if (btn) btn.disabled = false;
+            const sp = document.getElementById('spinner-' + accNo);
+            if (sp) sp.remove();
+            if (statusSpan) statusSpan.textContent = 'Error';
+            alert('Error generating QR: ' + err);
+        });
+    }
+
+    // Holding management handlers
+    document.addEventListener('click', function(e) {
+        // Save holding button
+        const saveBtn = e.target.closest('.save-holding-btn');
+        if (saveBtn) {
+            e.preventDefault();
+            const accNo = saveBtn.getAttribute('data-accno');
+            saveHoldingChanges(accNo);
+            return;
+        }
+
+        // Delete holding button
+        const delBtn = e.target.closest('.delete-holding-btn');
+        if (delBtn) {
+            e.preventDefault();
+            const accNo = delBtn.getAttribute('data-accno');
+            if (confirm(`Are you sure you want to delete holding ${accNo}?`)) {
+                deleteHolding(accNo);
+            }
+            return;
+        }
+
+        // Status select change
+        if (e.target.classList.contains('holding-status-select')) {
+            e.target.style.borderColor = '#cfac69';
+        }
+    });
+
+    function saveHoldingChanges(accNo) {
+        const row = document.querySelector(`tr[data-accno="${accNo}"]`);
+        if (!row) return;
+
+        const originalAccNo = row.getAttribute('data-original-accno') || accNo;
+        const newAccNo = row.querySelector('.holding-accno-input').value.trim();
+        const status = row.querySelector('.holding-status-select').value;
+        const location = row.querySelector('.holding-location-input').value;
+        const section = row.querySelector('.holding-section-input').value;
+
+        if (!newAccNo) {
+            alert('AccNo cannot be empty!');
+            return;
+        }
+
+        const saveBtn = row.querySelector('.save-holding-btn');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        // Prepare update payload
+        const updates = {
+            originalAccNo: originalAccNo,
+            newAccNo: newAccNo,
+            status: status,
+            location: location,
+            section: section
+        };
+
+        // Update holding via API
+        fetch('api/books.php?action=update-holding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                saveBtn.innerHTML = '<i class="fas fa-check"></i>';
+                saveBtn.style.backgroundColor = '#28a745';
+                
+                // Update data attributes if AccNo changed
+                if (newAccNo !== originalAccNo) {
+                    row.setAttribute('data-accno', newAccNo);
+                    row.setAttribute('data-original-accno', newAccNo);
+                    row.querySelector('.holding-accno-input').setAttribute('data-original', newAccNo);
+                    // Update all data-accno attributes in the row
+                    row.querySelectorAll('[data-accno]').forEach(el => {
+                        if (el.getAttribute('data-accno') === originalAccNo) {
+                            el.setAttribute('data-accno', newAccNo);
+                        }
+                    });
+                }
+                
+                setTimeout(() => {
+                    saveBtn.innerHTML = '<i class="fas fa-save"></i>';
+                    saveBtn.style.backgroundColor = '';
+                    saveBtn.disabled = false;
+                    // Refresh modal to show updated data
+                    const modal = document.getElementById('bookDetailsModal');
+                    const catNo = modal.getAttribute('data-catno');
+                    const editable = modal.getAttribute('data-editable') === '1';
+                    if (catNo) openBookDetailsModal(catNo, editable);
+                }, 1000);
+            } else {
+                alert('Failed to save changes: ' + (result.message || 'Unknown error'));
+                saveBtn.innerHTML = '<i class="fas fa-save"></i>';
+                saveBtn.disabled = false;
+            }
+        })
+        .catch(err => {
+            alert('Error saving changes: ' + err);
+            saveBtn.innerHTML = '<i class="fas fa-save"></i>';
+            saveBtn.disabled = false;
+        });
+    }
+
+    function deleteHolding(accNo) {
+        // TODO: Add API endpoint for deleting holdings
+        alert('Delete holding feature coming soon. AccNo: ' + accNo);
+    }
+
+    function addNewHolding(catNo) {
+        const accNo = prompt('Enter Accession Number for new holding:');
+        if (!accNo) return;
+
+        fetch('api/books.php?action=add-holding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                AccNo: accNo,
+                CatNo: catNo,
+                Status: 'Available',
+                Location: '',
+                Section: ''
+            })
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                alert('Holding added successfully!');
+                // Refresh modal
+                const modal = document.getElementById('bookDetailsModal');
+                const editable = modal.getAttribute('data-editable') === '1';
+                openBookDetailsModal(catNo, editable);
+            } else {
+                alert('Failed to add holding: ' + (result.message || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            alert('Error adding holding: ' + err);
+        });
+    }
+
     </script>
-</body>
-</html>
+    </body>
+    </html>
+
+<script>
+// Basic modal accessibility helpers
+function openModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.style.display = 'flex';
+    modal.setAttribute('role','dialog');
+    modal.setAttribute('aria-modal','true');
+    // focus the first focusable element
+    const focusable = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable) focusable.focus();
+    // trap focus minimally
+    document.addEventListener('keydown', escClose);
+}
+
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.removeAttribute('role');
+    modal.removeAttribute('aria-modal');
+    document.removeEventListener('keydown', escClose);
+}
+
+function escClose(e){
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal').forEach(m=>{ if (m.style.display==='flex') m.style.display='none'; });
+        document.removeEventListener('keydown', escClose);
+    }
+}
+
+// wire existing buttons if they call openModal/closeModal
+document.addEventListener('click', function(e){
+    if (e.target.matches('[data-open-modal]')){
+        openModal(e.target.getAttribute('data-open-modal'));
+    }
+});
+</script>
