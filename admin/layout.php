@@ -635,6 +635,27 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
                 } catch (e) {}
               }, 0);
             });
+              // Try calling common initialization functions from the loaded page
+              try {
+                const candidateFns = [
+                  `${page}Init`,
+                  `init_${page.replace(/-/g, '_')}`,
+                  `${page.replace(/-/g, '_')}Init`,
+                  'initPage',
+                  'loadBooksTable'
+                ];
+                candidateFns.forEach(fnName => {
+                  if (typeof window[fnName] === 'function') {
+                    try {
+                      window[fnName]();
+                    } catch (e) {
+                      console.warn('Error calling init function', fnName, e);
+                    }
+                  }
+                });
+              } catch (e) {
+                console.warn('Error while attempting to call page init functions', e);
+              }
           })
           .catch(error => {
             console.error('Error loading page:', error);

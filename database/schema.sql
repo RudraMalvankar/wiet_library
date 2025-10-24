@@ -99,6 +99,8 @@ CREATE TABLE IF NOT EXISTS Holding (
     Section VARCHAR(50),
     Collection VARCHAR(50),
     BarCode VARCHAR(50),
+    QRCode VARCHAR(255),
+    QrCodeImg LONGBLOB,
     Binding VARCHAR(50),
     `Condition` VARCHAR(50) DEFAULT 'Good',
     Remarks TEXT,
