@@ -1,3 +1,42 @@
+-- Library Events Table
+CREATE TABLE IF NOT EXISTS library_events (
+    EventID INT AUTO_INCREMENT PRIMARY KEY,
+    EventTitle VARCHAR(255) NOT NULL,
+    EventType VARCHAR(50) NOT NULL,
+    Description TEXT,
+    StartDate DATE NOT NULL,
+    EndDate DATE NOT NULL,
+    StartTime TIME NOT NULL,
+    EndTime TIME NOT NULL,
+    Venue VARCHAR(255) NOT NULL,
+    Capacity INT DEFAULT 0,
+    Status VARCHAR(20) DEFAULT 'Upcoming',
+    OrganizedBy VARCHAR(255),
+    ContactPerson VARCHAR(255),
+    ContactEmail VARCHAR(255),
+    ContactPhone VARCHAR(20),
+    RegistrationRequired TINYINT(1) DEFAULT 0,
+    RegistrationDeadline DATE,
+    EventImage VARCHAR(255),
+    CreatedBy INT,
+    CreatedDate DATETIME,
+    ModifiedBy INT,
+    ModifiedDate DATETIME
+);
+
+-- Event Registrations Table
+CREATE TABLE IF NOT EXISTS event_registrations (
+    RegistrationID INT AUTO_INCREMENT PRIMARY KEY,
+    EventID INT NOT NULL,
+    MemberNo INT NOT NULL,
+    MemberName VARCHAR(255) NOT NULL,
+    Email VARCHAR(255),
+    Phone VARCHAR(20),
+    RegistrationDate DATETIME NOT NULL,
+    Status VARCHAR(20) DEFAULT 'Confirmed',
+    AttendanceStatus VARCHAR(20) DEFAULT NULL,
+    FOREIGN KEY (EventID) REFERENCES library_events(EventID) ON DELETE CASCADE
+);
 -- =====================================================
 -- WIET Library Management System - Database Schema
 -- =====================================================

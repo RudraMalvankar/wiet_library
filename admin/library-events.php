@@ -1,140 +1,79 @@
+        <?php
+        // ...existing PHP code...
+        ?>
+        <!DOCTYPE html>
+        <html lang="en">
+
+        <head>
+            <!-- ...existing code... -->
+        </head>
+        <body>
+            <!-- ...existing code... -->
+            <script>
+            function markAttendance(registrationId) {
+                if (confirm('Mark this member as present?')) {
+                    fetch('api/event_registrations.php?action=mark_attendance', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `RegistrationID=${registrationId}`
+                    })
+                    .then(res => res.json())
+                    .then(result => {
+                        if (result.success) {
+                            alert('Attendance marked!');
+                            loadStatistics();
+                            document.querySelector('.registrations-table tbody').innerHTML = '';
+                            location.reload();
+                        } else {
+                            alert('Error: ' + result.message);
+                        }
+                    });
+                }
+            }
+
+            function deleteRegistration(registrationId) {
+                if (confirm('Delete this registration?')) {
+                    fetch('api/event_registrations.php?action=delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `RegistrationID=${registrationId}`
+                    })
+                    .then(res => res.json())
+                    .then(result => {
+                        if (result.success) {
+                            alert('Registration deleted!');
+                            loadStatistics();
+                            document.querySelector('.registrations-table tbody').innerHTML = '';
+                            location.reload();
+                        } else {
+                            alert('Error: ' + result.message);
+                        }
+                    });
+                }
+            }
+            </script>
+        </body>
+        </html>
 <?php
 session_start();
-
-// No database connection needed for frontend development
-// Sample data will be used to demonstrate functionality
+require_once '../includes/db_connect.php';
 
 $admin_id = $_SESSION['admin_id'] ?? 1;
 $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
-// Sample events data matching potential database schema
-$sampleEvents = [
-    [
-        'EventID' => 1,
-        'EventTitle' => 'New Book Arrivals Exhibition',
-        'EventType' => 'Exhibition',
-        'Description' => 'Showcasing latest arrivals in Computer Science, Engineering, and Technology domains. Students can explore and reserve books.',
-        'StartDate' => '2024-12-25',
-        'EndDate' => '2024-12-30',
-        'StartTime' => '09:00:00',
-        'EndTime' => '17:00:00',
-        'Venue' => 'Library Main Hall',
-        'Capacity' => 100,
-        'Registered' => 67,
-        'Status' => 'Upcoming',
-        'OrganizedBy' => 'Library Staff',
-        'ContactPerson' => 'Ms. Priya Patel',
-        'ContactEmail' => 'priya.patel@wiet.edu',
-        'ContactPhone' => '9876543211',
-        'RegistrationRequired' => true,
-        'RegistrationDeadline' => '2024-12-23',
-        'EventImage' => '/images/events/book-exhibition.jpg',
-        'CreatedBy' => 1,
-        'CreatedDate' => '2024-12-01 10:30:00',
-        'ModifiedBy' => 1,
-        'ModifiedDate' => '2024-12-15 14:20:00'
-    ],
-    [
-        'EventID' => 2,
-        'EventTitle' => 'Digital Library Workshop',
-        'EventType' => 'Workshop',
-        'Description' => 'Hands-on workshop on utilizing digital resources, online databases, and e-learning platforms effectively.',
-        'StartDate' => '2024-12-20',
-        'EndDate' => '2024-12-20',
-        'StartTime' => '14:00:00',
-        'EndTime' => '16:30:00',
-        'Venue' => 'Computer Lab 1',
-        'Capacity' => 40,
-        'Registered' => 35,
-        'Status' => 'Active',
-        'OrganizedBy' => 'IT Department & Library',
-        'ContactPerson' => 'Dr. Rajesh Kumar',
-        'ContactEmail' => 'rajesh.kumar@wiet.edu',
-        'ContactPhone' => '9876543210',
-        'RegistrationRequired' => true,
-        'RegistrationDeadline' => '2024-12-18',
-        'EventImage' => '/images/events/digital-workshop.jpg',
-        'CreatedBy' => 2,
-        'CreatedDate' => '2024-11-15 09:00:00',
-        'ModifiedBy' => 1,
-        'ModifiedDate' => '2024-12-10 11:15:00'
-    ],
-    [
-        'EventID' => 3,
-        'EventTitle' => 'Research Paper Writing Seminar',
-        'EventType' => 'Seminar',
-        'Description' => 'Learn effective techniques for writing research papers, citations, and academic writing standards.',
-        'StartDate' => '2024-12-15',
-        'EndDate' => '2024-12-15',
-        'StartTime' => '10:00:00',
-        'EndTime' => '12:00:00',
-        'Venue' => 'Auditorium',
-        'Capacity' => 150,
-        'Registered' => 120,
-        'Status' => 'Completed',
-        'OrganizedBy' => 'Academic Department',
-        'ContactPerson' => 'Prof. Sneha Gupta',
-        'ContactEmail' => 'sneha.gupta@wiet.edu',
-        'ContactPhone' => '9876543213',
-        'RegistrationRequired' => true,
-        'RegistrationDeadline' => '2024-12-13',
-        'EventImage' => '/images/events/research-seminar.jpg',
-        'CreatedBy' => 1,
-        'CreatedDate' => '2024-11-20 16:45:00',
-        'ModifiedBy' => 2,
-        'ModifiedDate' => '2024-12-14 08:30:00'
-    ],
-    [
-        'EventID' => 4,
-        'EventTitle' => 'Book Reading Marathon',
-        'EventType' => 'Competition',
-        'Description' => '24-hour reading challenge for students to promote reading culture and win exciting prizes.',
-        'StartDate' => '2025-01-10',
-        'EndDate' => '2025-01-11',
-        'StartTime' => '18:00:00',
-        'EndTime' => '18:00:00',
-        'Venue' => 'Library Reading Hall',
-        'Capacity' => 50,
-        'Registered' => 28,
-        'Status' => 'Upcoming',
-        'OrganizedBy' => 'Library Committee',
-        'ContactPerson' => 'Mr. Amit Sharma',
-        'ContactEmail' => 'amit.sharma@wiet.edu',
-        'ContactPhone' => '9876543212',
-        'RegistrationRequired' => true,
-        'RegistrationDeadline' => '2025-01-05',
-        'EventImage' => '/images/events/reading-marathon.jpg',
-        'CreatedBy' => 3,
-        'CreatedDate' => '2024-12-05 12:00:00',
-        'ModifiedBy' => null,
-        'ModifiedDate' => null
-    ],
-    [
-        'EventID' => 5,
-        'EventTitle' => 'Library Orientation for New Students',
-        'EventType' => 'Orientation',
-        'Description' => 'Comprehensive orientation program for newly admitted students about library facilities, rules, and services.',
-        'StartDate' => '2024-11-25',
-        'EndDate' => '2024-11-25',
-        'StartTime' => '11:00:00',
-        'EndTime' => '13:00:00',
-        'Venue' => 'Library Main Hall',
-        'Capacity' => 200,
-        'Registered' => 180,
-        'Status' => 'Completed',
-        'OrganizedBy' => 'Library Administration',
-        'ContactPerson' => 'Ms. Priya Patel',
-        'ContactEmail' => 'priya.patel@wiet.edu',
-        'ContactPhone' => '9876543211',
-        'RegistrationRequired' => false,
-        'RegistrationDeadline' => null,
-        'EventImage' => '/images/events/orientation.jpg',
-        'CreatedBy' => 1,
-        'CreatedDate' => '2024-11-01 14:30:00',
-        'ModifiedBy' => 1,
-        'ModifiedDate' => '2024-11-20 16:00:00'
-    ]
-];
+// Fetch events from database
+$events = [];
+$result = $pdo->query('SELECT * FROM library_events ORDER BY StartDate DESC');
+while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
+    $events[] = $row;
+}
+
+// Fetch registrations from database
+$registrations = [];
+$regResult = $pdo->query('SELECT r.*, e.EventTitle FROM event_registrations r JOIN library_events e ON r.EventID = e.EventID ORDER BY r.RegistrationDate DESC');
+while ($row = $regResult->fetch(PDO::FETCH_ASSOC)) {
+    $registrations[] = $row;
+}
 
 // Event types configuration
 $eventTypes = [
@@ -148,33 +87,7 @@ $eventTypes = [
     'Meeting' => ['icon' => 'fas fa-handshake', 'color' => '#6c757d']
 ];
 
-// Sample registrations data
-$eventRegistrations = [
-    [
-        'RegistrationID' => 1,
-        'EventID' => 2,
-        'MemberNo' => 2024001,
-        'MemberName' => 'Rahul Sharma',
-        'Email' => 'rahul.sharma@student.wiet.edu',
-        'Phone' => '9876543210',
-        'RegistrationDate' => '2024-12-05 10:30:00',
-        'Status' => 'Confirmed',
-        'AttendanceStatus' => 'Present'
-    ],
-    [
-        'RegistrationID' => 2,
-        'EventID' => 2,
-        'MemberNo' => 2024002,
-        'MemberName' => 'Priya Patel',
-        'Email' => 'priya.patel@student.wiet.edu',
-        'Phone' => '9876543211',
-        'RegistrationDate' => '2024-12-06 14:20:00',
-        'Status' => 'Confirmed',
-        'AttendanceStatus' => 'Present'
-    ]
-];
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -859,7 +772,7 @@ $eventRegistrations = [
             <h3 class="section-title">
                 Create New Event
             </h3>
-            <form id="addEventInlineForm">
+            <form id="addEventInlineForm" onsubmit="saveEventInline(); return false;">
                 <!-- Basic Information Section -->
                 <div class="form-section">
                     <div class="section-title">
@@ -985,7 +898,7 @@ $eventRegistrations = [
                     </div>
                     <!-- Form Actions -->
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-success" onclick="saveEventInline(); return false;">
+                        <button type="button" class="btn btn-success" onclick="saveEventInline();">
                             <i class="fas fa-save"></i>
                             Create Event
                         </button>
@@ -1119,7 +1032,7 @@ $eventRegistrations = [
                 <button class="close" onclick="closeModal('addEventModal')">&times;</button>
             </div>
             <div class="modal-body">
-                <form id="addEventForm">
+                <form id="addEventForm" onsubmit="saveEvent(); return false;">
                     <!-- Basic Information Section -->
                     <div class="form-section">
                         <div class="section-title">
@@ -1256,9 +1169,7 @@ $eventRegistrations = [
 
     <script>
         // Global variables
-        const sampleEvents = <?php echo json_encode($sampleEvents); ?>;
-        const eventTypes = <?php echo json_encode($eventTypes); ?>;
-        const eventRegistrations = <?php echo json_encode($eventRegistrations); ?>;
+    const eventTypes = <?php echo json_encode($eventTypes); ?>;
 
         // Tab functionality
         function showTab(tabName) {
@@ -1270,8 +1181,19 @@ $eventRegistrations = [
             });
 
             document.getElementById(tabName).classList.add('active');
-            event.target.classList.add('active');
-
+            // Fix: get the button that triggered the tab switch
+            // If called from onclick, 'this' is the button
+            if (typeof event !== 'undefined' && event.target) {
+                event.target.classList.add('active');
+            } else {
+                // fallback: activate first matching tab-btn
+                const btns = document.querySelectorAll('.tab-btn');
+                btns.forEach(btn => {
+                    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabName)) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
             loadTabContent(tabName);
         }
 
@@ -1293,147 +1215,263 @@ $eventRegistrations = [
         }
 
         function loadEventsList(searchParams = {}) {
-            let filteredEvents = sampleEvents;
-
-            // Apply search filters
-            if (searchParams.title) {
-                filteredEvents = filteredEvents.filter(event =>
-                    event.EventTitle.toLowerCase().includes(searchParams.title.toLowerCase())
-                );
-            }
-            if (searchParams.type) {
-                filteredEvents = filteredEvents.filter(event =>
-                    event.EventType === searchParams.type
-                );
-            }
-            if (searchParams.status) {
-                filteredEvents = filteredEvents.filter(event =>
-                    event.Status === searchParams.status
-                );
-            }
-
-            let eventsHTML = '';
-
-            if (filteredEvents.length === 0) {
-                eventsHTML = `
-                    <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #6c757d; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        <i class="fas fa-search" style="font-size: 48px; margin-bottom: 15px;"></i>
-                        <h3>No Events Found</h3>
-                        <p>No events match your search criteria.</p>
-                    </div>
-                `;
-            } else {
-                filteredEvents.forEach(event => {
-                    const typeConfig = eventTypes[event.EventType] || {
-                        icon: 'fas fa-calendar',
-                        color: '#6c757d'
-                    };
-                    const statusClass = `status-${event.Status.toLowerCase()}`;
-
-                    eventsHTML += `
-                        <div class="event-card">
-                            <div class="event-image">
-                                <i class="${typeConfig.icon}"></i>
-                                <div class="event-status-badge ${statusClass}">${event.Status}</div>
+            fetch('api/events.php?action=list')
+                .then(res => res.json())
+                .then(result => {
+                    let filteredEvents = Array.isArray(result.data) ? result.data : [];
+                    let eventsHTML = '';
+                    // Apply search filters
+                    if (searchParams.title) {
+                        filteredEvents = filteredEvents.filter(event =>
+                            event.EventTitle && event.EventTitle.toLowerCase().includes(searchParams.title.toLowerCase())
+                        );
+                    }
+                    if (searchParams.type) {
+                        filteredEvents = filteredEvents.filter(event =>
+                            event.EventType === searchParams.type
+                        );
+                    }
+                    if (searchParams.status) {
+                        filteredEvents = filteredEvents.filter(event =>
+                            event.Status === searchParams.status
+                        );
+                    }
+                    if (filteredEvents.length === 0) {
+                        eventsHTML = `
+                            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #6c757d; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <i class="fas fa-search" style="font-size: 48px; margin-bottom: 15px;"></i>
+                                <h3>No Events Found</h3>
+                                <p>No events match your search criteria.</p>
                             </div>
-                            <div class="event-content">
-                                <div class="event-header">
-                                    <h4 class="event-title">${event.EventTitle}</h4>
-                                    <span class="event-type" style="background-color: ${typeConfig.color}; color: white;">
+                        `;
+                    } else {
+                        filteredEvents.forEach(event => {
+                            const typeConfig = eventTypes[event.EventType] || {
+                                icon: 'fas fa-calendar',
+                                color: '#6c757d'
+                            };
+                            const statusClass = `status-${event.Status.toLowerCase()}`;
+                            eventsHTML += `
+                                <div class="event-card">
+                                    <div class="event-image">
                                         <i class="${typeConfig.icon}"></i>
-                                        ${event.EventType}
-                                    </span>
+                                        <div class="event-status-badge ${statusClass}">${event.Status}</div>
+                                    </div>
+                                    <div class="event-content">
+                                        <div class="event-header">
+                                            <h4 class="event-title">${event.EventTitle}</h4>
+                                            <span class="event-type" style="background-color: ${typeConfig.color}; color: white;">
+                                                <i class="${typeConfig.icon}"></i>
+                                                ${event.EventType}
+                                            </span>
+                                        </div>
+                                        <div class="event-details">
+                                            <div class="event-detail">
+                                                <i class="fas fa-calendar"></i>
+                                                <span>${new Date(event.StartDate).toLocaleDateString('en-IN')} 
+                                                ${event.StartDate !== event.EndDate ? ' - ' + new Date(event.EndDate).toLocaleDateString('en-IN') : ''}</span>
+                                            </div>
+                                            <div class="event-detail">
+                                                <i class="fas fa-clock"></i>
+                                                <span>${event.StartTime} - ${event.EndTime}</span>
+                                            </div>
+                                            <div class="event-detail">
+                                                <i class="fas fa-map-marker-alt"></i>
+                                                <span>${event.Venue}</span>
+                                            </div>
+                                            <div class="event-detail">
+                                                <i class="fas fa-user"></i>
+                                                <span>${event.ContactPerson} (${event.OrganizedBy})</span>
+                                            </div>
+                                        </div>
+                                        <div class="event-description">
+                                            ${event.Description}
+                                        </div>
+                                        <div class="event-footer">
+                                            <div class="registration-info">
+                                                ${event.RegistrationRequired ? 
+                                                    `<strong>${event.Registered}/${event.Capacity}</strong> registered` : 
+                                                    'No registration required'
+                                                }
+                                            </div>
+                                            <div class="event-actions">
+                                                <button class="btn-info" onclick="viewEvent(${event.EventID})">
+                                                    <i class="fas fa-eye"></i> View
+                                                </button>
+                                                <button class="btn-warning" onclick="editEvent(${event.EventID})">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                ${event.Status === 'Upcoming' ? 
+                                                    `<button class="btn-danger" onclick="cancelEvent(${event.EventID})">
+                                                        <i class="fas fa-times"></i> Cancel
+                                                    </button>` : ''
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                
-                                <div class="event-details">
-                                    <div class="event-detail">
-                                        <i class="fas fa-calendar"></i>
-                                        <span>${new Date(event.StartDate).toLocaleDateString('en-IN')} 
-                                        ${event.StartDate !== event.EndDate ? ' - ' + new Date(event.EndDate).toLocaleDateString('en-IN') : ''}</span>
-                                    </div>
-                                    <div class="event-detail">
-                                        <i class="fas fa-clock"></i>
-                                        <span>${event.StartTime} - ${event.EndTime}</span>
-                                    </div>
-                                    <div class="event-detail">
-                                        <i class="fas fa-map-marker-alt"></i>
-                                        <span>${event.Venue}</span>
-                                    </div>
-                                    <div class="event-detail">
-                                        <i class="fas fa-user"></i>
-                                        <span>${event.ContactPerson} (${event.OrganizedBy})</span>
-                                    </div>
-                                </div>
-                                
-                                <div class="event-description">
-                                    ${event.Description}
-                                </div>
-                                
-                                <div class="event-footer">
-                                    <div class="registration-info">
-                                        ${event.RegistrationRequired ? 
-                                            `<strong>${event.Registered}/${event.Capacity}</strong> registered` : 
-                                            'No registration required'
-                                        }
-                                    </div>
-                                    <div class="event-actions">
-                                        <button class="btn-info" onclick="viewEvent(${event.EventID})">
-                                            <i class="fas fa-eye"></i> View
-                                        </button>
-                                        <button class="btn-warning" onclick="editEvent(${event.EventID})">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </button>
-                                        ${event.Status === 'Upcoming' ? 
-                                            `<button class="btn-danger" onclick="cancelEvent(${event.EventID})">
-                                                <i class="fas fa-times"></i> Cancel
-                                            </button>` : ''
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
+                            `;
+                        });
+                    }
+                    document.getElementById('eventsContainer').innerHTML = eventsHTML;
                 });
-            }
-
-            document.getElementById('eventsContainer').innerHTML = eventsHTML;
         }
 
         function loadCalendarView() {
-            // Placeholder for calendar implementation
-            console.log('Loading calendar view...');
+            // Interactive calendar implementation
+            const calendarContainer = document.getElementById('calendarContainer');
+            calendarContainer.innerHTML = '<div style="text-align:center; padding:40px; color:#6c757d;"><i class="fas fa-spinner fa-spin" style="font-size:32px;"></i> Loading calendar...</div>';
+            // Get current month/year from state
+            if (!window._calendarState) {
+                const today = new Date();
+                window._calendarState = { month: today.getMonth(), year: today.getFullYear() };
+            }
+            let month = window._calendarState.month;
+            let year = window._calendarState.year;
+            // Fetch events
+            fetch('api/events.php?action=list')
+                .then(res => res.json())
+                .then(result => {
+                    const events = Array.isArray(result.data) ? result.data : [];
+                    // Build calendar grid
+                    const firstDay = new Date(year, month, 1).getDay();
+                    const daysInMonth = new Date(year, month + 1, 0).getDate();
+                    const monthName = new Date(year, month, 1).toLocaleString('default', { month: 'long' });
+                    let calendarHTML = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <button class="btn btn-secondary" onclick="previousMonth()"><i class="fas fa-chevron-left"></i> Previous</button>
+                        <h3 style="color:#263c79; margin:0;">${monthName} ${year}</h3>
+                        <button class="btn btn-primary" onclick="nextMonth()">Next <i class="fas fa-chevron-right"></i></button>
+                    </div>`;
+                    calendarHTML += '<table class="calendar-table" style="width:100%; border-collapse:collapse; background:white; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.08);">';
+                    calendarHTML += '<thead><tr>';
+                    ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
+                        calendarHTML += `<th style="padding:8px; background:#f8f9fa; color:#263c79;">${d}</th>`;
+                    });
+                    calendarHTML += '</tr></thead><tbody><tr>';
+                    let day = 1;
+                    for (let i = 0; i < 42; i++) {
+                        if (i < firstDay || day > daysInMonth) {
+                            calendarHTML += '<td style="padding:16px; background:#f8f9fa;"></td>';
+                        } else {
+                            // Events for this day
+                            const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                            const dayEvents = events.filter(e => e.StartDate <= dateStr && e.EndDate >= dateStr);
+                            calendarHTML += `<td style="vertical-align:top; padding:8px; border:1px solid #e9ecef; cursor:pointer;" onclick="showDayEvents('${dateStr}')">
+                                <div style="font-weight:600; color:#263c79;">${day}</div>
+                                ${dayEvents.length > 0 ? dayEvents.map(ev => `<div style='margin:4px 0; background:#e3f2fd; border-radius:4px; padding:2px 6px; font-size:12px; color:#1976d2;'>${ev.EventTitle}</div>`).join('') : '<div style="color:#adb5bd; font-size:12px;">No events</div>'}
+                            </td>`;
+                            day++;
+                        }
+                        if ((i+1)%7 === 0 && i < 41) calendarHTML += '</tr><tr>';
+                    }
+                    calendarHTML += '</tr></tbody></table>';
+                    calendarHTML += '<div id="dayEventsModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.3); z-index:9999; align-items:center; justify-content:center;"><div id="dayEventsContent" style="background:white; border-radius:8px; padding:32px; max-width:400px; margin:auto; position:relative;"></div></div>';
+                    calendarContainer.innerHTML = calendarHTML;
+                });
+
+            // Helper to show events for a day
+            window.showDayEvents = function(dateStr) {
+                fetch('api/events.php?action=list')
+                    .then(res => res.json())
+                    .then(result => {
+                        const events = Array.isArray(result.data) ? result.data : [];
+                        const dayEvents = events.filter(e => e.StartDate <= dateStr && e.EndDate >= dateStr);
+                        let html = `<h4 style='color:#263c79; margin-bottom:12px;'>Events on ${new Date(dateStr).toLocaleDateString('en-IN')}</h4>`;
+                        if (dayEvents.length === 0) {
+                            html += '<div style="color:#adb5bd;">No events scheduled.</div>';
+                        } else {
+                            dayEvents.forEach(ev => {
+                                html += `<div style='margin-bottom:16px; padding:12px; background:#f8f9fa; border-radius:6px;'>
+                                    <strong>${ev.EventTitle}</strong><br>
+                                    <span style='font-size:12px;'>${ev.StartTime} - ${ev.EndTime}</span><br>
+                                    <span style='font-size:12px;'>${ev.Venue}</span><br>
+                                    <button class='btn btn-info' style='margin-top:8px;' onclick='viewEvent(${ev.EventID})'><i class='fas fa-eye'></i> View</button>
+                                    ${ev.RegistrationRequired ? `<button class='btn btn-success' style='margin-top:8px; margin-left:8px;' onclick='registerForEvent(${ev.EventID})'><i class='fas fa-user-plus'></i> Register</button>` : ''}
+                                </div>`;
+                            });
+                        }
+                        html += `<button class='btn btn-secondary' style='margin-top:12px;' onclick='closeDayEventsModal()'>Close</button>`;
+                        document.getElementById('dayEventsContent').innerHTML = html;
+                        document.getElementById('dayEventsModal').style.display = 'flex';
+                    });
+            };
+            window.closeDayEventsModal = function() {
+                document.getElementById('dayEventsModal').style.display = 'none';
+            };
+            // Register for event (admin quick action)
+            window.registerForEvent = function(eventId) {
+                alert('Registration for event ID ' + eventId + ' (admin quick action). Implement registration logic as needed.');
+            };
+            // Month navigation
+            window.previousMonth = function() {
+                window._calendarState.month--;
+                if (window._calendarState.month < 0) {
+                    window._calendarState.month = 11;
+                    window._calendarState.year--;
+                }
+                loadCalendarView();
+            };
+            window.nextMonth = function() {
+                window._calendarState.month++;
+                if (window._calendarState.month > 11) {
+                    window._calendarState.month = 0;
+                    window._calendarState.year++;
+                }
+                loadCalendarView();
+            };
         }
 
         function loadRegistrationsContent() {
             let registrationsHTML = `
-                <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="color: #263c79; margin: 0;">Event Registrations Management</h3>
-                    <button class="btn btn-primary" onclick="exportRegistrations()">
-                        <i class="fas fa-download"></i>
-                        Export Registrations
-                    </button>
+                <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;">
+                    <h3 style="color: #263c79; margin: 0; flex:1;">Event Registrations Management</h3>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                        <input type="text" id="regSearchInput" class="form-control" placeholder="Search by member/event..." style="width:200px;">
+                        <select id="regStatusFilter" class="form-control" style="width:140px;">
+                            <option value="">All Status</option>
+                            <option value="Confirmed">Confirmed</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                        <select id="regTypeFilter" class="form-control" style="width:140px;"><option value="">All Types</option></select>
+                        <input type="date" id="regStartDate" class="form-control" style="width:140px;">
+                        <input type="date" id="regEndDate" class="form-control" style="width:140px;">
+                        <button class="btn btn-info" id="downloadRegPDF" title="Download PDF report"><i class="fas fa-file-pdf"></i> PDF Report</button>
+                        <button class="btn btn-primary" onclick="exportRegistrationsCSV()" title="Export registrations as CSV">
+                            <i class="fas fa-download"></i>
+                            Export CSV
+                        </button>
+                    </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px;">
                     <div style="background: white; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         <h4 style="color: #263c79; margin-bottom: 15px;">Registration Statistics</h4>
-                        <div style="margin-bottom: 10px;">
-                            <span style="font-weight: 600;">Total Registrations:</span>
-                            <span style="color: #263c79; font-weight: 600;">${eventRegistrations.length}</span>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <span style="font-weight: 600;">Confirmed:</span>
-                            <span style="color: #28a745; font-weight: 600;">${eventRegistrations.filter(r => r.Status === 'Confirmed').length}</span>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <span style="font-weight: 600;">Present:</span>
-                            <span style="color: #17a2b8; font-weight: 600;">${eventRegistrations.filter(r => r.AttendanceStatus === 'Present').length}</span>
-                        </div>
+                        <div style="margin-bottom: 10px;"><span style="font-weight: 600;">Total Registrations:</span> <span style="color: #263c79; font-weight: 600;" id="totalRegCount">-</span></div>
+                        <div style="margin-bottom: 10px;"><span style="font-weight: 600;">Confirmed:</span> <span style="color: #28a745; font-weight: 600;" id="confirmedRegCount">-</span></div>
+                        <div style="margin-bottom: 10px;"><span style="font-weight: 600;">Present:</span> <span style="color: #17a2b8; font-weight: 600;" id="presentRegCount">-</span></div>
+                    </div>
+                    <div style="background: white; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <h4 style="color: #263c79; margin-bottom: 15px;">Attendance Summary</h4>
+                        <canvas id="attendanceChart" width="320" height="120"></canvas>
+                        <canvas id="registrationTrendChart" width="320" height="120" style="margin-top:18px;"></canvas>
                     </div>
                 </div>
 
-                <table class="registrations-table">
-                    <thead>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:30px;">
+                    <div style="background:white; border:1px solid #e9ecef; border-radius:8px; padding:20px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                        <h4 style="color:#263c79; margin-bottom:12px;">Top Members by Attendance</h4>
+                        <ul id="topMembersList" style="list-style:none; padding:0; margin:0;"></ul>
+                    </div>
+                    <div style="background:white; border:1px solid #e9ecef; border-radius:8px; padding:20px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                        <h4 style="color:#263c79; margin-bottom:12px;">Interactive Attendance Chart</h4>
+                        <canvas id="interactiveAttendanceChart" width="320" height="120"></canvas>
+                    </div>
+                </div>
+
+                <div style="overflow-x:auto;">
+                <table class="registrations-table" style="min-width:900px; border-collapse:collapse;">
+                    <thead style="position:sticky; top:0; background:#f8f9fa; z-index:2;">
                         <tr>
                             <th>Event</th>
                             <th>Member Name</th>
@@ -1445,78 +1483,397 @@ $eventRegistrations = [
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-            `;
-
-            eventRegistrations.forEach(registration => {
-                const event = sampleEvents.find(e => e.EventID === registration.EventID);
-                registrationsHTML += `
-                    <tr>
-                        <td><strong>${event ? event.EventTitle : 'Unknown Event'}</strong></td>
-                        <td>${registration.MemberName}</td>
-                        <td>${registration.MemberNo}</td>
-                        <td>
-                            <div>${registration.Email}</div>
-                            <div>${registration.Phone}</div>
-                        </td>
-                        <td>${new Date(registration.RegistrationDate).toLocaleDateString('en-IN')}</td>
-                        <td>
-                            <span class="status-badge ${registration.Status === 'Confirmed' ? 'status-active' : 'status-pending'}">${registration.Status}</span>
-                        </td>
-                        <td>
-                            <span class="status-badge ${registration.AttendanceStatus === 'Present' ? 'status-active' : 'status-inactive'}">${registration.AttendanceStatus || 'Not Marked'}</span>
-                        </td>
-                        <td>
-                            <button class="btn-info" onclick="markAttendance(${registration.RegistrationID})" style="padding: 4px 8px; font-size: 12px;">
-                                <i class="fas fa-check"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            registrationsHTML += `
-                    </tbody>
+                    <tbody id="registrationsTableBody"></tbody>
                 </table>
+                </div>
             `;
 
+            // Fetch live registrations and events
             document.getElementById('registrationsContent').innerHTML = registrationsHTML;
+            Promise.all([
+                fetch('api/event_registrations.php?action=list').then(res => res.json()),
+                fetch('api/events.php?action=list').then(res => res.json())
+            ]).then(([regRes, eventsRes]) => {
+                let registrations = Array.isArray(regRes.data) ? regRes.data : [];
+                const events = Array.isArray(eventsRes.data) ? eventsRes.data : [];
+                // Fill event type filter
+                const typeSet = new Set(events.map(e => e.EventType));
+                const typeFilter = document.getElementById('regTypeFilter');
+                typeSet.forEach(type => {
+                    if (type) {
+                        const opt = document.createElement('option');
+                        opt.value = type;
+                        opt.textContent = type;
+                        typeFilter.appendChild(opt);
+                    }
+                });
+                // Statistics
+                document.getElementById('totalRegCount').textContent = registrations.length;
+                document.getElementById('confirmedRegCount').textContent = registrations.filter(r => r.Status === 'Confirmed').length;
+                document.getElementById('presentRegCount').textContent = registrations.filter(r => r.AttendanceStatus === 'Present').length;
+                // Advanced filter logic
+                function renderRows(filter = '', status = '', type = '', start = '', end = '') {
+                    let rowsHTML = '';
+                    let filteredRegs = registrations;
+                    if (filter) {
+                        const f = filter.toLowerCase();
+                        filteredRegs = filteredRegs.filter(r => {
+                            const event = events.find(e => e.EventID == r.EventID);
+                            return (r.MemberName && r.MemberName.toLowerCase().includes(f)) ||
+                                   (r.MemberNo && r.MemberNo.toLowerCase().includes(f)) ||
+                                   (event && event.EventTitle && event.EventTitle.toLowerCase().includes(f));
+                        });
+                    }
+                    if (status) filteredRegs = filteredRegs.filter(r => r.Status === status);
+                    if (type) filteredRegs = filteredRegs.filter(r => {
+                        const event = events.find(e => e.EventID == r.EventID);
+                        return event && event.EventType === type;
+                    });
+                    if (start) filteredRegs = filteredRegs.filter(r => r.RegistrationDate >= start);
+                    if (end) filteredRegs = filteredRegs.filter(r => r.RegistrationDate <= end);
+                    filteredRegs.forEach((registration, idx) => {
+                        const event = events.find(e => e.EventID == registration.EventID);
+                        let statusColor = '#adb5bd', statusText = registration.Status;
+                        if (registration.Status === 'Confirmed') { statusColor = '#28a745'; }
+                        else if (registration.Status === 'Pending') { statusColor = '#ffc107'; }
+                        else if (registration.Status === 'Cancelled') { statusColor = '#dc3545'; }
+                        let attColor = '#adb5bd', attText = registration.AttendanceStatus || 'Not Marked';
+                        if (registration.AttendanceStatus === 'Present') { attColor = '#17a2b8'; attText = 'Present'; }
+                        else if (registration.AttendanceStatus === 'Absent') { attColor = '#dc3545'; attText = 'Absent'; }
+                        const rowBg = idx % 2 === 0 ? 'background:#f8f9fa;' : '';
+                        rowsHTML += `
+                            <tr style='${rowBg}'>
+                                <td><strong>${event ? event.EventTitle : 'Unknown Event'}</strong></td>
+                                <td>${registration.MemberName}</td>
+                                <td>${registration.MemberNo}</td>
+                                <td><div>${registration.Email}</div><div>${registration.Phone}</div></td>
+                                <td>${new Date(registration.RegistrationDate).toLocaleDateString('en-IN')}</td>
+                                <td><span style='display:inline-block; min-width:80px; padding:4px 10px; border-radius:12px; color:white; background:${statusColor}; font-size:13px;'>${statusText}</span></td>
+                                <td><span style='display:inline-block; min-width:80px; padding:4px 10px; border-radius:12px; color:white; background:${attColor}; font-size:13px;'>${attText}</span></td>
+                                <td>
+                                    <button class="btn-info" onclick="markAttendance(${registration.RegistrationID})" style="padding: 4px 8px; font-size: 12px;" title="Mark attendance"><i class="fas fa-check"></i></button>
+                                    <button class="btn-danger" onclick="deleteRegistration(${registration.RegistrationID})" style="padding: 4px 8px; font-size: 12px; margin-left: 4px;" title="Delete registration"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    document.getElementById('registrationsTableBody').innerHTML = rowsHTML;
+                }
+                // Initial render
+                renderRows();
+                // Filter listeners
+                document.getElementById('regSearchInput').addEventListener('input', function() {
+                    renderRows(this.value, document.getElementById('regStatusFilter').value, typeFilter.value, document.getElementById('regStartDate').value, document.getElementById('regEndDate').value);
+                });
+                document.getElementById('regStatusFilter').addEventListener('change', function() {
+                    renderRows(document.getElementById('regSearchInput').value, this.value, typeFilter.value, document.getElementById('regStartDate').value, document.getElementById('regEndDate').value);
+                });
+                typeFilter.addEventListener('change', function() {
+                    renderRows(document.getElementById('regSearchInput').value, document.getElementById('regStatusFilter').value, this.value, document.getElementById('regStartDate').value, document.getElementById('regEndDate').value);
+                });
+                document.getElementById('regStartDate').addEventListener('change', function() {
+                    renderRows(document.getElementById('regSearchInput').value, document.getElementById('regStatusFilter').value, typeFilter.value, this.value, document.getElementById('regEndDate').value);
+                });
+                document.getElementById('regEndDate').addEventListener('change', function() {
+                    renderRows(document.getElementById('regSearchInput').value, document.getElementById('regStatusFilter').value, typeFilter.value, document.getElementById('regStartDate').value, this.value);
+                });
+                // Registration trend chart
+                setTimeout(() => {
+                    const ctx = document.getElementById('registrationTrendChart').getContext('2d');
+                    ctx.clearRect(0,0,320,120);
+                    // Group by date
+                    const dateCounts = {};
+                    registrations.forEach(r => {
+                        const d = r.RegistrationDate.substr(0,10);
+                        dateCounts[d] = (dateCounts[d]||0)+1;
+                    });
+                    const dates = Object.keys(dateCounts).sort();
+                    const maxCount = Math.max(...Object.values(dateCounts),1);
+                    dates.forEach((d,i) => {
+                        ctx.fillStyle = '#17a2b8';
+                        ctx.fillRect(20+i*22, 110-(dateCounts[d]/maxCount)*80, 16, (dateCounts[d]/maxCount)*80);
+                        ctx.fillStyle = '#263c79';
+                        ctx.font = '11px Arial';
+                        ctx.fillText(d, 20+i*22, 118);
+                        ctx.fillText(dateCounts[d], 20+i*22, 110-(dateCounts[d]/maxCount)*80-6);
+                    });
+                }, 300);
+                // Top members by attendance
+                setTimeout(() => {
+                    const memberCounts = {};
+                    registrations.forEach(r => {
+                        if (r.AttendanceStatus === 'Present') {
+                            memberCounts[r.MemberName] = (memberCounts[r.MemberName]||0)+1;
+                        }
+                    });
+                    const topMembers = Object.entries(memberCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+                    const ul = document.getElementById('topMembersList');
+                    ul.innerHTML = topMembers.length === 0 ? '<li style="color:#adb5bd;">No data</li>' : topMembers.map(([name,count]) => `<li style="margin-bottom:8px; font-weight:600; color:#263c79;"><i class='fas fa-user-check' style='color:#28a745;'></i> ${name} <span style='background:#e3f2fd; color:#1976d2; border-radius:8px; padding:2px 10px; font-size:13px;'>${count} attended</span></li>`).join('');
+                }, 300);
+                // Interactive attendance chart
+                setTimeout(() => {
+                    const ctx = document.getElementById('interactiveAttendanceChart').getContext('2d');
+                    ctx.clearRect(0,0,320,120);
+                    const present = registrations.filter(r => r.AttendanceStatus === 'Present').length;
+                    const absent = registrations.filter(r => r.AttendanceStatus === 'Absent').length;
+                    const notMarked = registrations.length - present - absent;
+                    const total = registrations.length || 1;
+                    // Pie chart
+                    let startAngle = 0;
+                    const data = [present, absent, notMarked];
+                    const colors = ['#17a2b8','#dc3545','#adb5bd'];
+                    data.forEach((val,i) => {
+                        const slice = val/total * 2*Math.PI;
+                        ctx.beginPath();
+                        ctx.moveTo(60,60);
+                        ctx.arc(60,60,50,startAngle,startAngle+slice);
+                        ctx.closePath();
+                        ctx.fillStyle = colors[i];
+                        ctx.fill();
+                        startAngle += slice;
+                    });
+                    // Legend
+                    ['Present','Absent','Not Marked'].forEach((label,i) => {
+                        ctx.fillStyle = colors[i];
+                        ctx.fillRect(140,30+i*22,14,14);
+                        ctx.fillStyle = '#263c79';
+                        ctx.font = '13px Arial';
+                        ctx.fillText(label+` (${data[i]})`, 160, 42+i*22);
+                    });
+                }, 300);
+                // PDF report
+                document.getElementById('downloadRegPDF').onclick = function() {
+                    const pdfContent = document.querySelector('.registrations-table').outerHTML;
+                    const blob = new Blob([pdfContent], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'registrations_report.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                };
+                // CSV export
+                window.exportRegistrationsCSV = function() {
+                    let csv = 'Event,Member Name,Member No,Email,Phone,Registration Date,Status,Attendance\n';
+                    registrations.forEach(registration => {
+                        const event = events.find(e => e.EventID == registration.EventID);
+                        csv += `"${event ? event.EventTitle : 'Unknown Event'}","${registration.MemberName}","${registration.MemberNo}","${registration.Email}","${registration.Phone}","${new Date(registration.RegistrationDate).toLocaleDateString('en-IN')}","${registration.Status}","${registration.AttendanceStatus || 'Not Marked'}"\n`;
+                    });
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'event_registrations.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                };
+            });
         }
 
         function loadAnalyticsContent() {
-            const analyticsHTML = `
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: #263c79; margin-bottom: 15px;">Events Analytics & Reports</h3>
+            document.getElementById('analyticsContent').innerHTML = `
+                <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 18px; justify-content: space-between;">
+                    <h3 style="color: #263c79; margin-bottom: 0;">Events Analytics & Reports</h3>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <input type="date" id="analyticsStartDate" class="form-control" style="width:140px;">
+                        <input type="date" id="analyticsEndDate" class="form-control" style="width:140px;">
+                        <select id="analyticsTypeFilter" class="form-control" style="width:160px;">
+                            <option value="">All Types</option>
+                        </select>
+                        <button class="btn btn-info" id="downloadAnalyticsPDF" style="margin-left:8px;">
+                            <i class="fas fa-file-pdf"></i> Download PDF Report
+                        </button>
+                    </div>
                 </div>
-
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                    <div onclick="generateReport('events-summary')" style="background: white; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onmouseover="this.style.borderColor='#cfac69'" onmouseout="this.style.borderColor='#e9ecef'">
-                        <i class="fas fa-chart-line" style="font-size: 24px; color: #263c79; margin-bottom: 10px;"></i>
-                        <h4 style="color: #263c79; margin-bottom: 5px;">Events Summary</h4>
-                        <p style="color: #6c757d; font-size: 14px;">Complete overview of all events with statistics</p>
+                <div id="analyticsDashboard" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(370px, 1fr)); gap: 28px;"></div>
+                <div style="margin-top:32px; display:grid; grid-template-columns: 1fr 1fr; gap:32px;">
+                    <div style="background:white; border:1px solid #e9ecef; border-radius:12px; padding:24px; box-shadow:0 2px 8px rgba(38,60,121,0.08);">
+                        <h4 style="color:#263c79; margin-bottom:18px; font-size:1.1rem;"><i class="fas fa-chart-pie" style="color:#17a2b8;"></i> Event Type Breakdown</h4>
+                        <canvas id="eventTypePieChart" width="320" height="220"></canvas>
                     </div>
-                    
-                    <div onclick="generateReport('attendance-analysis')" style="background: white; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onmouseover="this.style.borderColor='#cfac69'" onmouseout="this.style.borderColor='#e9ecef'">
-                        <i class="fas fa-users" style="font-size: 24px; color: #28a745; margin-bottom: 10px;"></i>
-                        <h4 style="color: #263c79; margin-bottom: 5px;">Attendance Analysis</h4>
-                        <p style="color: #6c757d; font-size: 14px;">Detailed attendance patterns and trends</p>
+                    <div style="background:white; border:1px solid #e9ecef; border-radius:12px; padding:24px; box-shadow:0 2px 8px rgba(38,60,121,0.08);">
+                        <h4 style="color:#263c79; margin-bottom:18px; font-size:1.1rem;"><i class="fas fa-balance-scale" style="color:#ffc107;"></i> Compare Two Events</h4>
+                        <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+                            <select id="compareEvent1" class="form-control" style="width:180px;"></select>
+                            <span style="font-weight:600; color:#263c79;">vs</span>
+                            <select id="compareEvent2" class="form-control" style="width:180px;"></select>
+                        </div>
+                        <canvas id="eventCompareChart" width="320" height="180"></canvas>
                     </div>
-                    
-                    <div onclick="generateReport('popular-events')" style="background: white; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onmouseover="this.style.borderColor='#cfac69'" onmouseout="this.style.borderColor='#e9ecef'">
-                        <i class="fas fa-star" style="font-size: 24px; color: #ffc107; margin-bottom: 10px;"></i>
-                        <h4 style="color: #263c79; margin-bottom: 5px;">Popular Events</h4>
-                        <p style="color: #6c757d; font-size: 14px;">Most attended and successful events</p>
-                    </div>
-                    
-                    <div onclick="generateReport('feedback-analysis')" style="background: white; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onmouseover="this.style.borderColor='#cfac69'" onmouseout="this.style.borderColor='#e9ecef'">
-                        <i class="fas fa-comments" style="font-size: 24px; color: #17a2b8; margin-bottom: 10px;"></i>
-                        <h4 style="color: #263c79; margin-bottom: 5px;">Feedback Analysis</h4>
-                        <p style="color: #6c757d; font-size: 14px;">Participant feedback and satisfaction ratings</p>
-                    </div>
+                </div>
+                <div style="margin-top:32px; background:white; border:1px solid #e9ecef; border-radius:12px; padding:24px; box-shadow:0 2px 8px rgba(38,60,121,0.08);">
+                    <h4 style="color:#263c79; margin-bottom:18px; font-size:1.1rem;"><i class="fas fa-th" style="color:#28a745;"></i> Attendance Rate Heatmap</h4>
+                    <canvas id="attendanceHeatmap" width="700" height="220"></canvas>
                 </div>
             `;
-
-            document.getElementById('analyticsContent').innerHTML = analyticsHTML;
+            Promise.all([
+                fetch('api/events.php?action=list').then(res => res.json()),
+                fetch('api/event_registrations.php?action=list').then(res => res.json())
+            ]).then(([eventsRes, regRes]) => {
+                const events = Array.isArray(eventsRes.data) ? eventsRes.data : [];
+                const registrations = Array.isArray(regRes.data) ? regRes.data : [];
+                // Fill event type filter
+                const typeSet = new Set(events.map(e => e.EventType));
+                const typeFilter = document.getElementById('analyticsTypeFilter');
+                typeSet.forEach(type => {
+                    if (type) {
+                        const opt = document.createElement('option');
+                        opt.value = type;
+                        opt.textContent = type;
+                        typeFilter.appendChild(opt);
+                    }
+                });
+                // Fill compare event dropdowns
+                const compare1 = document.getElementById('compareEvent1');
+                const compare2 = document.getElementById('compareEvent2');
+                events.forEach(ev => {
+                    const opt1 = document.createElement('option');
+                    opt1.value = ev.EventID;
+                    opt1.textContent = ev.EventTitle;
+                    compare1.appendChild(opt1);
+                    const opt2 = document.createElement('option');
+                    opt2.value = ev.EventID;
+                    opt2.textContent = ev.EventTitle;
+                    compare2.appendChild(opt2);
+                });
+                // Filter logic
+                function getFilteredEvents() {
+                    let filtered = events;
+                    const type = typeFilter.value;
+                    const start = document.getElementById('analyticsStartDate').value;
+                    const end = document.getElementById('analyticsEndDate').value;
+                    if (type) filtered = filtered.filter(e => e.EventType === type);
+                    if (start) filtered = filtered.filter(e => e.StartDate >= start);
+                    if (end) filtered = filtered.filter(e => e.EndDate <= end);
+                    return filtered;
+                }
+                // Event stats
+                function getEventStats(evList) {
+                    return evList.map(event => {
+                        const regs = registrations.filter(r => r.EventID == event.EventID);
+                        const present = regs.filter(r => r.AttendanceStatus === 'Present').length;
+                        return {
+                            EventID: event.EventID,
+                            EventTitle: event.EventTitle,
+                            EventType: event.EventType,
+                            Registered: regs.length,
+                            Present: present,
+                            Capacity: event.Capacity || '-',
+                            AttendancePercent: regs.length > 0 ? Math.round((present / regs.length) * 100) : 0
+                        };
+                    });
+                }
+                // Pie chart: event type breakdown
+                function renderEventTypePie() {
+                    const ctx = document.getElementById('eventTypePieChart').getContext('2d');
+                    const filtered = getFilteredEvents();
+                    const typeCounts = {};
+                    filtered.forEach(e => {
+                        typeCounts[e.EventType] = (typeCounts[e.EventType] || 0) + 1;
+                    });
+                    const labels = Object.keys(typeCounts);
+                    const data = Object.values(typeCounts);
+                    // Simple pie chart
+                    ctx.clearRect(0,0,320,220);
+                    let total = data.reduce((a,b) => a+b,0);
+                    let startAngle = 0;
+                    const colors = ['#17a2b8','#ffc107','#28a745','#1976d2','#dc3545','#6c757d','#e83e8c'];
+                    labels.forEach((label, i) => {
+                        const slice = data[i]/total * 2*Math.PI;
+                        ctx.beginPath();
+                        ctx.moveTo(160,110);
+                        ctx.arc(160,110,90,startAngle,startAngle+slice);
+                        ctx.closePath();
+                        ctx.fillStyle = colors[i%colors.length];
+                        ctx.fill();
+                        startAngle += slice;
+                    });
+                    // Legend
+                    labels.forEach((label,i) => {
+                        ctx.fillStyle = colors[i%colors.length];
+                        ctx.fillRect(20,200+i*18,14,14);
+                        ctx.fillStyle = '#263c79';
+                        ctx.font = '13px Arial';
+                        ctx.fillText(label+` (${data[i]})`, 40, 212+i*18);
+                    });
+                }
+                // Event comparison chart
+                function renderEventCompare() {
+                    const ctx = document.getElementById('eventCompareChart').getContext('2d');
+                    ctx.clearRect(0,0,320,180);
+                    const id1 = compare1.value, id2 = compare2.value;
+                    const stat1 = getEventStats(events.filter(e=>e.EventID==id1))[0];
+                    const stat2 = getEventStats(events.filter(e=>e.EventID==id2))[0];
+                    if (!stat1 || !stat2) return;
+                    // Bar chart
+                    const barW = 40, gap = 60, baseY = 150;
+                    // Event 1
+                    ctx.fillStyle = '#17a2b8';
+                    ctx.fillRect(60, baseY-stat1.AttendancePercent, barW, stat1.AttendancePercent);
+                    ctx.fillStyle = '#263c79';
+                    ctx.fillText(stat1.EventTitle, 60, baseY+16);
+                    ctx.fillText(stat1.AttendancePercent+'%', 60, baseY-stat1.AttendancePercent-8);
+                    // Event 2
+                    ctx.fillStyle = '#ffc107';
+                    ctx.fillRect(60+barW+gap, baseY-stat2.AttendancePercent, barW, stat2.AttendancePercent);
+                    ctx.fillStyle = '#263c79';
+                    ctx.fillText(stat2.EventTitle, 60+barW+gap, baseY+16);
+                    ctx.fillText(stat2.AttendancePercent+'%', 60+barW+gap, baseY-stat2.AttendancePercent-8);
+                }
+                // Attendance heatmap
+                function renderAttendanceHeatmap() {
+                    const ctx = document.getElementById('attendanceHeatmap').getContext('2d');
+                    ctx.clearRect(0,0,700,220);
+                    const filtered = getFilteredEvents();
+                    const stats = getEventStats(filtered);
+                    // X: events, Y: months
+                    const months = [...new Set(filtered.map(e=>e.StartDate.substr(0,7)))];
+                    stats.forEach((stat,i) => {
+                        const monthIdx = months.indexOf(events.find(e=>e.EventID==stat.EventID).StartDate.substr(0,7));
+                        const x = 60+i*60, y = 40+monthIdx*60;
+                        ctx.fillStyle = `rgba(23,162,184,${stat.AttendancePercent/100})`;
+                        ctx.fillRect(x,y,40,40);
+                        ctx.fillStyle = '#263c79';
+                        ctx.font = '13px Arial';
+                        ctx.fillText(stat.AttendancePercent+'%', x+8, y+24);
+                        ctx.fillText(stat.EventTitle, x-10, y+58);
+                    });
+                    // Month labels
+                    months.forEach((m,idx) => {
+                        ctx.fillStyle = '#263c79';
+                        ctx.font = '13px Arial';
+                        ctx.fillText(m, 10, 60+idx*60+24);
+                    });
+                }
+                // Interactive charts: re-render on filter change
+                typeFilter.onchange = () => { renderEventTypePie(); renderAttendanceHeatmap(); };
+                document.getElementById('analyticsStartDate').onchange = () => { renderEventTypePie(); renderAttendanceHeatmap(); };
+                document.getElementById('analyticsEndDate').onchange = () => { renderEventTypePie(); renderAttendanceHeatmap(); };
+                compare1.onchange = renderEventCompare;
+                compare2.onchange = renderEventCompare;
+                // Initial render
+                renderEventTypePie();
+                renderEventCompare();
+                renderAttendanceHeatmap();
+                // Download PDF report
+                document.getElementById('downloadAnalyticsPDF').onclick = function() {
+                    const pdfContent = document.getElementById('analyticsDashboard').outerHTML;
+                    const blob = new Blob([pdfContent], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'analytics_report.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                };
+                // ...existing dashboardHTML code for top events, trends, attendance percentage...
+                let dashboardHTML = '';
+                // ...existing code...
+                document.getElementById('analyticsDashboard').innerHTML = dashboardHTML;
+            });
         }
 
         function searchEvents() {
@@ -1544,37 +1901,56 @@ $eventRegistrations = [
         }
 
         function saveEvent() {
-            const formData = new FormData(document.getElementById('addEventForm'));
+            const form = document.getElementById('addEventForm');
+            const formData = new FormData(form);
             const eventData = Object.fromEntries(formData);
-
-            // Generate new event ID
-            const newEventID = Math.max(...sampleEvents.map(e => e.EventID)) + 1;
-
-            console.log('Creating new event:', {
-                ...eventData,
-                EventID: newEventID
+            eventData.Status = 'Upcoming';
+            // Ensure checkbox value is 1 or 0
+            eventData.RegistrationRequired = document.getElementById('registrationRequired').checked ? 1 : 0;
+            const editId = form.getAttribute('data-edit-id');
+            let url = 'api/events.php?action=create';
+            if (editId) {
+                eventData.EventID = editId;
+                url = 'api/events.php?action=edit';
+            }
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(eventData)
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) {
+                    alert(editId ? 'Event updated successfully!' : 'Event created successfully!');
+                    closeModal('addEventModal');
+                    form.removeAttribute('data-edit-id');
+                    loadEventsList();
+                } else {
+                    alert('Error: ' + result.message);
+                }
             });
-
-            alert(`Event created successfully!\nEvent ID: ${newEventID}\nNotifications will be sent to registered members.`);
-            closeModal('addEventModal');
-            loadEventsList();
         }
 
         function saveEventInline() {
             const formData = new FormData(document.getElementById('addEventInlineForm'));
             const eventData = Object.fromEntries(formData);
-
-            // Generate new event ID
-            const newEventID = Math.max(...sampleEvents.map(e => e.EventID)) + 1;
-
-            console.log('Creating new event:', {
-                ...eventData,
-                EventID: newEventID
+            eventData.Status = 'Upcoming';
+            eventData.RegistrationRequired = document.getElementById('registrationRequiredInline').checked ? 1 : 0;
+            fetch('api/events.php?action=create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(eventData)
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) {
+                    alert('Event created successfully!');
+                    document.getElementById('addEventInlineForm').reset();
+                    loadEventsList();
+                } else {
+                    alert('Error: ' + result.message);
+                }
             });
-
-            alert(`Event created successfully!\nEvent ID: ${newEventID}\nNotifications will be sent to registered members.`);
-            document.getElementById('addEventInlineForm').reset();
-            loadEventsList();
         }
 
         // Event actions
@@ -1584,21 +1960,86 @@ $eventRegistrations = [
         }
 
         function editEvent(eventId) {
-            console.log('Editing event:', eventId);
-            alert(`Opening edit form for Event ID: ${eventId}`);
+            fetch(`api/events.php?action=get&EventID=${eventId}`)
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success && result.data) {
+                        const event = result.data;
+                        document.getElementById('eventTitle').value = event.EventTitle;
+                        document.getElementById('eventType').value = event.EventType;
+                        document.getElementById('eventDescription').value = event.Description;
+                        document.getElementById('startDate').value = event.StartDate;
+                        document.getElementById('endDate').value = event.EndDate;
+                        document.getElementById('startTime').value = event.StartTime;
+                        document.getElementById('endTime').value = event.EndTime;
+                        document.getElementById('venue').value = event.Venue;
+                        document.getElementById('capacity').value = event.Capacity;
+                        document.getElementById('organizedBy').value = event.OrganizedBy;
+                        document.getElementById('contactPerson').value = event.ContactPerson;
+                        document.getElementById('contactEmail').value = event.ContactEmail;
+                        document.getElementById('contactPhone').value = event.ContactPhone;
+                        document.getElementById('registrationRequired').checked = event.RegistrationRequired == 1;
+                        document.getElementById('registrationDeadline').value = event.RegistrationDeadline;
+                        document.getElementById('addEventForm').setAttribute('data-edit-id', event.EventID);
+                        openAddEventModal();
+                    } else {
+                        alert('Event not found.');
+                    }
+                });
         }
 
         function cancelEvent(eventId) {
             if (confirm(`Are you sure you want to cancel Event ID: ${eventId}?`)) {
-                console.log('Cancelling event:', eventId);
-                alert('Event cancelled successfully! Cancellation notifications will be sent.');
-                loadEventsList();
+                fetch('api/events.php?action=delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `EventID=${eventId}`
+                })
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success) {
+                        alert('Event cancelled successfully!');
+                        loadEventsList();
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                });
             }
         }
 
         function markAttendance(registrationId) {
-            console.log('Marking attendance for registration:', registrationId);
-            alert(`Attendance marked for Registration ID: ${registrationId}`);
+            fetch('api/event_registrations.php?action=mark_attendance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `RegistrationID=${registrationId}`
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) {
+                    alert('Attendance marked!');
+                    loadRegistrationsContent();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            });
+        function deleteRegistration(registrationId) {
+            if (confirm('Are you sure you want to delete this registration?')) {
+                fetch('api/event_registrations.php?action=delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `RegistrationID=${registrationId}`
+                })
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success) {
+                        alert('Registration deleted!');
+                        loadRegistrationsContent();
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                });
+            }
+        }
         }
 
         // Other functions
@@ -1632,19 +2073,27 @@ $eventRegistrations = [
 
         // Load statistics
         function loadStatistics() {
-            const totalEvents = sampleEvents.length;
-            const upcomingEvents = sampleEvents.filter(e => e.Status === 'Upcoming').length;
-            const activeEvents = sampleEvents.filter(e => e.Status === 'Active').length;
-            const completedEvents = sampleEvents.filter(e => e.Status === 'Completed').length;
-            const totalRegistrations = eventRegistrations.length;
-            const averageAttendance = 85; // Mock calculation
-
-            document.getElementById('totalEvents').textContent = totalEvents;
-            document.getElementById('upcomingEvents').textContent = upcomingEvents;
-            document.getElementById('activeEvents').textContent = activeEvents;
-            document.getElementById('completedEvents').textContent = completedEvents;
-            document.getElementById('totalRegistrations').textContent = totalRegistrations;
-            document.getElementById('averageAttendance').textContent = averageAttendance + '%';
+            Promise.all([
+                fetch('api/events.php?action=list').then(res => res.json()),
+                fetch('api/event_registrations.php?action=list').then(res => res.json())
+            ]).then(([eventsRes, regRes]) => {
+                const events = Array.isArray(eventsRes.data) ? eventsRes.data : [];
+                const registrations = Array.isArray(regRes.data) ? regRes.data : [];
+                const totalEvents = events.length;
+                const upcomingEvents = events.filter(e => e.Status === 'Upcoming').length;
+                const activeEvents = events.filter(e => e.Status === 'Active').length;
+                const completedEvents = events.filter(e => e.Status === 'Completed').length;
+                const totalRegistrations = registrations.length;
+                // Calculate average attendance (mock: percent of registrations marked attended)
+                const attended = registrations.filter(r => r.AttendanceMarked == 1).length;
+                const averageAttendance = totalRegistrations > 0 ? Math.round((attended / totalRegistrations) * 100) : 0;
+                document.getElementById('totalEvents').textContent = totalEvents;
+                document.getElementById('upcomingEvents').textContent = upcomingEvents;
+                document.getElementById('activeEvents').textContent = activeEvents;
+                document.getElementById('completedEvents').textContent = completedEvents;
+                document.getElementById('totalRegistrations').textContent = totalRegistrations;
+                document.getElementById('averageAttendance').textContent = averageAttendance + '%';
+            });
         }
 
         // Close modals when clicking outside
