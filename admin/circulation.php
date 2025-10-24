@@ -1,4 +1,8 @@
 <?php
+// Enable error display for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 
 // Include database connection and functions
@@ -82,9 +86,38 @@ $sampleReturns = [
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Circulation Management</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+    /* Spinner overlay for camera loading */
+    .camera-loading-overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(38,60,121,0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+        color: #fff;
+        font-size: 20px;
+    }
+    .camera-loading-spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #cfac69;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin-right: 16px;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+        /* All your CSS goes here */
         .circulation-header {
             display: flex;
             justify-content: space-between;
@@ -131,6 +164,8 @@ $sampleReturns = [
             margin-bottom: 5px;
         }
 
+       
+    
         .stat-label {
             color: #6c757d;
             font-size: 14px;
@@ -253,13 +288,6 @@ $sampleReturns = [
             flex-wrap: wrap;
         }
 
-        .form-row-scan {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            margin-bottom: 15px;
-            align-items: center;
-        }
 
         .scan-group {
             width: 100%;
@@ -278,10 +306,25 @@ $sampleReturns = [
 
         .form-group label {
             display: block;
-            font-weight: 600;
-            color: #263c79;
+            color: #495057;
+            font-weight: 500;
             margin-bottom: 5px;
             font-size: 14px;
+        }
+        
+        .search-filters {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .search-filters .form-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: end;
         }
 
         .form-control {
@@ -306,8 +349,9 @@ $sampleReturns = [
             border-radius: 8px;
             background: white;
             margin: 15px auto;
-            width: 350px;
-            height: 520px;
+            width: 100%;
+            max-width: 380px;
+            min-height: 400px;
             position: relative;
             overflow: hidden;
         }
@@ -327,7 +371,7 @@ $sampleReturns = [
         .camera-container {
             position: relative;
             width: 100%;
-            height: 450px;
+            height: 300px;
             background: #f8f9fa;
             border-radius: 4px;
             overflow: hidden;
@@ -577,12 +621,54 @@ $sampleReturns = [
                 padding: 8px 4px;
             }
         }
+        
+        /* Page Layout Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .page-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px;
+            background-color: white;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            overflow-x: auto;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
     </style>
     <!-- Add QR Code scanning library -->
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
 </head>
 
 <body>
+<!-- DEBUG: Page loaded at <?php echo date('Y-m-d H:i:s'); ?> -->
+<div class="page-container">
     <div class="circulation-header">
         <h1 class="circulation-title">
             <i class="fas fa-exchange-alt"></i>
@@ -650,6 +736,10 @@ $sampleReturns = [
                             <div class="scan-group">
                                 <label for="memberScan">Member QR Code / ID Card</label>
                                 <div class="scan-area" id="memberScanArea">
+        <div class="camera-loading-overlay" id="memberCameraLoading" style="display:none;">
+            <div class="camera-loading-spinner"></div>
+            <span>Initializing camera...</span>
+        </div>
                                     <div class="camera-container">
                                         <video id="memberVideo" class="camera-video" autoplay playsinline></video>
                                         <canvas id="memberCanvas" class="camera-canvas"></canvas>
@@ -726,6 +816,10 @@ $sampleReturns = [
                             <div class="scan-group">
                                 <label for="bookScan">Book QR Code / Barcode</label>
                                 <div class="scan-area" id="bookScanArea">
+        <div class="camera-loading-overlay" id="bookCameraLoading" style="display:none;">
+            <div class="camera-loading-spinner"></div>
+            <span>Initializing camera...</span>
+        </div>
                                     <div class="camera-container">
                                         <video id="bookVideo" class="camera-video" autoplay playsinline></video>
                                         <canvas id="bookCanvas" class="camera-canvas"></canvas>
@@ -839,6 +933,13 @@ $sampleReturns = [
                         <div class="form-group">
                             <label for="returnBookScan">Book QR Code / Barcode</label>
                             <div class="scan-area" id="returnScanArea">
+        <div class="camera-loading-overlay" id="returnCameraLoading" style="display:none;">
+            <div class="camera-loading-spinner"></div>
+            <span>Initializing camera...</span>
+        </div>
+    <select id="memberCameraSelect" style="margin-right:8px; display:none;"></select>
+    <select id="bookCameraSelect" style="margin-right:8px; display:none;"></select>
+    <select id="returnCameraSelect" style="margin-right:8px; display:none;"></select>
                                 <div class="camera-container">
                                     <video id="returnVideo" class="camera-video" autoplay playsinline></video>
                                     <canvas id="returnCanvas" class="camera-canvas"></canvas>
@@ -1058,47 +1159,67 @@ $sampleReturns = [
         </div>
     </div>
 
-    <script>
-        // Global variables
-        let selectedMember = null;
-        let selectedBook = null;
-        let returnBookData = null;
+    <!-- ...existing code... -->
+</div>
+<!-- End page-container -->
 
-        // Tab switching function
-        function showTab(tabName) {
-            // Hide all tabs
-            var tabs = document.querySelectorAll('.tab-content');
-            for (var i = 0; i < tabs.length; i++) {
-                tabs[i].style.display = 'none';
-                tabs[i].classList.remove('active');
-            }
-            
-            // Remove active from all buttons
-            var buttons = document.querySelectorAll('.tab-btn');
-            for (var i = 0; i < buttons.length; i++) {
-                buttons[i].classList.remove('active');
-            }
-            
-            // Show selected tab
-            var selectedTab = document.getElementById(tabName);
-            if (selectedTab) {
-                selectedTab.style.display = 'block';
-                selectedTab.classList.add('active');
-            }
-            
-            // Activate button
-            var activeButton = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
-            if (activeButton) {
-                activeButton.classList.add('active');
-            }
-            
-            // Load content
-            if (tabName === 'active') {
-                loadActiveCirculations();
-            } else if (tabName === 'history') {
-                loadReturnHistory();
-            }
+<script>
+    // Utility: Populate camera select dropdowns
+    async function populateCameraSelect(selectId) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoInputs = devices.filter(d => d.kind === 'videoinput');
+            select.innerHTML = '';
+            videoInputs.forEach((device, idx) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `Camera ${idx+1}`;
+                select.appendChild(option);
+            });
+            select.style.display = videoInputs.length > 1 ? 'inline-block' : 'none';
+        } catch (err) {
+            select.style.display = 'none';
         }
+    }
+    // Tab switching function - MUST BE AT TOP FOR ONCLICK HANDLERS
+    window.showTab = function(tabName) {
+        console.log('showTab called with:', tabName);
+        // Hide all tabs
+        var tabs = document.querySelectorAll('.tab-content');
+        for (var i = 0; i < tabs.length; i++) {
+            tabs[i].style.display = 'none';
+            tabs[i].classList.remove('active');
+        }
+        // Remove active from all buttons
+        var buttons = document.querySelectorAll('.tab-btn');
+        for (var i = 0; i < buttons.length; i++) {
+            buttons[i].classList.remove('active');
+        }
+        // Show selected tab
+        var selectedTab = document.getElementById(tabName);
+        if (selectedTab) {
+            selectedTab.style.display = 'block';
+            selectedTab.classList.add('active');
+        }
+        // Activate button
+        var activeButton = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
+        if (activeButton) {
+            activeButton.classList.add('active');
+        }
+        // Load content
+        if (tabName === 'active') {
+            loadActiveCirculations();
+        } else if (tabName === 'history') {
+            loadReturnHistory();
+        }
+    };
+    // Global variables
+    let selectedMember = null;
+    let selectedBook = null;
+    let returnBookData = null;
+
 
         function loadTabContent(tabName) {
             switch (tabName) {
@@ -1260,14 +1381,35 @@ $sampleReturns = [
         }
 
         function resetIssueForm() {
+            // Stop camera if running
+            stopMemberScan();
+            stopBookScan();
+            
+            // Clear variables
             selectedMember = null;
             selectedBook = null;
+            
+            // Clear form fields
             document.getElementById('memberNo').value = '';
             document.getElementById('accNo').value = '';
             document.getElementById('remarks').value = '';
+            document.getElementById('issueDate').value = '<?php echo date('Y-m-d'); ?>';
+            document.getElementById('dueDate').value = '<?php echo date('Y-m-d', strtotime('+15 days')); ?>';
+            
+            // Hide info panels
             document.getElementById('memberInfo').classList.remove('show');
             document.getElementById('bookInfo').classList.remove('show');
+            
+            // Clear scan results
+            document.getElementById('memberScanResult').textContent = '';
+            document.getElementById('bookScanResult').textContent = '';
+            document.getElementById('memberScanError').textContent = '';
+            document.getElementById('bookScanError').textContent = '';
+            
+            // Disable issue button
             document.getElementById('issueBtn').disabled = true;
+            
+            console.log('Issue form reset complete');
         }
 
         // Return Book Functions
@@ -1390,13 +1532,29 @@ $sampleReturns = [
         }
 
         function resetReturnForm() {
+            // Stop camera if running
+            stopReturnScan();
+            
+            // Clear variables
             returnBookData = null;
+            
+            // Clear form fields
             document.getElementById('returnAccNo').value = '';
             document.getElementById('returnRemarks').value = '';
             document.getElementById('returnCondition').value = 'Good';
+            
+            // Hide info panels
             document.getElementById('returnBookInfo').classList.remove('show');
             document.getElementById('fineCalculator').classList.remove('show');
+            
+            // Clear scan results
+            document.getElementById('returnScanResult').textContent = '';
+            document.getElementById('returnScanError').textContent = '';
+            
+            // Disable return button
             document.getElementById('returnBtn').disabled = true;
+            
+            console.log('Return form reset complete');
         }
 
         // Load Active Circulations from API
@@ -1494,10 +1652,6 @@ $sampleReturns = [
                 document.getElementById('returnHistoryTable').innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #dc3545;">Error loading data</td></tr>';
             }
         }
-            });
-
-            document.getElementById('returnHistoryTable').innerHTML = tableHTML;
-        }
 
         // Action Functions
         function renewBook(circulationId) {
@@ -1562,19 +1716,19 @@ $sampleReturns = [
         // Member scanning functions
         async function startMemberScan() {
             try {
+                document.getElementById('memberCameraLoading').style.display = 'flex';
+                await populateCameraSelect('memberCameraSelect');
+                let deviceId = document.getElementById('memberCameraSelect').value;
                 const constraints = {
-                    video: {
-                        facingMode: 'environment', // Use back camera if available
-                        width: {
-                            ideal: 350
-                        },
-                        height: {
-                            ideal: 150
-                        }
-                    }
+                    video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment', width: { ideal: 350 }, height: { ideal: 150 } }
                 };
-
-                memberStream = await navigator.mediaDevices.getUserMedia(constraints);
+                try {
+                    memberStream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (err) {
+                    document.getElementById('memberCameraLoading').style.display = 'none';
+                    showScanError('memberScanError', 'Camera access denied or unavailable.');
+                    return;
+                }
                 const video = document.getElementById('memberVideo');
                 const placeholder = document.getElementById('memberPlaceholder');
                 const scanBtn = document.getElementById('memberScanBtn');
@@ -1585,6 +1739,7 @@ $sampleReturns = [
                 placeholder.style.display = 'none';
                 scanBtn.disabled = true;
                 stopBtn.disabled = false;
+                document.getElementById('memberCameraLoading').style.display = 'none';
 
                 // Start QR code detection
                 if (memberCodeReader) {
@@ -1652,19 +1807,19 @@ $sampleReturns = [
         // Book scanning functions
         async function startBookScan() {
             try {
+                document.getElementById('bookCameraLoading').style.display = 'flex';
+                await populateCameraSelect('bookCameraSelect');
+                let deviceId = document.getElementById('bookCameraSelect').value;
                 const constraints = {
-                    video: {
-                        facingMode: 'environment',
-                        width: {
-                            ideal: 350
-                        },
-                        height: {
-                            ideal: 150
-                        }
-                    }
+                    video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment', width: { ideal: 350 }, height: { ideal: 150 } }
                 };
-
-                bookStream = await navigator.mediaDevices.getUserMedia(constraints);
+                try {
+                    bookStream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (err) {
+                    document.getElementById('bookCameraLoading').style.display = 'none';
+                    showScanError('bookScanError', 'Camera access denied or unavailable.');
+                    return;
+                }
                 const video = document.getElementById('bookVideo');
                 const placeholder = document.getElementById('bookPlaceholder');
                 const scanBtn = document.getElementById('bookScanBtn');
@@ -1675,6 +1830,7 @@ $sampleReturns = [
                 placeholder.style.display = 'none';
                 scanBtn.disabled = true;
                 stopBtn.disabled = false;
+                document.getElementById('bookCameraLoading').style.display = 'none';
 
                 if (bookCodeReader) {
                     bookCodeReader.decodeFromVideoDevice(null, 'bookVideo', (result, error) => {
@@ -1738,19 +1894,19 @@ $sampleReturns = [
         // Return scanning functions
         async function startReturnScan() {
             try {
+                document.getElementById('returnCameraLoading').style.display = 'flex';
+                await populateCameraSelect('returnCameraSelect');
+                let deviceId = document.getElementById('returnCameraSelect').value;
                 const constraints = {
-                    video: {
-                        facingMode: 'environment',
-                        width: {
-                            ideal: 350
-                        },
-                        height: {
-                            ideal: 150
-                        }
-                    }
+                    video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment', width: { ideal: 350 }, height: { ideal: 150 } }
                 };
-
-                returnStream = await navigator.mediaDevices.getUserMedia(constraints);
+                try {
+                    returnStream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (err) {
+                    document.getElementById('returnCameraLoading').style.display = 'none';
+                    showScanError('returnScanError', 'Camera access denied or unavailable.');
+                    return;
+                }
                 const video = document.getElementById('returnVideo');
                 const placeholder = document.getElementById('returnPlaceholder');
                 const scanBtn = document.getElementById('returnScanBtn');
@@ -1761,6 +1917,7 @@ $sampleReturns = [
                 placeholder.style.display = 'none';
                 scanBtn.disabled = true;
                 stopBtn.disabled = false;
+                document.getElementById('returnCameraLoading').style.display = 'none';
 
                 if (returnCodeReader) {
                     returnCodeReader.decodeFromVideoDevice(null, 'returnVideo', (result, error) => {
@@ -1868,6 +2025,9 @@ $sampleReturns = [
         // Clean up streams when tab changes
         // Initialize everything when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('✅ Circulation page loaded successfully');
+            console.log('📅 Current date:', new Date().toLocaleDateString());
+            
             // Initialize code readers
             initializeCodeReaders();
 
@@ -1878,6 +2038,8 @@ $sampleReturns = [
 
             // Refresh stats every 30 seconds
             setInterval(loadStatistics, 30000);
+            
+            console.log('✅ All initialization complete');
 
             // ...existing code...
         });
@@ -2043,6 +2205,44 @@ $sampleReturns = [
             }
         });
     </script>
-</body>
 
-</html>
+<script>
+    // Tab switching function - MUST BE AT TOP FOR ONCLICK HANDLERS
+    window.showTab = function(tabName) {
+        console.log('showTab called with:', tabName);
+        // Hide all tabs
+        var tabs = document.querySelectorAll('.tab-content');
+        for (var i = 0; i < tabs.length; i++) {
+            tabs[i].style.display = 'none';
+            tabs[i].classList.remove('active');
+        }
+        // Remove active from all buttons
+        var buttons = document.querySelectorAll('.tab-btn');
+        for (var i = 0; i < buttons.length; i++) {
+            buttons[i].classList.remove('active');
+        }
+        // Show selected tab
+        var selectedTab = document.getElementById(tabName);
+        if (selectedTab) {
+            selectedTab.style.display = 'block';
+            selectedTab.classList.add('active');
+        }
+        // Activate button
+        var activeButton = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
+        if (activeButton) {
+            activeButton.classList.add('active');
+        }
+        // Load content
+        if (tabName === 'active') {
+            loadActiveCirculations();
+        } else if (tabName === 'history') {
+            loadReturnHistory();
+        }
+    };
+    // Global variables
+    let selectedMember = null;
+    let selectedBook = null;
+    let returnBookData = null;
+</script>
+</div>
+<!-- End page-container -->
