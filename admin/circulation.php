@@ -703,19 +703,19 @@ $sampleReturns = [
     <!-- Tabs -->
     <div class="tabs-container">
         <div class="tab-buttons">
-            <button class="tab-btn active" data-tab="issue" onclick="showTab('issue')">
+            <button class="tab-btn active" data-tab="issue" onclick="showTab('issue')" aria-label="Issue Books" tabindex="0" role="tab">
                 <i class="fas fa-plus-circle"></i>
                 Issue Books
             </button>
-            <button class="tab-btn" data-tab="return" onclick="showTab('return')">
+            <button class="tab-btn" data-tab="return" onclick="showTab('return')" aria-label="Return Books" tabindex="0" role="tab">
                 <i class="fas fa-undo"></i>
                 Return Books
             </button>
-            <button class="tab-btn" data-tab="active" onclick="showTab('active')">
+            <button class="tab-btn" data-tab="active" onclick="showTab('active')" aria-label="Active Circulations" tabindex="0" role="tab">
                 <i class="fas fa-list"></i>
                 Active Circulations
             </button>
-            <button class="tab-btn" data-tab="history" onclick="showTab('history')">
+            <button class="tab-btn" data-tab="history" onclick="showTab('history')" aria-label="Return History" tabindex="0" role="tab">
                 <i class="fas fa-history"></i>
                 Return History
             </button>
@@ -757,11 +757,11 @@ $sampleReturns = [
                                         </div>
                                     </div>
                                     <div class="scan-controls">
-                                        <button class="btn-scan" onclick="startMemberScan()" id="memberScanBtn">
+                                        <button class="btn-scan" onclick="startMemberScan()" id="memberScanBtn" aria-label="Start member camera scan" tabindex="0">
                                             <i class="fas fa-camera"></i>
                                             Start Camera
                                         </button>
-                                        <button class="btn-scan btn-scan-secondary" onclick="stopMemberScan()" id="memberStopBtn" disabled>
+                                        <button class="btn-scan btn-scan-secondary" onclick="stopMemberScan()" id="memberStopBtn" disabled aria-label="Stop member camera scan" tabindex="0">
                                             <i class="fas fa-stop"></i>
                                             Stop
                                         </button>
@@ -772,7 +772,7 @@ $sampleReturns = [
                             </div>
                             <div class="manual-group">
                                 <label for="memberNo">Or Enter Member Number</label>
-                                <input type="text" id="memberNo" class="form-control" placeholder="Enter member number..." onchange="searchMember()">
+                                <input type="text" id="memberNo" class="form-control" placeholder="Enter member number..." onchange="searchMember()" aria-label="Member Number" tabindex="0">
                                 <button type="button" class="btn btn-primary" onclick="searchMember()" style="margin-top: 10px; width: 100%;">
                                     <i class="fas fa-search"></i>
                                     Search Member
@@ -837,11 +837,11 @@ $sampleReturns = [
                                         </div>
                                     </div>
                                     <div class="scan-controls">
-                                        <button class="btn-scan" onclick="startBookScan()" id="bookScanBtn">
+                                        <button class="btn-scan" onclick="startBookScan()" id="bookScanBtn" aria-label="Start book camera scan" tabindex="0">
                                             <i class="fas fa-camera"></i>
                                             Start Camera
                                         </button>
-                                        <button class="btn-scan btn-scan-secondary" onclick="stopBookScan()" id="bookStopBtn" disabled>
+                                        <button class="btn-scan btn-scan-secondary" onclick="stopBookScan()" id="bookStopBtn" disabled aria-label="Stop book camera scan" tabindex="0">
                                             <i class="fas fa-stop"></i>
                                             Stop
                                         </button>
@@ -852,7 +852,7 @@ $sampleReturns = [
                             </div>
                             <div class="manual-group">
                                 <label for="accNo">Or Enter Accession Number</label>
-                                <input type="text" id="accNo" class="form-control" placeholder="Enter accession number..." onchange="searchBook()">
+                                <input type="text" id="accNo" class="form-control" placeholder="Enter accession number..." onchange="searchBook()" aria-label="Accession Number" tabindex="0">
                                 <button type="button" class="btn btn-primary" onclick="searchBook()" style="margin-top: 10px; width: 100%;">
                                     <i class="fas fa-search"></i>
                                     Search Book
@@ -957,11 +957,11 @@ $sampleReturns = [
                                     </div>
                                 </div>
                                 <div class="scan-controls">
-                                    <button class="btn-scan" onclick="startReturnScan()" id="returnScanBtn">
+                                    <button class="btn-scan" onclick="startReturnScan()" id="returnScanBtn" aria-label="Start return camera scan" tabindex="0">
                                         <i class="fas fa-camera"></i>
                                         Start Camera
                                     </button>
-                                    <button class="btn-scan btn-scan-secondary" onclick="stopReturnScan()" id="returnStopBtn" disabled>
+                                    <button class="btn-scan btn-scan-secondary" onclick="stopReturnScan()" id="returnStopBtn" disabled aria-label="Stop return camera scan" tabindex="0">
                                         <i class="fas fa-stop"></i>
                                         Stop
                                     </button>
@@ -972,7 +972,7 @@ $sampleReturns = [
                         </div>
                         <div class="form-group">
                             <label for="returnAccNo">Or Enter Accession Number</label>
-                            <input type="text" id="returnAccNo" class="form-control" placeholder="Enter accession number..." onchange="searchReturnBook()">
+                            <input type="text" id="returnAccNo" class="form-control" placeholder="Enter accession number..." onchange="searchReturnBook()" aria-label="Return Accession Number" tabindex="0">
                             <button type="button" class="btn btn-primary" onclick="searchReturnBook()" style="margin-top: 10px;">
                                 <i class="fas fa-search"></i>
                                 Search Book
@@ -1041,7 +1041,7 @@ $sampleReturns = [
                         </div>
                         <div class="form-group">
                             <label for="returnRemarks">Remarks</label>
-                            <input type="text" id="returnRemarks" class="form-control" placeholder="Any remarks about the return...">
+                            <input type="text" id="returnRemarks" class="form-control" placeholder="Any remarks about the return..." aria-label="Return Remarks" tabindex="0">
                         </div>
                     </div>
 
@@ -1160,10 +1160,73 @@ $sampleReturns = [
     </div>
 
     <!-- ...existing code... -->
+<script>
+// Wait for ZXing to be loaded before initializing code readers and scan logic
+// Ensure all scan functions are globally accessible
+window.initializeCodeReaders = function() {
+    if (typeof ZXing !== 'undefined') {
+        window.memberCodeReader = new ZXing.BrowserQRCodeReader();
+        window.bookCodeReader = new ZXing.BrowserMultiFormatReader();
+        window.returnCodeReader = new ZXing.BrowserMultiFormatReader();
+    }
+};
+window.startMemberScan = startMemberScan;
+window.stopMemberScan = stopMemberScan;
+window.startBookScan = startBookScan;
+window.stopBookScan = stopBookScan;
+window.startReturnScan = startReturnScan;
+window.stopReturnScan = stopReturnScan;
+window.handleMemberScanResult = handleMemberScanResult;
+window.handleBookScanResult = handleBookScanResult;
+window.handleReturnScanResult = handleReturnScanResult;
+// Loader for ZXing
+function waitForZXingInit() {
+    if (typeof ZXing !== 'undefined') {
+        window.initializeCodeReaders();
+        loadStatistics();
+        loadActiveCirculations();
+        loadReturnHistory();
+        setInterval(loadStatistics, 30000);
+        console.log('✅ ZXing loaded and all initialization complete');
+    } else {
+        setTimeout(waitForZXingInit, 100);
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    waitForZXingInit();
+});
+</script>
 </div>
 <!-- End page-container -->
 
 <script>
+    // Debounce utility for search inputs
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+    // Debounced search for active circulations
+    document.getElementById('searchMember').addEventListener('input', debounce(searchCirculations, 400));
+    document.getElementById('searchAccession').addEventListener('input', debounce(searchCirculations, 400));
+    // API error handling wrapper
+    async function safeApiCall(apiFn, errorElementId) {
+        try {
+            await apiFn();
+        } catch (err) {
+            showScanError(errorElementId, 'Network/API error: ' + (err.message || err));
+        }
+    }
+    // Audit logging (simple local log, can be sent to server)
+    function logAudit(action, details) {
+        const entry = { action, details, timestamp: new Date().toISOString() };
+        if (!window.circulationAuditLog) window.circulationAuditLog = [];
+        window.circulationAuditLog.push(entry);
+        // TODO: Send to server via fetch if needed
+        console.log('Audit:', entry);
+    }
     // Utility: Populate camera select dropdowns
     async function populateCameraSelect(selectId) {
         const select = document.getElementById(selectId);
@@ -1334,6 +1397,7 @@ $sampleReturns = [
         }
 
         async function issueBook() {
+            logAudit('issueBook', { member: selectedMember, book: selectedBook, issueDate, dueDate, remarks });
             if (!selectedMember || !selectedBook) {
                 alert('Please select both a member and a book');
                 return;
@@ -1489,6 +1553,18 @@ $sampleReturns = [
         }
 
         async function returnBook() {
+            logAudit('returnBook', { circulation: returnBookData, condition, remarks, fineAmount });
+    <!-- Help Section / Tooltips -->
+    <div class="help-section" style="background:#f8f9fa; border-radius:8px; margin:20px 0; padding:16px;">
+        <h2 style="color:#263c79; font-size:20px; margin-bottom:10px;"><i class="fas fa-info-circle"></i> How to Use Circulation Page</h2>
+        <ul style="font-size:15px; color:#333;">
+            <li><b>Scan Member/Book:</b> Click the camera button in the scan area to use your device camera. You can switch cameras if available.</li>
+            <li><b>Manual Entry:</b> Enter member or book numbers if QR/barcode is not available.</li>
+            <li><b>Tabs:</b> Use the tabs to switch between Issue, Return, Active Circulations, and History.</li>
+            <li><b>Errors:</b> If you see a red error, check your camera permissions or network connection.</li>
+            <li><b>Accessibility:</b> All controls are keyboard and screen reader friendly.</li>
+        </ul>
+    </div>
             if (!returnBookData) {
                 alert('Please scan a book to return');
                 return;
@@ -1714,7 +1790,8 @@ $sampleReturns = [
         }
 
         // Member scanning functions
-        async function startMemberScan() {
+async function startMemberScan() {
+window.startMemberScan = startMemberScan;
             try {
                 document.getElementById('memberCameraLoading').style.display = 'flex';
                 await populateCameraSelect('memberCameraSelect');
@@ -1805,7 +1882,8 @@ $sampleReturns = [
         }
 
         // Book scanning functions
-        async function startBookScan() {
+async function startBookScan() {
+window.startBookScan = startBookScan;
             try {
                 document.getElementById('bookCameraLoading').style.display = 'flex';
                 await populateCameraSelect('bookCameraSelect');
@@ -1892,7 +1970,8 @@ $sampleReturns = [
         }
 
         // Return scanning functions
-        async function startReturnScan() {
+async function startReturnScan() {
+window.startReturnScan = startReturnScan;
             try {
                 document.getElementById('returnCameraLoading').style.display = 'flex';
                 await populateCameraSelect('returnCameraSelect');
@@ -2042,6 +2121,13 @@ $sampleReturns = [
             console.log('✅ All initialization complete');
 
             // ...existing code...
+// Ensure all scan functions are globally accessible for button onclick handlers
+window.startMemberScan = startMemberScan;
+window.stopMemberScan = stopMemberScan;
+window.startBookScan = startBookScan;
+window.stopBookScan = stopBookScan;
+window.startReturnScan = startReturnScan;
+window.stopReturnScan = stopReturnScan;
         });
 
         // Clean up streams when page unloads
@@ -2246,3 +2332,4 @@ $sampleReturns = [
 </script>
 </div>
 <!-- End page-container -->
+this is le
