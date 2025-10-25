@@ -785,6 +785,35 @@ try {
             sendJson(['success' => true, 'message' => 'Book deleted successfully']);
             break;
             
+        case 'stats':
+            // Get database-wide statistics
+            // Total unique books
+            $totalBooksStmt = $pdo->query("SELECT COUNT(DISTINCT CatNo) as total FROM Books");
+            $totalBooks = (int)$totalBooksStmt->fetchColumn();
+            
+            // Total copies in Holding table
+            $totalCopiesStmt = $pdo->query("SELECT COUNT(*) as total FROM Holding");
+            $totalCopies = (int)$totalCopiesStmt->fetchColumn();
+            
+            // Available copies
+            $availableCopiesStmt = $pdo->query("SELECT COUNT(*) as total FROM Holding WHERE Status = 'Available'");
+            $availableCopies = (int)$availableCopiesStmt->fetchColumn();
+            
+            // Issued copies
+            $issuedCopiesStmt = $pdo->query("SELECT COUNT(*) as total FROM Holding WHERE Status = 'Issued'");
+            $issuedCopies = (int)$issuedCopiesStmt->fetchColumn();
+            
+            sendJson([
+                'success' => true,
+                'stats' => [
+                    'totalBooks' => $totalBooks,
+                    'totalCopies' => $totalCopies,
+                    'availableCopies' => $availableCopies,
+                    'issuedCopies' => $issuedCopies
+                ]
+            ]);
+            break;
+            
         default:
             sendJson(['success' => false, 'message' => 'Invalid action'], 400);
     }
