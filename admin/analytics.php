@@ -3,70 +3,164 @@
 // This file will be included in the main-content area of admin/layout.php
 
 session_start();
+require_once '../includes/db_connect.php';
 
 $admin_name = isset($_SESSION['admin_name']) ? $_SESSION['admin_name'] : "Library Admin";
 $admin_id = isset($_SESSION['admin_id']) ? $_SESSION['admin_id'] : "ADM2025001";
 
-// TODO: Replace with actual database queries
-// Mock analytics data based on actual database schema
+// Fetch real analytics data from database
 $stats = [
-    'total_books' => 12450,           // Count from Books table
-    'total_copies' => 18670,          // Count from Holding table
-    'books_available' => 14280,       // Holding.Status = 'Available'
-    'books_issued' => 4390,           // Holding.Status = 'Issued'
-    'active_members' => 850,          // Member.Status = 'Active'
-    'overdue_books' => 67,            // Circulation where DueDate < today
-    'pending_returns' => 134,         // DropReturn with Outcome = 'PENDING'
-    'todays_footfall' => 178,         // Footfall.Date = today
+    'total_books' => 0,
+    'total_copies' => 0,
+    'books_available' => 0,
+    'books_issued' => 0,
+    'active_members' => 0,
+    'overdue_books' => 0,
+    'pending_returns' => 0,
+    'todays_footfall' => 0,
 ];
+
+try {
+    // Total unique books
+    $stmt = $pdo->query("SELECT COUNT(DISTINCT CatNo) as count FROM Books");
+    $stats['total_books'] = (int)$stmt->fetchColumn();
+    
+    // Total copies
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM Holding");
+    $stats['total_copies'] = (int)$stmt->fetchColumn();
+    
+    // Available books
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM Holding WHERE Status = 'Available'");
+    $stats['books_available'] = (int)$stmt->fetchColumn();
+    
+    // Issued books
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM Holding WHERE Status = 'Issued'");
+    $stats['books_issued'] = (int)$stmt->fetchColumn();
+    
+    // Active members
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM Member WHERE Status = 'Active'");
+    $stats['active_members'] = (int)$stmt->fetchColumn();
+    
+    // Overdue books (DueDate < today and not returned)
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM Circulation WHERE DueDate < CURDATE() AND ReturnDate IS NULL");
+    $stats['overdue_books'] = (int)$stmt->fetchColumn();
+    
+    // Pending returns from DropReturn
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM DropReturn WHERE Outcome = 'PENDING'");
+    $stats['pending_returns'] = (int)$stmt->fetchColumn();
+    
+    // Today's footfall
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM Footfall WHERE DATE(EntryTime) = CURDATE()");
+    $stats['todays_footfall'] = (int)$stmt->fetchColumn();
+} catch (Exception $e) {
+    error_log("Analytics - Error fetching stats: " . $e->getMessage());
+}
 
 // Monthly circulation trend (last 6 months)
-$circulation_trend = [
-    ['month' => 'Apr 2024', 'issued' => 420, 'returned' => 395],
-    ['month' => 'May 2024', 'issued' => 380, 'returned' => 410],
-    ['month' => 'Jun 2024', 'issued' => 450, 'returned' => 425],
-    ['month' => 'Jul 2024', 'issued' => 520, 'returned' => 490],
-    ['month' => 'Aug 2024', 'issued' => 485, 'returned' => 510],
-    ['month' => 'Sep 2024', 'issued' => 430, 'returned' => 465],
-    ['month' => 'Oct 2024', 'issued' => 460, 'returned' => 440],
-    
-];
+$circulation_trend = [];
+try {
+    $stmt = $pdo->query("
+        SELECT 
+            DATE_FORMAT(IssueDate, '%b %Y') as month,
+            COUNT(*) as issued,
+            SUM(CASE WHEN ReturnDate IS NOT NULL THEN 1 ELSE 0 END) as returned
+        FROM Circulation
+        WHERE IssueDate >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+        GROUP BY DATE_FORMAT(IssueDate, '%Y-%m')
+        ORDER BY IssueDate
+    ");
+    $circulation_trend = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    error_log("Analytics - Error fetching circulation trend: " . $e->getMessage());
+}
 
 // Most borrowed books (from Circulation + Books tables)
-$popular_books = [
-    ['title' => 'Introduction to Algorithms', 'author' => 'Cormen, Thomas H.', 'times_borrowed' => 48, 'available_copies' => 3],
-    ['title' => 'Operating System Concepts', 'author' => 'Silberschatz, Abraham', 'times_borrowed' => 44, 'available_copies' => 2],
-    ['title' => 'Database System Concepts', 'author' => 'Korth, Henry F.', 'times_borrowed' => 39, 'available_copies' => 5],
-    ['title' => 'Computer Networks', 'author' => 'Tanenbaum, Andrew S.', 'times_borrowed' => 36, 'available_copies' => 1],
-    ['title' => 'Software Engineering', 'author' => 'Pressman, Roger S.', 'times_borrowed' => 32, 'available_copies' => 4],
-];
+$popular_books = [];
+try {
+    $stmt = $pdo->query("
+        SELECT 
+            b.Title as title,
+            b.Author1 as author,
+            COUNT(c.CirculationID) as times_borrowed,
+            SUM(CASE WHEN h.Status = 'Available' THEN 1 ELSE 0 END) as available_copies
+        FROM Circulation c
+        JOIN Holding h ON c.AccNo = h.AccNo
+        JOIN Books b ON h.CatNo = b.CatNo
+        GROUP BY b.CatNo
+        ORDER BY times_borrowed DESC
+        LIMIT 5
+    ");
+    $popular_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    error_log("Analytics - Error fetching popular books: " . $e->getMessage());
+}
 
 // Top active members (most books issued)
-$active_members = [
-    ['name' => 'Rahul Sharma', 'member_no' => 'MEM2024001', 'books_issued' => 8, 'group' => 'B.Tech Final Year'],
-    ['name' => 'Priya Patel', 'member_no' => 'MEM2024015', 'books_issued' => 7, 'group' => 'M.Tech'],
-    ['name' => 'Amit Kumar', 'member_no' => 'MEM2024032', 'books_issued' => 6, 'group' => 'B.Tech Third Year'],
-    ['name' => 'Sneha Gupta', 'member_no' => 'MEM2024008', 'books_issued' => 6, 'group' => 'Faculty'],
-    ['name' => 'Vikash Singh', 'member_no' => 'MEM2024021', 'books_issued' => 5, 'group' => 'B.Tech Second Year'],
-];
+$active_members = [];
+try {
+    $stmt = $pdo->query("
+        SELECT 
+            m.Name as name,
+            m.MemberNo as member_no,
+            COUNT(c.CirculationID) as books_issued,
+            m.MemberGroup as `group`
+        FROM Circulation c
+        JOIN Member m ON c.MemberNo = m.MemberNo
+        WHERE c.ReturnDate IS NULL
+        GROUP BY m.MemberNo
+        ORDER BY books_issued DESC
+        LIMIT 5
+    ");
+    $active_members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    error_log("Analytics - Error fetching active members: " . $e->getMessage());
+}
 
 // Recent acquisitions
-$recent_acquisitions = [
-    ['title' => 'Artificial Intelligence: A Modern Approach', 'author' => 'Russell, Stuart', 'date_added' => '2024-09-20', 'copies' => 3],
-    ['title' => 'Clean Architecture', 'author' => 'Martin, Robert C.', 'date_added' => '2024-09-18', 'copies' => 2],
-    ['title' => 'Machine Learning Yearning', 'author' => 'Ng, Andrew', 'date_added' => '2024-09-15', 'copies' => 4],
-    ['title' => 'Design Patterns', 'author' => 'Gamma, Erich', 'date_added' => '2024-09-12', 'copies' => 2],
-];
+$recent_acquisitions = [];
+try {
+    $stmt = $pdo->query("
+        SELECT 
+            b.Title as title,
+            b.Author1 as author,
+            DATE(b.EntryDate) as date_added,
+            COUNT(h.AccNo) as copies
+        FROM Books b
+        LEFT JOIN Holding h ON b.CatNo = h.CatNo
+        GROUP BY b.CatNo
+        ORDER BY b.EntryDate DESC
+        LIMIT 5
+    ");
+    $recent_acquisitions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    error_log("Analytics - Error fetching recent acquisitions: " . $e->getMessage());
+}
 
-// Subject-wise distribution
-$subject_distribution = [
-    ['subject' => 'Computer Science', 'book_count' => 3250, 'percentage' => 26.1],
-    ['subject' => 'Electronics & Communication', 'book_count' => 2100, 'percentage' => 16.9],
-    ['subject' => 'Mechanical Engineering', 'book_count' => 1890, 'percentage' => 15.2],
-    ['subject' => 'Mathematics', 'book_count' => 1450, 'percentage' => 11.6],
-    ['subject' => 'Physics', 'book_count' => 1200, 'percentage' => 9.6],
-    ['subject' => 'Others', 'book_count' => 2560, 'percentage' => 20.6],
-];
+// Category-wise distribution
+$category_distribution = [];
+try {
+    $stmt = $pdo->query("
+        SELECT 
+            COALESCE(Subject, 'Uncategorized') as category,
+            COUNT(DISTINCT b.CatNo) as book_count,
+            COUNT(h.AccNo) as copy_count
+        FROM Books b
+        LEFT JOIN Holding h ON b.CatNo = h.CatNo
+        GROUP BY Subject
+        ORDER BY book_count DESC
+        LIMIT 10
+    ");
+    $category_distribution = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    error_log("Analytics - Error fetching category distribution: " . $e->getMessage());
+}
+
+// Calculate percentages for category distribution
+$total_category_books = array_sum(array_column($category_distribution, 'book_count'));
+foreach ($category_distribution as &$cat) {
+    $cat['percentage'] = $total_category_books > 0 ? round(($cat['book_count'] / $total_category_books) * 100, 1) : 0;
+}
+unset($cat);
 ?>
 
 <style>
@@ -390,19 +484,29 @@ $subject_distribution = [
         <div class="section-content">
             <div class="trend-chart">
                 <?php
-                $max_value = max(array_merge(array_column($circulation_trend, 'issued'), array_column($circulation_trend, 'returned')));
-                foreach ($circulation_trend as $month):
-                    $issued_height = ($max_value > 0) ? round(($month['issued'] / $max_value) * 180) : 0;
-                    $returned_height = ($max_value > 0) ? round(($month['returned'] / $max_value) * 180) : 0;
+                if (!empty($circulation_trend)):
+                    $max_value = max(array_merge(array_column($circulation_trend, 'issued'), array_column($circulation_trend, 'returned')));
+                    if ($max_value == 0) $max_value = 1; // Prevent division by zero
+                    foreach ($circulation_trend as $month):
+                        $issued_height = ($max_value > 0) ? round(($month['issued'] / $max_value) * 180) : 0;
+                        $returned_height = ($max_value > 0) ? round(($month['returned'] / $max_value) * 180) : 0;
                 ?>
                     <div class="bar-group">
                         <div class="bar-pair">
                             <div class="bar-rect bar-issued" style="height: <?php echo $issued_height; ?>px;"></div>
                             <div class="bar-rect bar-returned" style="height: <?php echo $returned_height; ?>px;"></div>
                         </div>
-                        <div class="bar-label"><?php echo $month['month']; ?></div>
+                        <div class="bar-label"><?php echo htmlspecialchars($month['month']); ?></div>
                     </div>
-                <?php endforeach; ?>
+                <?php 
+                    endforeach;
+                else:
+                ?>
+                    <div style="text-align:center; padding:40px; color:#6c757d;">
+                        <i class="fas fa-chart-line" style="font-size:48px; opacity:0.3;"></i>
+                        <p style="margin-top:15px;">No circulation data available for the last 6 months</p>
+                    </div>
+                <?php endif; ?>
             </div>
             <div class="chart-legend">
                 <div class="legend-item">
@@ -422,12 +526,12 @@ $subject_distribution = [
             <h3 class="section-title"><i class="fas fa-chart-pie" style="margin-right: 8px;"></i> Collection by Subject</h3>
         </div>
         <div class="section-content">
-            <?php foreach ($subject_distribution as $subject): ?>
+            <?php foreach ($category_distribution as $cat): ?>
                 <div style="margin-bottom: 15px;">
-                    <div class="subject-label"><?php echo $subject['subject']; ?> (<?php echo number_format($subject['book_count']); ?>)</div>
+                    <div class="subject-label"><?php echo htmlspecialchars($cat['category']); ?> (<?php echo number_format($cat['book_count']); ?>)</div>
                     <div class="subject-bar">
-                        <div class="subject-fill" style="width: <?php echo $subject['percentage']; ?>%;">
-                            <?php echo $subject['percentage']; ?>%
+                        <div class="subject-fill" style="width: <?php echo $cat['percentage']; ?>%;">
+                            <?php echo $cat['percentage']; ?>%
                         </div>
                     </div>
                 </div>
@@ -442,6 +546,7 @@ $subject_distribution = [
         <h3 class="section-title"><i class="fas fa-star" style="margin-right: 8px;"></i> Most Borrowed Books</h3>
     </div>
     <div class="section-content">
+        <?php if (!empty($popular_books)): ?>
         <table class="data-table">
             <thead>
                 <tr>
@@ -456,8 +561,8 @@ $subject_distribution = [
                 <?php foreach ($popular_books as $book): ?>
                     <tr>
                         <td class="book-title"><?php echo htmlspecialchars($book['title']); ?></td>
-                        <td><?php echo htmlspecialchars($book['author']); ?></td>
-                        <td><?php echo $book['times_borrowed']; ?></td>
+                        <td><?php echo htmlspecialchars($book['author'] ?? 'Unknown'); ?></td>
+                        <td><?php echo number_format($book['times_borrowed']); ?></td>
                         <td><?php echo $book['available_copies']; ?></td>
                         <td>
                             <?php if ($book['available_copies'] > 3): ?>
@@ -472,6 +577,12 @@ $subject_distribution = [
                 <?php endforeach; ?>
             </tbody>
         </table>
+        <?php else: ?>
+            <div style="text-align:center; padding:40px; color:#6c757d;">
+                <i class="fas fa-book" style="font-size:48px; opacity:0.3;"></i>
+                <p style="margin-top:15px;">No circulation data available yet</p>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -482,6 +593,7 @@ $subject_distribution = [
             <h3 class="section-title"><i class="fas fa-users" style="margin-right: 8px;"></i> Most Active Members</h3>
         </div>
         <div class="section-content">
+            <?php if (!empty($active_members)): ?>
             <table class="data-table">
                 <thead>
                     <tr>
@@ -497,11 +609,17 @@ $subject_distribution = [
                             <td><?php echo htmlspecialchars($member['name']); ?></td>
                             <td><?php echo htmlspecialchars($member['member_no']); ?></td>
                             <td><?php echo $member['books_issued']; ?></td>
-                            <td><?php echo htmlspecialchars($member['group']); ?></td>
+                            <td><?php echo htmlspecialchars($member['group'] ?? 'N/A'); ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            <?php else: ?>
+                <div style="text-align:center; padding:40px; color:#6c757d;">
+                    <i class="fas fa-users" style="font-size:48px; opacity:0.3;"></i>
+                    <p style="margin-top:15px;">No active members with borrowed books</p>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -510,6 +628,7 @@ $subject_distribution = [
             <h3 class="section-title"><i class="fas fa-plus-circle" style="margin-right: 8px;"></i> Recent Acquisitions</h3>
         </div>
         <div class="section-content">
+            <?php if (!empty($recent_acquisitions)): ?>
             <table class="data-table">
                 <thead>
                     <tr>
@@ -523,13 +642,19 @@ $subject_distribution = [
                     <?php foreach ($recent_acquisitions as $book): ?>
                         <tr>
                             <td class="book-title"><?php echo htmlspecialchars($book['title']); ?></td>
-                            <td><?php echo htmlspecialchars($book['author']); ?></td>
-                            <td><?php echo date('M j, Y', strtotime($book['date_added'])); ?></td>
+                            <td><?php echo htmlspecialchars($book['author'] ?? 'Unknown'); ?></td>
+                            <td><?php echo $book['date_added'] ? date('M j, Y', strtotime($book['date_added'])) : 'N/A'; ?></td>
                             <td><?php echo $book['copies']; ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            <?php else: ?>
+                <div style="text-align:center; padding:40px; color:#6c757d;">
+                    <i class="fas fa-book" style="font-size:48px; opacity:0.3;"></i>
+                    <p style="margin-top:15px;">No recent acquisitions</p>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
