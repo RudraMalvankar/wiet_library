@@ -884,6 +884,122 @@ try {
             ]);
             break;
             
+        case 'search_inventory':
+            // Advanced inventory search with multiple filters
+            $keyword = $_GET['keyword'] ?? '';
+            $status = $_GET['status'] ?? '';
+            $location = $_GET['location'] ?? '';
+            $subject = $_GET['subject'] ?? '';
+            $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+            $pageSize = isset($_GET['pageSize']) ? max(1, intval($_GET['pageSize'])) : 20;
+            $offset = ($page - 1) * $pageSize;
+
+            // Build WHERE clause for counting
+            $countSql = "
+                SELECT COUNT(DISTINCT b.CatNo) as total 
+                FROM Books b
+                LEFT JOIN Holding h ON b.CatNo = h.CatNo
+                WHERE 1=1
+            ";
+            $countParams = [];
+            
+            // Keyword search (title, ISBN, author)
+            if ($keyword) {
+                $countSql .= " AND (b.Title LIKE ? OR b.ISBN LIKE ? OR b.Author1 LIKE ? OR b.Keywords LIKE ?)";
+                $keywordTerm = "%{$keyword}%";
+                $countParams[] = $keywordTerm;
+                $countParams[] = $keywordTerm;
+                $countParams[] = $keywordTerm;
+                $countParams[] = $keywordTerm;
+            }
+            
+            // Status filter (affects holdings)
+            if ($status) {
+                $countSql .= " AND h.Status = ?";
+                $countParams[] = $status;
+            }
+            
+            // Location filter
+            if ($location) {
+                $countSql .= " AND h.Location = ?";
+                $countParams[] = $location;
+            }
+            
+            // Subject filter
+            if ($subject) {
+                $countSql .= " AND b.Subject = ?";
+                $countParams[] = $subject;
+            }
+            
+            $countStmt = $pdo->prepare($countSql);
+            $countStmt->execute($countParams);
+            $total = $countStmt->fetchColumn();
+
+            // Main query with aggregated holdings data
+            $sql = "
+                SELECT b.*, 
+                       COUNT(h.HoldID) as TotalCopies,
+                       SUM(CASE WHEN h.Status = 'Available' THEN 1 ELSE 0 END) as AvailableCopies,
+                       SUM(CASE WHEN h.Status = 'Issued' THEN 1 ELSE 0 END) as IssuedCopies,
+                       SUM(CASE WHEN h.Status = 'Lost' THEN 1 ELSE 0 END) as LostCopies,
+                       SUM(CASE WHEN h.Status = 'Damaged' THEN 1 ELSE 0 END) as DamagedCopies,
+                       SUM(CASE WHEN h.Status = 'Maintenance' THEN 1 ELSE 0 END) as MaintenanceCopies
+                FROM Books b
+                LEFT JOIN Holding h ON b.CatNo = h.CatNo
+                WHERE 1=1
+            ";
+            $params = [];
+            
+            // Apply same filters
+            if ($keyword) {
+                $sql .= " AND (b.Title LIKE ? OR b.ISBN LIKE ? OR b.Author1 LIKE ? OR b.Keywords LIKE ?)";
+                $keywordTerm = "%{$keyword}%";
+                $params[] = $keywordTerm;
+                $params[] = $keywordTerm;
+                $params[] = $keywordTerm;
+                $params[] = $keywordTerm;
+            }
+            
+            if ($status) {
+                $sql .= " AND h.Status = ?";
+                $params[] = $status;
+            }
+            
+            if ($location) {
+                $sql .= " AND h.Location = ?";
+                $params[] = $location;
+            }
+            
+            if ($subject) {
+                $sql .= " AND b.Subject = ?";
+                $params[] = $subject;
+            }
+            
+            $sql .= " GROUP BY b.CatNo ORDER BY b.Title LIMIT ? OFFSET ?";
+            $params[] = $pageSize;
+            $params[] = $offset;
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $books = $stmt->fetchAll();
+            
+            // Remove binary data
+            foreach ($books as &$b) {
+                if (isset($b['QrCodeImg'])) {
+                    unset($b['QrCodeImg']);
+                }
+            }
+            
+            sendJson([
+                'success' => true,
+                'data' => $books,
+                'total' => (int)$total,
+                'page' => $page,
+                'pageSize' => $pageSize,
+                'totalPages' => ceil($total / $pageSize)
+            ]);
+            break;
+            
         default:
             sendJson(['success' => false, 'message' => 'Invalid action'], 400);
     }

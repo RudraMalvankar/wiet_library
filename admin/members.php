@@ -1017,21 +1017,53 @@ $memberEntitlements = [
     </div>
 
     <script>
-        // Inline Add Member handler
-        function saveMemberInline() {
-            const formData = new FormData(document.getElementById('addMemberInlineForm'));
-            const memberData = Object.fromEntries(formData);
-            memberData.MemberNo = Math.max(...sampleMembers.map(m => m.MemberNo)) + 1;
-            memberData.BooksIssued = 0;
-            memberData.CreatedBy = 1;
-            sampleMembers.push(memberData);
-            alert(`Member created successfully!\nMember No: ${memberData.MemberNo}\nMember card will be generated automatically.`);
-            loadMembersTable();
-            document.getElementById('addMemberInlineForm').reset();
-        }
         // Global variables
-        const sampleMembers = <?php echo json_encode($sampleMembers); ?>;
         const memberEntitlements = <?php echo json_encode($memberEntitlements); ?>;
+        let selectedMembers = [];
+
+        // Inline Add Member handler
+        async function saveMemberInline() {
+            const form = document.getElementById('addMemberInlineForm');
+            const formData = new FormData(form);
+            
+            // Convert to JSON for API
+            const memberData = {
+                action: 'add',
+                MemberName: formData.get('MemberName'),
+                Group: formData.get('Group'),
+                Designation: formData.get('Designation'),
+                Entitlement: formData.get('Entitlement'),
+                Phone: formData.get('Phone'),
+                Email: formData.get('Email'),
+                FinePerDay: formData.get('FinePerDay'),
+                AdmissionDate: formData.get('AdmissionDate'),
+                Status: formData.get('Status') || 'Active'
+            };
+
+            try {
+                const response = await fetch('api/members.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(memberData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`Member created successfully!\nMember No: ${result.memberNo}\nMember card will be generated automatically.`);
+                    form.reset();
+                    loadMembersTable();
+                    loadStatistics();
+                } else {
+                    alert('Error creating member: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error saving member:', error);
+                alert('Error saving member. Please try again.');
+            }
+        }
 
         // Tab functionality
         function showTab(tabName) {
@@ -1378,98 +1410,292 @@ $memberEntitlements = [
             }
         }
 
-        function saveMember() {
-            const formData = new FormData(document.getElementById('addMemberForm'));
-            const memberData = Object.fromEntries(formData);
+        async function saveMember() {
+            const form = document.getElementById('addMemberForm');
+            const formData = new FormData(form);
+            
+            // Convert to JSON for API
+            const memberData = {
+                action: 'add',
+                MemberName: formData.get('MemberName'),
+                Group: formData.get('Group'),
+                Designation: formData.get('Designation'),
+                Entitlement: formData.get('Entitlement'),
+                Phone: formData.get('Phone'),
+                Email: formData.get('Email'),
+                FinePerDay: formData.get('FinePerDay'),
+                AdmissionDate: formData.get('AdmissionDate'),
+                Status: formData.get('Status') || 'Active'
+            };
 
-            // Generate new member number
-            const newMemberNo = Math.max(...sampleMembers.map(m => m.MemberNo)) + 1;
+            try {
+                const response = await fetch('api/members.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(memberData)
+                });
 
-            console.log('Creating new member:', {
-                ...memberData,
-                MemberNo: newMemberNo
-            });
+                const result = await response.json();
 
-            alert(`Member created successfully!\nMember No: ${newMemberNo}\nMember card will be generated automatically.`);
-            closeModal('addMemberModal');
-            loadMembersTable();
+                if (result.success) {
+                    alert(`Member created successfully!\nMember No: ${result.memberNo}\nMember card will be generated automatically.`);
+                    closeModal('addMemberModal');
+                    loadMembersTable();
+                    loadStatistics();
+                } else {
+                    alert('Error creating member: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error saving member:', error);
+                alert('Error saving member. Please try again.');
+            }
         }
 
         // Member actions
-        function viewMember(memberNo) {
-            console.log('Viewing member:', memberNo);
-            alert(`Opening detailed view for Member No: ${memberNo}`);
+        async function viewMember(memberNo) {
+            try {
+                const response = await fetch(`api/members.php?action=get&memberNo=${memberNo}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const member = result.data;
+                    const circulations = member.activeCirculations || [];
+                    
+                    let circulationInfo = '';
+                    if (circulations.length > 0) {
+                        circulationInfo = '<h3>Active Book Issues:</h3><ul>';
+                        circulations.forEach(circ => {
+                            circulationInfo += `<li>${circ.Title} - Due: ${new Date(circ.DueDate).toLocaleDateString()}</li>`;
+                        });
+                        circulationInfo += '</ul>';
+                    }
+                    
+                    alert(`Member Details:\n\nMember No: ${member.MemberNo}\nName: ${member.MemberName}\nGroup: ${member.Group}\nDesignation: ${member.Designation || 'N/A'}\nPhone: ${member.Phone || 'N/A'}\nEmail: ${member.Email || 'N/A'}\nBooks Issued: ${member.BooksIssued}\nStatus: ${member.Status}\nAdmission Date: ${new Date(member.AdmissionDate).toLocaleDateString()}`);
+                    // TODO: Create a proper view modal with all details
+                } else {
+                    alert('Error loading member details: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error viewing member:', error);
+                alert('Error loading member details. Please try again.');
+            }
         }
 
-        function editMember(memberNo) {
-            console.log('Editing member:', memberNo);
-            alert(`Opening edit form for Member No: ${memberNo}`);
+        async function editMember(memberNo) {
+            try {
+                const response = await fetch(`api/members.php?action=get&memberNo=${memberNo}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const member = result.data;
+                    
+                    // Populate inline form
+                    document.getElementById('addMemberInlineForm').querySelector('[name="MemberName"]').value = member.MemberName || '';
+                    document.getElementById('addMemberInlineForm').querySelector('[name="Group"]').value = member.Group || '';
+                    document.getElementById('addMemberInlineForm').querySelector('[name="Designation"]').value = member.Designation || '';
+                    document.getElementById('addMemberInlineForm').querySelector('[name="Entitlement"]').value = member.Entitlement || '';
+                    document.getElementById('addMemberInlineForm').querySelector('[name="Phone"]').value = member.Phone || '';
+                    document.getElementById('addMemberInlineForm').querySelector('[name="Email"]').value = member.Email || '';
+                    document.getElementById('addMemberInlineForm').querySelector('[name="FinePerDay"]').value = member.FinePerDay || '';
+                    document.getElementById('addMemberInlineForm').querySelector('[name="AdmissionDate"]').value = member.AdmissionDate || '';
+                    document.getElementById('addMemberInlineForm').querySelector('[name="Status"]').value = member.Status || '';
+                    
+                    // Store member number for update
+                    document.getElementById('addMemberInlineForm').dataset.memberNo = memberNo;
+                    
+                    // Scroll to form
+                    document.getElementById('addMemberInlineForm').scrollIntoView({ behavior: 'smooth' });
+                    alert('Member data loaded in form. Update the fields and click Save.');
+                    // TODO: Change button to "Update Member" and implement update API call
+                } else {
+                    alert('Error loading member details: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error editing member:', error);
+                alert('Error loading member details. Please try again.');
+            }
         }
 
-        function deleteMember(memberNo) {
-            if (confirm(`Are you sure you want to delete Member No: ${memberNo}?`)) {
-                console.log('Deleting member:', memberNo);
-                alert('Member deleted successfully!');
-                loadMembersTable();
+        async function deleteMember(memberNo) {
+            if (!confirm(`Are you sure you want to delete Member No: ${memberNo}?\n\nThis action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('api/members.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'delete',
+                        MemberNo: memberNo
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Member deactivated successfully!');
+                    loadMembersTable();
+                    loadStatistics();
+                } else {
+                    alert('Error deleting member: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error deleting member:', error);
+                alert('Error deleting member. Please try again.');
             }
         }
 
         // Other functions
         function generateMemberCards() {
-            console.log('Generating member cards...');
-            alert('Opening member card generation interface...');
+            showTab('member-cards');
         }
 
-        function bulkOperations() {
-            console.log('Opening bulk operations...');
-            alert('Opening bulk operations interface...');
+        async function bulkOperations() {
+            const selectedMembers = Array.from(document.querySelectorAll('.member-checkbox:checked'))
+                .map(cb => cb.value);
+            
+            if (selectedMembers.length === 0) {
+                alert('Please select at least one member to perform bulk operations.');
+                return;
+            }
+            
+            const action = prompt(`Selected ${selectedMembers.length} member(s).\n\nChoose action:\n1. Generate Cards\n2. Send Notifications\n3. Change Status\n4. Export to Excel\n\nEnter option number (1-4):`);
+            
+            switch(action) {
+                case '1':
+                    alert(`Generating ID cards for ${selectedMembers.length} selected members...`);
+                    // TODO: Implement card generation
+                    break;
+                case '2':
+                    alert(`Sending notifications to ${selectedMembers.length} selected members...`);
+                    // TODO: Implement notification sending
+                    break;
+                case '3':
+                    const newStatus = prompt('Enter new status (Active/Inactive/Suspended):');
+                    if (newStatus) {
+                        alert(`Updating status to ${newStatus} for ${selectedMembers.length} members...`);
+                        // TODO: Implement bulk status update
+                    }
+                    break;
+                case '4':
+                    alert(`Exporting ${selectedMembers.length} members to Excel...`);
+                    // TODO: Implement Excel export
+                    break;
+                default:
+                    if (action) alert('Invalid option selected.');
+            }
+        }
+
+        function selectAllMembers() {
+            const selectAll = document.getElementById('selectAllMembers');
+            const checkboxes = document.querySelectorAll('.member-checkbox');
+            
+            checkboxes.forEach(cb => {
+                cb.checked = selectAll.checked;
+            });
         }
 
         function editEntitlement(entitlement) {
-            console.log('Editing entitlement:', entitlement);
-            alert(`Opening entitlement editor for: ${entitlement}`);
+            const details = memberEntitlements[entitlement];
+            const newMaxBooks = prompt(`Edit ${entitlement} Entitlement\n\nCurrent Max Books: ${details.max_books}\nEnter new value:`, details.max_books);
+            const newPeriod = prompt(`Current Issue Period: ${details.issue_period} days\nEnter new value:`, details.issue_period);
+            const newFine = prompt(`Current Fine Per Day: ₹${details.fine_per_day}\nEnter new value:`, details.fine_per_day);
+            
+            if (newMaxBooks && newPeriod && newFine) {
+                alert(`Entitlement updated successfully!\n\nNote: This is demo mode. In production, this would update the database.`);
+                // TODO: Implement entitlement update API
+            }
         }
 
         function generateAllCards() {
-            console.log('Generating all cards...');
-            alert('Generating ID cards for all active members...');
+            if (confirm('Generate ID cards for ALL active members?\n\nThis may take some time for large member lists.')) {
+                alert('Generating ID cards for all active members...\n\nCards will be available for download in the Downloads section.');
+                // TODO: Implement bulk card generation
+            }
         }
 
-        function generateSelectedCards() {
-            console.log('Generating selected cards...');
-            alert('Please select members from the All Members tab first.');
+        async function generateSelectedCards() {
+            const selectedMembers = Array.from(document.querySelectorAll('.member-checkbox:checked'))
+                .map(cb => cb.value);
+            
+            if (selectedMembers.length === 0) {
+                alert('Please select members from the "All Members" tab first.');
+                showTab('all-members');
+                return;
+            }
+            
+            alert(`Generating ID cards for ${selectedMembers.length} selected member(s)...\n\nCards will be available for download shortly.`);
+            // TODO: Implement selected card generation
         }
 
         function printExistingCards() {
-            console.log('Printing existing cards...');
-            alert('Opening card printing interface...');
+            alert('Opening card printing interface...\n\nYou can select previously generated cards to print.');
+            // TODO: Implement card printing interface
         }
 
         function cardTemplateSettings() {
-            console.log('Opening card template settings...');
-            alert('Opening card template configuration...');
+            alert('Opening card template configuration...\n\nCustomize:\n- Card dimensions\n- Logo and branding\n- QR code position\n- Color scheme');
+            // TODO: Implement template settings
         }
 
-        function generateReport(reportType) {
-            console.log('Generating report:', reportType);
-            alert(`Generating ${reportType} report...`);
+        async function generateReport(reportType) {
+            alert(`Generating ${reportType} report...\n\nReport will be downloaded shortly.`);
+            
+            // TODO: Implement report generation
+            switch(reportType) {
+                case 'members-list':
+                    // Export all members to Excel/PDF
+                    break;
+                case 'active-issues':
+                    // Report of all active book issues
+                    break;
+                case 'overdue-fines':
+                    // Report of overdue books and fines
+                    break;
+                case 'membership-stats':
+                    // Statistical analysis
+                    break;
+            }
         }
 
         // Load statistics
-        function loadStatistics() {
-            const totalMembers = sampleMembers.length;
-            const activeMembers = sampleMembers.filter(m => m.Status === 'Active').length;
-            const facultyMembers = sampleMembers.filter(m => m.Group === 'Faculty').length;
-            const staffMembers = sampleMembers.filter(m => m.Group === 'Staff').length;
-            const studentMembers = sampleMembers.filter(m => m.Group === 'Student').length;
-            const inactiveMembers = sampleMembers.filter(m => m.Status === 'Inactive').length;
+        async function loadStatistics() {
+            try {
+                const response = await fetch('api/members.php?action=list');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const members = result.data || [];
+                    const totalMembers = members.length;
+                    const activeMembers = members.filter(m => m.Status === 'Active').length;
+                    const facultyMembers = members.filter(m => m.Group === 'Faculty').length;
+                    const staffMembers = members.filter(m => m.Group === 'Staff').length;
+                    const studentMembers = members.filter(m => m.Group === 'Student').length;
+                    const inactiveMembers = members.filter(m => m.Status === 'Inactive' || m.Status === 'Suspended').length;
 
-            document.getElementById('totalMembers').textContent = totalMembers;
-            document.getElementById('activeMembers').textContent = activeMembers;
-            document.getElementById('facultyMembers').textContent = facultyMembers;
-            document.getElementById('staffMembers').textContent = staffMembers;
-            document.getElementById('studentMembers').textContent = studentMembers;
-            document.getElementById('inactiveMembers').textContent = inactiveMembers;
+                    document.getElementById('totalMembers').textContent = totalMembers;
+                    document.getElementById('activeMembers').textContent = activeMembers;
+                    document.getElementById('facultyMembers').textContent = facultyMembers;
+                    document.getElementById('staffMembers').textContent = staffMembers;
+                    document.getElementById('studentMembers').textContent = studentMembers;
+                    document.getElementById('inactiveMembers').textContent = inactiveMembers;
+                } else {
+                    // Show dash if failed
+                    document.getElementById('totalMembers').textContent = '-';
+                    document.getElementById('activeMembers').textContent = '-';
+                    document.getElementById('facultyMembers').textContent = '-';
+                    document.getElementById('staffMembers').textContent = '-';
+                    document.getElementById('studentMembers').textContent = '-';
+                    document.getElementById('inactiveMembers').textContent = '-';
+                }
+            } catch (error) {
+                console.error('Error loading statistics:', error);
+            }
         }
 
         // Close modals when clicking outside

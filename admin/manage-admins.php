@@ -1,82 +1,70 @@
 <?php
 session_start();
+require_once '../includes/db_connect.php';
 
-// No database connection needed for frontend development
-// Sample data will be used to demonstrate functionality
+// Check if user is logged in
+if (!isset($_SESSION['admin_id'])) {
+    header("Location: admin_login.php");
+    exit();
+}
 
 $admin_id = $_SESSION['admin_id'] ?? 1;
 $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
-// Sample data matching database schema
-$sampleAdmins = [
-    [
-        'AdminID' => 1,
-        'Name' => 'Dr. Rajesh Kumar',
-        'Email' => 'rajesh.kumar@wiet.edu',
-        'Phone' => '9876543210',
-        'Role' => 'Super Admin',
-        'Password' => 'hashed_password_123',
-        'Status' => 'Active',
-        'LastLogin' => '2024-10-02 09:30:00',
-        'CreatedDate' => '2024-01-15',
-        'CreatedBy' => 1,
-        'IsOnline' => true
-    ],
-    [
-        'AdminID' => 2,
-        'Name' => 'Ms. Priya Patel',
-        'Email' => 'priya.patel@wiet.edu',
-        'Phone' => '9876543211',
-        'Role' => 'Library Manager',
-        'Password' => 'hashed_password_456',
-        'Status' => 'Active',
-        'LastLogin' => '2024-10-02 08:15:00',
-        'CreatedDate' => '2024-02-10',
-        'CreatedBy' => 1,
-        'IsOnline' => true
-    ],
-    [
-        'AdminID' => 3,
-        'Name' => 'Mr. Amit Sharma',
-        'Email' => 'amit.sharma@wiet.edu',
-        'Phone' => '9876543212',
-        'Role' => 'Librarian',
-        'Password' => 'hashed_password_789',
-        'Status' => 'Active',
-        'LastLogin' => '2024-10-01 16:45:00',
-        'CreatedDate' => '2024-03-05',
-        'CreatedBy' => 2,
-        'IsOnline' => false
-    ],
-    [
-        'AdminID' => 4,
-        'Name' => 'Mrs. Sneha Gupta',
-        'Email' => 'sneha.gupta@wiet.edu',
-        'Phone' => '9876543213',
-        'Role' => 'Assistant Librarian',
-        'Password' => 'hashed_password_012',
-        'Status' => 'Active',
-        'LastLogin' => '2024-10-02 07:20:00',
-        'CreatedDate' => '2024-04-20',
-        'CreatedBy' => 2,
-        'IsOnline' => false
-    ],
-    [
-        'AdminID' => 5,
-        'Name' => 'Mr. Vikram Singh',
-        'Email' => 'vikram.singh@wiet.edu',
-        'Phone' => '9876543214',
-        'Role' => 'Data Entry Operator',
-        'Password' => 'hashed_password_345',
-        'Status' => 'Suspended',
-        'LastLogin' => '2024-09-25 14:30:00',
-        'CreatedDate' => '2024-05-15',
-        'CreatedBy' => 3,
-        'IsOnline' => false
-    ]
-];
+// Fetch all admins from database
+try {
+    $stmt = $pdo->query("SELECT * FROM Admin ORDER BY CreatedDate DESC");
+    $sampleAdmins = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Admins fetch error: " . $e->getMessage());
+    $sampleAdmins = [];
+}
 
-// Role definitions with permissions
+// Calculate statistics
+try {
+    // Total admins
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Admin");
+    $total_admins = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Active admins
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Admin WHERE Status = 'Active'");
+    $active_admins = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Inactive admins
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Admin WHERE Status = 'Inactive'");
+    $inactive_admins = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Suspended admins
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Admin WHERE Status = 'Suspended'");
+    $suspended_admins = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Recently active (logged in today)
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Admin WHERE DATE(LastLogin) = CURDATE()");
+    $recent_active = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+} catch (PDOException $e) {
+    error_log("Admin stats error: " . $e->getMessage());
+    $total_admins = $active_admins = $inactive_admins = $suspended_admins = $recent_active = 0;
+}
+
+// Fetch recent activities from ActivityLog
+try {
+    $stmt = $pdo->prepare("
+        SELECT a.*, ad.Name as AdminName 
+        FROM ActivityLog a
+        LEFT JOIN Admin ad ON a.UserID = ad.AdminID
+        WHERE a.UserType = 'Admin'
+        ORDER BY a.Timestamp DESC
+        LIMIT 10
+    ");
+    $stmt->execute();
+    $recentActivities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Activity log fetch error: " . $e->getMessage());
+    $recentActivities = [];
+}
+
+// Role definitions with permissions (static configuration)
 $rolePermissions = [
     'Super Admin' => [
         'permissions' => ['All System Access', 'User Management', 'System Configuration', 'Reports & Analytics'],
@@ -107,34 +95,12 @@ $rolePermissions = [
         'description' => 'Responsible for data entry and book cataloging tasks',
         'level' => 5,
         'color' => '#ffc107'
-    ]
-];
-
-// Activity log sample
-$recentActivities = [
-    [
-        'AdminID' => 2,
-        'AdminName' => 'Ms. Priya Patel',
-        'Action' => 'User Login',
-        'Details' => 'Successfully logged into the system',
-        'Timestamp' => '2024-10-02 08:15:23',
-        'IPAddress' => '192.168.1.45'
     ],
-    [
-        'AdminID' => 1,
-        'AdminName' => 'Dr. Rajesh Kumar',
-        'Action' => 'User Created',
-        'Details' => 'Created new admin user: John Doe',
-        'Timestamp' => '2024-10-01 15:30:12',
-        'IPAddress' => '192.168.1.23'
-    ],
-    [
-        'AdminID' => 3,
-        'AdminName' => 'Mr. Amit Sharma',
-        'Action' => 'Password Changed',
-        'Details' => 'Changed account password',
-        'Timestamp' => '2024-10-01 14:22:45',
-        'IPAddress' => '192.168.1.67'
+    'Admin' => [
+        'permissions' => ['Circulation', 'Member Management', 'Book Management', 'Basic Reports'],
+        'description' => 'General administrative access to library operations',
+        'level' => 3,
+        'color' => '#17a2b8'
     ]
 ];
 ?>
@@ -807,19 +773,19 @@ $recentActivities = [
     <!-- Statistics Cards -->
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-number" id="totalAdmins">-</div>
+            <div class="stat-number" id="totalAdmins"><?php echo number_format($total_admins); ?></div>
             <div class="stat-label">Total Admins</div>
         </div>
         <div class="stat-card online">
-            <div class="stat-number" id="onlineAdmins">-</div>
-            <div class="stat-label">Currently Online</div>
+            <div class="stat-number" id="onlineAdmins"><?php echo number_format($active_admins); ?></div>
+            <div class="stat-label">Active Admins</div>
         </div>
         <div class="stat-card roles">
-            <div class="stat-number" id="totalRoles">-</div>
-            <div class="stat-label">Active Roles</div>
+            <div class="stat-number" id="totalRoles"><?php echo number_format($recent_active); ?></div>
+            <div class="stat-label">Logged In Today</div>
         </div>
         <div class="stat-card suspended">
-            <div class="stat-number" id="suspendedAdmins">-</div>
+            <div class="stat-number" id="suspendedAdmins"><?php echo number_format($suspended_admins); ?></div>
             <div class="stat-label">Suspended Accounts</div>
         </div>
     </div>
@@ -1319,23 +1285,43 @@ $recentActivities = [
                     <tbody>
             `;
 
-            recentActivities.forEach(activity => {
-                const actionClass = {
-                    'User Login': 'action-login',
-                    'User Created': 'action-create',
-                    'Password Changed': 'action-update'
-                } [activity.Action] || 'action-update';
-
+            if (recentActivities.length === 0) {
                 activityHTML += `
                     <tr>
-                        <td>${new Date(activity.Timestamp).toLocaleString('en-IN')}</td>
-                        <td>${activity.AdminName}</td>
-                        <td><span class="activity-action ${actionClass}">${activity.Action}</span></td>
-                        <td>${activity.Details}</td>
-                        <td>${activity.IPAddress}</td>
+                        <td colspan="5" style="text-align: center; padding: 40px; color: #6c757d;">
+                            <i class="fas fa-clipboard-list" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+                            <p>No recent activities found</p>
+                        </td>
                     </tr>
                 `;
-            });
+            } else {
+                recentActivities.forEach(activity => {
+                    const actionClass = {
+                        'User Login': 'action-login',
+                        'User Created': 'action-create',
+                        'Password Changed': 'action-update',
+                        'BOOK_ADD': 'action-create',
+                        'BOOK_UPDATE': 'action-update',
+                        'BOOK_DELETE': 'action-delete'
+                    } [activity.Action] || 'action-update';
+
+                    const timestamp = activity.Timestamp || '';
+                    const adminName = activity.AdminName || 'Unknown';
+                    const action = activity.Action || '-';
+                    const details = activity.Details || '-';
+                    const ipAddress = activity.IPAddress || '-';
+
+                    activityHTML += `
+                        <tr>
+                            <td>${timestamp ? new Date(timestamp).toLocaleString('en-IN') : '-'}</td>
+                            <td>${adminName}</td>
+                            <td><span class="activity-action ${actionClass}">${action}</span></td>
+                            <td>${details}</td>
+                            <td>${ipAddress}</td>
+                        </tr>
+                    `;
+                });
+            }
 
             activityHTML += `
                     </tbody>
@@ -1575,18 +1561,8 @@ $recentActivities = [
             alert('Opening backup configuration...');
         }
 
-        // Load statistics
-        function loadStatistics() {
-            const totalAdmins = sampleAdmins.length;
-            const onlineAdmins = sampleAdmins.filter(a => a.IsOnline).length;
-            const totalRoles = Object.keys(rolePermissions).length;
-            const suspendedAdmins = sampleAdmins.filter(a => a.Status === 'Suspended').length;
-
-            document.getElementById('totalAdmins').textContent = totalAdmins;
-            document.getElementById('onlineAdmins').textContent = onlineAdmins;
-            document.getElementById('totalRoles').textContent = totalRoles;
-            document.getElementById('suspendedAdmins').textContent = suspendedAdmins;
-        }
+        // Statistics are now loaded from PHP directly in HTML
+        // No need for loadStatistics() function
 
         // Close modals when clicking outside
         window.onclick = function(event) {
@@ -1600,7 +1576,6 @@ $recentActivities = [
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
-            loadStatistics();
             loadAdminUsersTable();
         });
     </script>
