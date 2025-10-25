@@ -1159,43 +1159,6 @@ $sampleReturns = [
         </div>
     </div>
 
-    <!-- ...existing code... -->
-<script>
-// Wait for ZXing to be loaded before initializing code readers and scan logic
-// Ensure all scan functions are globally accessible
-window.initializeCodeReaders = function() {
-    if (typeof ZXing !== 'undefined') {
-        window.memberCodeReader = new ZXing.BrowserQRCodeReader();
-        window.bookCodeReader = new ZXing.BrowserMultiFormatReader();
-        window.returnCodeReader = new ZXing.BrowserMultiFormatReader();
-    }
-};
-window.startMemberScan = startMemberScan;
-window.stopMemberScan = stopMemberScan;
-window.startBookScan = startBookScan;
-window.stopBookScan = stopBookScan;
-window.startReturnScan = startReturnScan;
-window.stopReturnScan = stopReturnScan;
-window.handleMemberScanResult = handleMemberScanResult;
-window.handleBookScanResult = handleBookScanResult;
-window.handleReturnScanResult = handleReturnScanResult;
-// Loader for ZXing
-function waitForZXingInit() {
-    if (typeof ZXing !== 'undefined') {
-        window.initializeCodeReaders();
-        loadStatistics();
-        loadActiveCirculations();
-        loadReturnHistory();
-        setInterval(loadStatistics, 30000);
-        console.log('✅ ZXing loaded and all initialization complete');
-    } else {
-        setTimeout(waitForZXingInit, 100);
-    }
-}
-document.addEventListener('DOMContentLoaded', function() {
-    waitForZXingInit();
-});
-</script>
 </div>
 <!-- End page-container -->
 
@@ -1313,30 +1276,60 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             try {
+                // Show loading indicator
+                document.getElementById('memberScanResult').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching member...';
+                
                 const response = await fetch(`api/members.php?action=get&memberNo=${encodeURIComponent(memberNo)}`);
                 const result = await response.json();
 
                 if (result.success && result.data) {
                     const member = result.data;
+                    
+                    // Check member status
+                    if (member.Status !== 'Active') {
+                        showScanError('memberScanError', `Member is ${member.Status}. Cannot issue books to inactive members.`);
+                        selectedMember = null;
+                        document.getElementById('memberInfo').classList.remove('show');
+                        return;
+                    }
+                    
+                    // Check book limit
+                    const booksIssued = parseInt(member.BooksIssued) || 0;
+                    const maxBooks = parseInt(member.MaxBooks) || 3;
+                    
+                    if (booksIssued >= maxBooks) {
+                        showScanError('memberScanError', `Member has reached maximum book limit (${booksIssued}/${maxBooks}). Please return books first.`);
+                        selectedMember = null;
+                        document.getElementById('memberInfo').classList.remove('show');
+                        return;
+                    }
+                    
                     selectedMember = member;
                     document.getElementById('memberName').textContent = member.MemberName || 'N/A';
                     document.getElementById('memberNumber').textContent = member.MemberNo;
                     document.getElementById('memberGroup').textContent = member.Group || 'N/A';
-                    document.getElementById('memberBooks').textContent = member.BooksIssued || 0;
+                    document.getElementById('memberBooks').textContent = `${booksIssued}/${maxBooks}`;
+                    
+                    // Update status badge
+                    const statusBadge = document.querySelector('#memberInfo .status-badge');
+                    statusBadge.className = 'status-badge status-active';
+                    statusBadge.textContent = member.Status;
+                    
                     document.getElementById('memberInfo').classList.add('show');
-                    showScanResult('memberScanResult', `✓ Member found: ${member.MemberName}`);
+                    showScanResult('memberScanResult', `✓ Member found: ${member.MemberName} (Books: ${booksIssued}/${maxBooks})`);
                     checkIssueFormComplete();
                 } else {
-                    showScanError('memberScanError', `Member ${memberNo} not found!`);
+                    showScanError('memberScanError', `Member ${memberNo} not found in database!`);
                     selectedMember = null;
                     document.getElementById('memberInfo').classList.remove('show');
                 }
             } catch (error) {
                 console.error('Error searching member:', error);
-                showScanError('memberScanError', 'Error searching member. Please try again.');
+                showScanError('memberScanError', 'Error searching member. Please check your connection and try again.');
                 document.getElementById('memberInfo').classList.remove('show');
             }
         }
+        window.searchMember = searchMember;
 
         function simulateBookScan() {
             const accNo = prompt('Simulate Barcode Scan - Enter Accession Number:', 'ACC001001');
@@ -1355,37 +1348,75 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             try {
+                // Show loading indicator
+                document.getElementById('bookScanResult').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching book...';
+                
                 const response = await fetch(`api/books.php?action=lookup&accNo=${encodeURIComponent(accNo)}`);
                 const result = await response.json();
 
                 if (result.success && result.data) {
                     const book = result.data;
                     
-                    if (book.Status === 'Available') {
-                        selectedBook = book;
-                        document.getElementById('bookTitle').textContent = book.Title || 'Unknown';
-                        document.getElementById('bookAuthor').textContent = book.Author1 || 'N/A';
-                        document.getElementById('bookAccNo').textContent = book.AccNo;
-                        document.getElementById('bookLocation').textContent = book.Location || 'Library';
-                        document.getElementById('bookInfo').classList.add('show');
-                        showScanResult('bookScanResult', `✓ Book available: ${book.Title}`);
-                        checkIssueFormComplete();
-                    } else {
-                        showScanError('bookScanError', `Book is not available for issue! Current status: ${book.Status}`);
+                    // Check book status - must be Available
+                    if (book.Status !== 'Available') {
+                        let errorMsg = `Book is not available for issue!`;
+                        if (book.Status === 'Issued') {
+                            errorMsg += ` Currently issued to another member.`;
+                        } else if (book.Status === 'Lost') {
+                            errorMsg += ` Book is marked as lost.`;
+                        } else if (book.Status === 'Damaged') {
+                            errorMsg += ` Book is damaged and needs repair.`;
+                        } else if (book.Status === 'Reserved') {
+                            errorMsg += ` Book is reserved for another member.`;
+                        } else {
+                            errorMsg += ` Current status: ${book.Status}`;
+                        }
+                        
+                        showScanError('bookScanError', errorMsg);
                         selectedBook = null;
                         document.getElementById('bookInfo').classList.remove('show');
+                        return;
                     }
+                    
+                    selectedBook = book;
+                    document.getElementById('bookTitle').textContent = book.Title || 'Unknown';
+                    document.getElementById('bookAuthor').textContent = book.Author1 || 'N/A';
+                    document.getElementById('bookAccNo').textContent = book.AccNo;
+                    document.getElementById('bookLocation').textContent = book.Location || 'Library';
+                    
+                    // Show additional book info
+                    const bookInfoDetails = document.querySelector('#bookInfo .info-details');
+                    if (bookInfoDetails && book.CatNo) {
+                        const catNoInfo = bookInfoDetails.querySelector('[data-field="catno"]');
+                        if (!catNoInfo) {
+                            const catNoItem = document.createElement('div');
+                            catNoItem.className = 'info-item';
+                            catNoItem.setAttribute('data-field', 'catno');
+                            catNoItem.innerHTML = `
+                                <span class="info-label">Catalog No:</span>
+                                <span class="info-value">${book.CatNo}</span>
+                            `;
+                            bookInfoDetails.appendChild(catNoItem);
+                        } else {
+                            catNoInfo.querySelector('.info-value').textContent = book.CatNo;
+                        }
+                    }
+                    
+                    document.getElementById('bookInfo').classList.add('show');
+                    showScanResult('bookScanResult', `✓ Book available: ${book.Title}`);
+                    checkIssueFormComplete();
                 } else {
-                    showScanError('bookScanError', `Book with AccNo ${accNo} not found!`);
+                    showScanError('bookScanError', `Book with AccNo ${accNo} not found in database!`);
                     selectedBook = null;
                     document.getElementById('bookInfo').classList.remove('show');
                 }
             } catch (error) {
                 console.error('Error searching book:', error);
-                showScanError('bookScanError', 'Error searching book. Please try again.');
+                showScanError('bookScanError', 'Error searching book. Please check your connection and try again.');
                 document.getElementById('bookInfo').classList.remove('show');
             }
         }
+        window.searchBook = searchBook;
 
         function checkIssueFormComplete() {
             const issueBtn = document.getElementById('issueBtn');
@@ -1397,7 +1428,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         async function issueBook() {
-            logAudit('issueBook', { member: selectedMember, book: selectedBook, issueDate, dueDate, remarks });
             if (!selectedMember || !selectedBook) {
                 alert('Please select both a member and a book');
                 return;
@@ -1412,7 +1442,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Call API to issue book
+            // Validate dates
+            const issue = new Date(issueDate);
+            const due = new Date(dueDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (issue > due) {
+                alert('Due date cannot be before issue date!');
+                return;
+            }
+
+            if (issue > today) {
+                alert('Issue date cannot be in the future!');
+                return;
+            }
+
+            // Disable button to prevent double submission
+            const issueBtn = document.getElementById('issueBtn');
+            const originalText = issueBtn.innerHTML;
+            issueBtn.disabled = true;
+            issueBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
             try {
                 const response = await fetch('api/circulation.php?action=issue', {
                     method: 'POST',
@@ -1431,18 +1482,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 const result = await response.json();
 
                 if (result.success) {
-                    alert(`Book issued successfully!\n\nMember: ${selectedMember.MemberName}\nBook: ${selectedBook.Title}\nDue Date: ${dueDate}`);
+                    // Show success message with details
+                    alert(`✓ Book Issued Successfully!\n\n` +
+                          `Member: ${selectedMember.MemberName}\n` +
+                          `Book: ${selectedBook.Title}\n` +
+                          `Accession No: ${selectedBook.AccNo}\n` +
+                          `Issue Date: ${issueDate}\n` +
+                          `Due Date: ${dueDate}\n\n` +
+                          `Please return the book by the due date to avoid fines.`);
+                    
+                    // Reset form and refresh data
                     resetIssueForm();
-                    loadStatistics(); // Refresh stats
-                    loadActiveCirculations(); // Refresh the list
+                    loadStatistics(); // Refresh dashboard stats
+                    loadActiveCirculations(); // Refresh active circulations list
+                    
+                    // Optionally switch to active circulations tab
+                    // showTab('active');
                 } else {
-                    alert('Error: ' + result.message);
+                    alert('❌ Error issuing book:\n\n' + (result.message || 'Unknown error occurred'));
+                    issueBtn.disabled = false;
+                    issueBtn.innerHTML = originalText;
                 }
             } catch (error) {
                 console.error('Error issuing book:', error);
-                alert('Failed to issue book. Please try again.');
+                alert('❌ Failed to issue book. Please check your connection and try again.\n\nError: ' + error.message);
+                issueBtn.disabled = false;
+                issueBtn.innerHTML = originalText;
             }
         }
+        window.issueBook = issueBook;
 
         function resetIssueForm() {
             // Stop camera if running
@@ -1494,6 +1562,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             try {
+                // Show loading indicator
+                document.getElementById('returnScanResult').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching circulation...';
+                
                 // Get active circulation for this accession number
                 const response = await fetch('api/circulation.php?action=active');
                 const result = await response.json();
@@ -1503,14 +1574,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     if (circulation) {
                         returnBookData = circulation;
+                        
+                        // Display book and member information
                         document.getElementById('returnBookTitle').textContent = circulation.Title || 'Unknown';
                         document.getElementById('returnMemberName').textContent = circulation.MemberName || 'N/A';
-                        document.getElementById('returnIssueDate').textContent = circulation.IssueDate;
-                        document.getElementById('returnDueDate').textContent = circulation.DueDate;
+                        document.getElementById('returnIssueDate').textContent = new Date(circulation.IssueDate).toLocaleDateString('en-IN');
+                        document.getElementById('returnDueDate').textContent = new Date(circulation.DueDate).toLocaleDateString('en-IN');
 
-                        // Calculate overdue days
+                        // Calculate overdue days and fine
                         const dueDate = new Date(circulation.DueDate);
                         const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        dueDate.setHours(0, 0, 0, 0);
+                        
                         const diffTime = today - dueDate;
                         const overdueDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
                         
@@ -1518,53 +1594,46 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('returnBookInfo').classList.add('show');
 
                         if (overdueDays > 0) {
-                            const totalFine = overdueDays * 2; // ₹2 per day
+                            const finePerDay = parseFloat(circulation.FinePerDay) || 2; // ₹2 per day default
+                            const totalFine = overdueDays * finePerDay;
+                            
                             document.getElementById('fineOverdueDays').textContent = overdueDays;
                             document.getElementById('totalFine').textContent = totalFine.toFixed(2);
                             document.getElementById('fineCalculator').classList.add('show');
+                            
                             showScanError('returnScanError', `⚠️ Book is overdue by ${overdueDays} days. Fine: ₹${totalFine.toFixed(2)}`);
                         } else {
                             document.getElementById('fineCalculator').classList.remove('show');
-                            showScanResult('returnScanResult', `✓ Circulation found: ${circulation.Title}`);
+                            document.getElementById('totalFine').textContent = '0.00';
+                            showScanResult('returnScanResult', `✓ Circulation found: ${circulation.Title} (On time)`);
                         }
 
                         document.getElementById('returnBtn').disabled = false;
                     } else {
-                        showScanError('returnScanError', `No active circulation found for AccNo: ${accNo}`);
+                        showScanError('returnScanError', `No active circulation found for AccNo: ${accNo}. Book may not be issued or already returned.`);
                         returnBookData = null;
-                        returnBookInfo.classList.remove('show');
+                        document.getElementById('returnBookInfo').classList.remove('show');
                         document.getElementById('fineCalculator').classList.remove('show');
                         document.getElementById('returnBtn').disabled = true;
                     }
                 } else {
                     showScanError('returnScanError', 'Unable to fetch active circulations. Please try again.');
                     returnBookData = null;
-                    returnBookInfo.classList.remove('show');
+                    document.getElementById('returnBookInfo').classList.remove('show');
                     document.getElementById('fineCalculator').classList.remove('show');
                     document.getElementById('returnBtn').disabled = true;
                 }
             } catch (error) {
                 console.error('Error searching return book:', error);
-                showScanError('returnScanError', 'Error searching for book circulation. Please try again.');
-                returnBookInfo.classList.remove('show');
+                showScanError('returnScanError', 'Error searching for book circulation. Please check your connection and try again.');
+                document.getElementById('returnBookInfo').classList.remove('show');
                 document.getElementById('fineCalculator').classList.remove('show');
                 document.getElementById('returnBtn').disabled = true;
             }
         }
+        window.searchReturnBook = searchReturnBook;
 
         async function returnBook() {
-            logAudit('returnBook', { circulation: returnBookData, condition, remarks, fineAmount });
-    <!-- Help Section / Tooltips -->
-    <div class="help-section" style="background:#f8f9fa; border-radius:8px; margin:20px 0; padding:16px;">
-        <h2 style="color:#263c79; font-size:20px; margin-bottom:10px;"><i class="fas fa-info-circle"></i> How to Use Circulation Page</h2>
-        <ul style="font-size:15px; color:#333;">
-            <li><b>Scan Member/Book:</b> Click the camera button in the scan area to use your device camera. You can switch cameras if available.</li>
-            <li><b>Manual Entry:</b> Enter member or book numbers if QR/barcode is not available.</li>
-            <li><b>Tabs:</b> Use the tabs to switch between Issue, Return, Active Circulations, and History.</li>
-            <li><b>Errors:</b> If you see a red error, check your camera permissions or network connection.</li>
-            <li><b>Accessibility:</b> All controls are keyboard and screen reader friendly.</li>
-        </ul>
-    </div>
             if (!returnBookData) {
                 alert('Please scan a book to return');
                 return;
@@ -1573,8 +1642,24 @@ document.addEventListener('DOMContentLoaded', function() {
             const condition = document.getElementById('returnCondition').value;
             const remarks = document.getElementById('returnRemarks').value;
             const fineAmount = parseFloat(document.getElementById('totalFine').textContent || '0');
+            const returnDate = new Date().toISOString().split('T')[0];
 
-            // Call API to return book
+            // Confirm return if there's a fine
+            if (fineAmount > 0) {
+                const confirmMsg = `Book is overdue. Fine amount: ₹${fineAmount.toFixed(2)}\n\n` +
+                                   `Has the member paid the fine?\n\n` +
+                                   `Click OK to proceed with return, or Cancel to go back.`;
+                if (!confirm(confirmMsg)) {
+                    return;
+                }
+            }
+
+            // Disable button to prevent double submission
+            const returnBtn = document.getElementById('returnBtn');
+            const originalText = returnBtn.innerHTML;
+            returnBtn.disabled = true;
+            returnBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
             try {
                 const response = await fetch('api/circulation.php?action=return', {
                     method: 'POST',
@@ -1583,7 +1668,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: JSON.stringify({
                         circulationId: returnBookData.CirculationID,
-                        returnDate: new Date().toISOString().split('T')[0],
+                        returnDate: returnDate,
                         condition: condition,
                         remarks: remarks,
                         fineAmount: fineAmount
@@ -1593,19 +1678,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 const result = await response.json();
 
                 if (result.success) {
-                    alert(`Book returned successfully!\n\nBook: ${returnBookData.Title}\nMember: ${returnBookData.MemberName}\nFine: ₹${fineAmount.toFixed(2)}`);
+                    // Show success message with details
+                    let successMsg = `✓ Book Returned Successfully!\n\n` +
+                                    `Book: ${returnBookData.Title}\n` +
+                                    `Member: ${returnBookData.MemberName}\n` +
+                                    `Return Date: ${returnDate}\n` +
+                                    `Condition: ${condition}`;
+                    
+                    if (fineAmount > 0) {
+                        successMsg += `\n\n💰 Fine Collected: ₹${fineAmount.toFixed(2)}`;
+                    } else {
+                        successMsg += `\n\n✓ Returned on time - No fine`;
+                    }
+                    
+                    alert(successMsg);
+                    
+                    // Reset form and refresh data
                     resetReturnForm();
-                    loadStatistics(); // Refresh stats
-                    loadActiveCirculations(); // Refresh the list
-                    loadReturnHistory(); // Refresh returns
+                    loadStatistics(); // Refresh dashboard stats
+                    loadActiveCirculations(); // Refresh active circulations list
+                    loadReturnHistory(); // Refresh return history
+                    
+                    // Optionally switch to history tab
+                    // showTab('history');
                 } else {
-                    alert('Error: ' + result.message);
+                    alert('❌ Error returning book:\n\n' + (result.message || 'Unknown error occurred'));
+                    returnBtn.disabled = false;
+                    returnBtn.innerHTML = originalText;
                 }
             } catch (error) {
                 console.error('Error returning book:', error);
-                alert('Failed to return book. Please try again.');
+                alert('❌ Failed to return book. Please check your connection and try again.\n\nError: ' + error.message);
+                returnBtn.disabled = false;
+                returnBtn.innerHTML = originalText;
             }
         }
+        window.returnBook = returnBook;
 
         function resetReturnForm() {
             // Stop camera if running
@@ -1769,7 +1877,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('totalIssued').textContent = '0';
                     document.getElementById('dueToday').textContent = '0';
                     document.getElementById('overdue').textContent = '0';
-            document.getElementById('todayReturns').textContent = todayReturns;
+                    document.getElementById('todayReturns').textContent = '0';
+                });
         }
 
         // Camera and QR scanning functionality
@@ -1790,14 +1899,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Member scanning functions
-async function startMemberScan() {
-window.startMemberScan = startMemberScan;
+        async function startMemberScan() {
             try {
                 document.getElementById('memberCameraLoading').style.display = 'flex';
-                await populateCameraSelect('memberCameraSelect');
-                let deviceId = document.getElementById('memberCameraSelect').value;
+                
                 const constraints = {
-                    video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment', width: { ideal: 350 }, height: { ideal: 150 } }
+                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
                 };
                 try {
                     memberStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -1834,9 +1941,11 @@ window.startMemberScan = startMemberScan;
 
             } catch (error) {
                 console.error('Error accessing camera:', error);
+                document.getElementById('memberCameraLoading').style.display = 'none';
                 showScanError('memberScanError', 'Could not access camera. Please check permissions.');
             }
         }
+        window.startMemberScan = startMemberScan;
 
         function stopMemberScan() {
             if (memberStream) {
@@ -1859,6 +1968,7 @@ window.startMemberScan = startMemberScan;
             stopBtn.disabled = true;
             document.getElementById('memberScanningOverlay').style.display = 'none';
         }
+        window.stopMemberScan = stopMemberScan;
 
         function handleMemberScanResult(scannedData) {
             console.log('Member scan result:', scannedData);
@@ -1882,14 +1992,12 @@ window.startMemberScan = startMemberScan;
         }
 
         // Book scanning functions
-async function startBookScan() {
-window.startBookScan = startBookScan;
+        async function startBookScan() {
             try {
                 document.getElementById('bookCameraLoading').style.display = 'flex';
-                await populateCameraSelect('bookCameraSelect');
-                let deviceId = document.getElementById('bookCameraSelect').value;
+                
                 const constraints = {
-                    video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment', width: { ideal: 350 }, height: { ideal: 150 } }
+                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
                 };
                 try {
                     bookStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -1925,9 +2033,11 @@ window.startBookScan = startBookScan;
 
             } catch (error) {
                 console.error('Error accessing camera:', error);
+                document.getElementById('bookCameraLoading').style.display = 'none';
                 showScanError('bookScanError', 'Could not access camera. Please check permissions.');
             }
         }
+        window.startBookScan = startBookScan;
 
         function stopBookScan() {
             if (bookStream) {
@@ -1950,6 +2060,7 @@ window.startBookScan = startBookScan;
             stopBtn.disabled = true;
             document.getElementById('bookScanningOverlay').style.display = 'none';
         }
+        window.stopBookScan = stopBookScan;
 
         function handleBookScanResult(scannedData) {
             console.log('Book scan result:', scannedData);
@@ -1970,14 +2081,12 @@ window.startBookScan = startBookScan;
         }
 
         // Return scanning functions
-async function startReturnScan() {
-window.startReturnScan = startReturnScan;
+        async function startReturnScan() {
             try {
                 document.getElementById('returnCameraLoading').style.display = 'flex';
-                await populateCameraSelect('returnCameraSelect');
-                let deviceId = document.getElementById('returnCameraSelect').value;
+                
                 const constraints = {
-                    video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment', width: { ideal: 350 }, height: { ideal: 150 } }
+                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
                 };
                 try {
                     returnStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -2013,9 +2122,11 @@ window.startReturnScan = startReturnScan;
 
             } catch (error) {
                 console.error('Error accessing camera:', error);
+                document.getElementById('returnCameraLoading').style.display = 'none';
                 showScanError('returnScanError', 'Could not access camera. Please check permissions.');
             }
         }
+        window.startReturnScan = startReturnScan;
 
         function stopReturnScan() {
             if (returnStream) {
@@ -2038,6 +2149,7 @@ window.startReturnScan = startReturnScan;
             stopBtn.disabled = true;
             document.getElementById('returnScanningOverlay').style.display = 'none';
         }
+        window.stopReturnScan = stopReturnScan;
 
         function handleReturnScanResult(scannedData) {
             console.log('Return scan result:', scannedData);
@@ -2119,16 +2231,15 @@ window.startReturnScan = startReturnScan;
             setInterval(loadStatistics, 30000);
             
             console.log('✅ All initialization complete');
-
-            // ...existing code...
-// Ensure all scan functions are globally accessible for button onclick handlers
-window.startMemberScan = startMemberScan;
-window.stopMemberScan = stopMemberScan;
-window.startBookScan = startBookScan;
-window.stopBookScan = stopBookScan;
-window.startReturnScan = startReturnScan;
-window.stopReturnScan = stopReturnScan;
         });
+
+        // Ensure all scan functions are globally accessible for button onclick handlers
+        window.startMemberScan = startMemberScan;
+        window.stopMemberScan = stopMemberScan;
+        window.startBookScan = startBookScan;
+        window.stopBookScan = stopBookScan;
+        window.startReturnScan = startReturnScan;
+        window.stopReturnScan = stopReturnScan;
 
         // Clean up streams when page unloads
         window.addEventListener('beforeunload', function() {

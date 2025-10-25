@@ -731,6 +731,46 @@ try {
             $books = searchBooks($pdo, $query, 20);
             sendJson(['success' => true, 'data' => $books]);
             break;
+        
+        case 'lookup':
+            // Lookup book by Accession Number (for stock verification)
+            $accNo = $_GET['accNo'] ?? '';
+            
+            if (!$accNo) {
+                sendJson(['success' => false, 'message' => 'AccNo is required'], 400);
+            }
+            
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        h.AccNo,
+                        b.Title,
+                        b.Author1,
+                        b.Author2,
+                        b.Subject,
+                        h.Status,
+                        h.Location,
+                        h.Section,
+                        b.ISBN,
+                        b.Publisher,
+                        b.Year
+                    FROM Holding h
+                    INNER JOIN Books b ON h.BookID = b.BookID
+                    WHERE h.AccNo = ?
+                    LIMIT 1
+                ");
+                $stmt->execute([$accNo]);
+                $book = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($book) {
+                    sendJson(['success' => true, 'data' => $book]);
+                } else {
+                    sendJson(['success' => false, 'message' => 'Book not found'], 404);
+                }
+            } catch (PDOException $e) {
+                sendJson(['success' => false, 'message' => 'Database error: ' . $e->getMessage()], 500);
+            }
+            break;
             
         case 'subjects':
             // Get list of all subjects
