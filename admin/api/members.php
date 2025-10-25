@@ -262,6 +262,250 @@ try {
             sendJson(['success' => true, 'data' => $members]);
             break;
             
+        case 'list_students':
+            // Get all students with member information
+            $name = $_GET['name'] ?? '';
+            $prn = $_GET['prn'] ?? '';
+            $branch = $_GET['branch'] ?? '';
+            $status = $_GET['status'] ?? '';
+            
+            $sql = "
+                SELECT 
+                    s.*,
+                    m.MemberNo,
+                    m.MemberName,
+                    m.`Group`,
+                    m.Phone,
+                    m.Email as MemberEmail,
+                    m.Status,
+                    m.BooksIssued,
+                    m.Designation,
+                    CONCAT(s.FirstName, ' ', COALESCE(s.MiddleName, ''), ' ', COALESCE(s.Surname, '')) as FullName
+                FROM Student s
+                INNER JOIN Member m ON s.MemberNo = m.MemberNo
+                WHERE 1=1
+            ";
+            
+            $params = [];
+            
+            if ($name) {
+                $sql .= " AND (m.MemberName LIKE ? OR s.FirstName LIKE ? OR s.Surname LIKE ?)";
+                $nameTerm = "%{$name}%";
+                $params[] = $nameTerm;
+                $params[] = $nameTerm;
+                $params[] = $nameTerm;
+            }
+            
+            if ($prn) {
+                $sql .= " AND s.PRN LIKE ?";
+                $params[] = "%{$prn}%";
+            }
+            
+            if ($branch) {
+                $sql .= " AND s.Branch = ?";
+                $params[] = $branch;
+            }
+            
+            if ($status) {
+                $sql .= " AND m.Status = ?";
+                $params[] = $status;
+            }
+            
+            $sql .= " ORDER BY m.MemberName ASC";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $students = $stmt->fetchAll();
+            
+            sendJson(['success' => true, 'data' => $students, 'count' => count($students)]);
+            break;
+            
+        case 'add_student':
+            // Add new student with photo upload support
+            if ($method !== 'POST') {
+                sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
+            }
+            
+            // Get form data
+            $surname = $_POST['Surname'] ?? '';
+            $middleName = $_POST['MiddleName'] ?? '';
+            $firstName = $_POST['FirstName'] ?? '';
+            $prn = $_POST['PRN'] ?? '';
+            $branch = $_POST['Branch'] ?? '';
+            $courseName = $_POST['CourseName'] ?? '';
+            $gender = $_POST['Gender'] ?? '';
+            $dob = $_POST['DOB'] ?? null;
+            $bloodGroup = $_POST['BloodGroup'] ?? '';
+            $mobile = $_POST['Mobile'] ?? '';
+            $email = $_POST['Email'] ?? '';
+            $address = $_POST['Address'] ?? '';
+            $validTill = $_POST['ValidTill'] ?? null;
+            $cardColour = $_POST['CardColour'] ?? 'Blue';
+            
+            // Validate required fields
+            if (empty($firstName) || empty($prn) || empty($branch)) {
+                sendJson(['success' => false, 'message' => 'First name, PRN, and Branch are required'], 400);
+            }
+            
+            // Handle photo upload
+            $photoData = null;
+            if (isset($_FILES['Photo']) && $_FILES['Photo']['error'] === UPLOAD_ERR_OK) {
+                $photoData = file_get_contents($_FILES['Photo']['tmp_name']);
+            }
+            
+            // Generate member number
+            $stmt = $pdo->query("SELECT MAX(MemberNo) as maxNo FROM Member");
+            $result = $stmt->fetch();
+            $memberNo = ($result['maxNo'] ?? 0) + 1;
+            
+            // Create full name for Member table
+            $fullName = trim("$firstName $middleName $surname");
+            
+            // Start transaction
+            $pdo->beginTransaction();
+            
+            try {
+                // Insert into Member table
+                $stmt = $pdo->prepare("
+                    INSERT INTO Member (MemberNo, MemberName, `Group`, Phone, Email, 
+                                       FinePerDay, AdmissionDate, Status, BooksIssued)
+                    VALUES (?, ?, 'Student', ?, ?, 2.00, CURDATE(), 'Active', 0)
+                ");
+                
+                $stmt->execute([
+                    $memberNo,
+                    $fullName,
+                    $mobile,
+                    $email
+                ]);
+                
+                // Generate QR code (simple format: PRN-MemberNo)
+                $qrCode = "$prn-$memberNo";
+                
+                // Insert into Student table
+                $stmt = $pdo->prepare("
+                    INSERT INTO Student (MemberNo, Surname, MiddleName, FirstName, DOB, Gender, 
+                                        BloodGroup, Branch, CourseName, ValidTill, PRN, Mobile, 
+                                        Email, Address, CardColour, QRCode, Photo)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                
+                $stmt->execute([
+                    $memberNo,
+                    $surname,
+                    $middleName,
+                    $firstName,
+                    $dob,
+                    $gender,
+                    $bloodGroup,
+                    $branch,
+                    $courseName,
+                    $validTill,
+                    $prn,
+                    $mobile,
+                    $email,
+                    $address,
+                    $cardColour,
+                    $qrCode,
+                    $photoData
+                ]);
+                
+                $studentId = $pdo->lastInsertId();
+                
+                $pdo->commit();
+                
+                sendJson([
+                    'success' => true, 
+                    'message' => 'Student added successfully',
+                    'memberNo' => $memberNo,
+                    'studentId' => $studentId,
+                    'qrCode' => $qrCode
+                ]);
+                
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+            break;
+            
+        case 'get_student':
+            // Get single student details
+            $studentId = $_GET['studentId'] ?? 0;
+            
+            $stmt = $pdo->prepare("
+                SELECT s.*, m.*
+                FROM Student s
+                INNER JOIN Member m ON s.MemberNo = m.MemberNo
+                WHERE s.StudentID = ?
+            ");
+            $stmt->execute([$studentId]);
+            $student = $stmt->fetch();
+            
+            if (!$student) {
+                sendJson(['success' => false, 'message' => 'Student not found'], 404);
+            }
+            
+            sendJson(['success' => true, 'data' => $student]);
+            break;
+            
+        case 'delete_student':
+            // Delete student and associated member
+            if ($method !== 'POST') {
+                sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
+            }
+            
+            $data = json_decode(file_get_contents('php://input'), true);
+            $studentId = $data['studentId'] ?? 0;
+            
+            if (!$studentId) {
+                sendJson(['success' => false, 'message' => 'Student ID is required'], 400);
+            }
+            
+            // Get member number first
+            $stmt = $pdo->prepare("SELECT MemberNo FROM Student WHERE StudentID = ?");
+            $stmt->execute([$studentId]);
+            $student = $stmt->fetch();
+            
+            if (!$student) {
+                sendJson(['success' => false, 'message' => 'Student not found'], 404);
+            }
+            
+            $memberNo = $student['MemberNo'];
+            
+            // Check if student has active circulations
+            $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM Circulation WHERE MemberNo = ? AND Status = 'Issued'");
+            $stmt->execute([$memberNo]);
+            $result = $stmt->fetch();
+            
+            if ($result['count'] > 0) {
+                sendJson(['success' => false, 'message' => 'Cannot delete student with active book issues. Please return all books first.'], 400);
+            }
+            
+            // Start transaction
+            $pdo->beginTransaction();
+            
+            try {
+                // Delete student record
+                $stmt = $pdo->prepare("DELETE FROM Student WHERE StudentID = ?");
+                $stmt->execute([$studentId]);
+                
+                // Delete member record
+                $stmt = $pdo->prepare("DELETE FROM Member WHERE MemberNo = ?");
+                $stmt->execute([$memberNo]);
+                
+                $pdo->commit();
+                
+                sendJson([
+                    'success' => true, 
+                    'message' => 'Student and member record deleted successfully'
+                ]);
+                
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+            break;
+            
         default:
             sendJson(['success' => false, 'message' => 'Invalid action'], 400);
     }

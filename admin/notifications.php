@@ -1,102 +1,90 @@
 <?php
 session_start();
+require_once '../includes/db_connect.php';
 
-// No database connection needed for frontend development
-// Sample data will be used to demonstrate functionality
+// Check if user is logged in
+if (!isset($_SESSION['admin_id'])) {
+    header("Location: admin_login.php");
+    exit();
+}
 
 $admin_id = $_SESSION['admin_id'] ?? 1;
 $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
-// Sample notification data matching potential database schema
-$sampleNotifications = [
-    [
-        'NotificationID' => 1,
-        'Type' => 'Due Reminder',
-        'Title' => 'Book Due Tomorrow',
-        'Message' => 'Dear {member_name}, your book "{book_title}" is due tomorrow. Please return it to avoid late fees.',
-        'Recipients' => 'Specific Members',
-        'Status' => 'Sent',
-        'SentCount' => 23,
-        'DeliveredCount' => 22,
-        'FailedCount' => 1,
-        'ScheduledDate' => '2024-12-19 09:00:00',
-        'SentDate' => '2024-12-19 09:00:00',
-        'CreatedBy' => 1,
-        'CreatedDate' => '2024-12-18 15:30:00',
-        'Channels' => ['Email', 'SMS'],
-        'Priority' => 'High'
-    ],
-    [
-        'NotificationID' => 2,
-        'Type' => 'Overdue Notice',
-        'Title' => 'Overdue Books - Immediate Action Required',
-        'Message' => 'Dear {member_name}, you have {overdue_count} overdue book(s). Total fine: ₹{fine_amount}. Please return immediately.',
-        'Recipients' => 'Overdue Members',
-        'Status' => 'Sent',
-        'SentCount' => 15,
-        'DeliveredCount' => 14,
-        'FailedCount' => 1,
-        'ScheduledDate' => '2024-12-19 10:30:00',
-        'SentDate' => '2024-12-19 10:30:00',
-        'CreatedBy' => 1,
-        'CreatedDate' => '2024-12-19 08:00:00',
-        'Channels' => ['Email', 'SMS', 'Push'],
-        'Priority' => 'Critical'
-    ],
-    [
-        'NotificationID' => 3,
-        'Type' => 'New Arrivals',
-        'Title' => 'New Books Added to Library Collection',
-        'Message' => 'New books in Computer Science and Engineering have arrived! Visit the library to explore our latest collection.',
-        'Recipients' => 'All Active Members',
-        'Status' => 'Scheduled',
-        'SentCount' => 0,
-        'DeliveredCount' => 0,
-        'FailedCount' => 0,
-        'ScheduledDate' => '2024-12-20 14:00:00',
-        'SentDate' => null,
-        'CreatedBy' => 2,
-        'CreatedDate' => '2024-12-19 12:15:00',
-        'Channels' => ['Email', 'Push'],
-        'Priority' => 'Medium'
-    ],
-    [
-        'NotificationID' => 4,
-        'Type' => 'Event Reminder',
-        'Title' => 'Digital Library Workshop Tomorrow',
-        'Message' => 'Reminder: Digital Library Workshop is scheduled for tomorrow at 2:00 PM in Computer Lab 1. Don\'t miss out!',
-        'Recipients' => 'Event Registrants',
-        'Status' => 'Draft',
-        'SentCount' => 0,
-        'DeliveredCount' => 0,
-        'FailedCount' => 0,
-        'ScheduledDate' => '2024-12-19 18:00:00',
-        'SentDate' => null,
-        'CreatedBy' => 1,
-        'CreatedDate' => '2024-12-19 14:45:00',
-        'Channels' => ['Email'],
-        'Priority' => 'Medium'
-    ],
-    [
-        'NotificationID' => 5,
-        'Type' => 'System Maintenance',
-        'Title' => 'Library System Maintenance Notice',
-        'Message' => 'The library system will be under maintenance on Sunday from 2:00 AM to 6:00 AM. Online services will be temporarily unavailable.',
-        'Recipients' => 'All Members',
-        'Status' => 'Failed',
-        'SentCount' => 0,
-        'DeliveredCount' => 0,
-        'FailedCount' => 1456,
-        'ScheduledDate' => '2024-12-18 20:00:00',
-        'SentDate' => '2024-12-18 20:00:00',
-        'CreatedBy' => 1,
-        'CreatedDate' => '2024-12-18 16:00:00',
-        'Channels' => ['Email', 'SMS', 'Push'],
-        'Priority' => 'High'
-    ]
-];
+// Fetch notification statistics from database
+try {
+    // Total sent notifications
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Notifications");
+    $total_sent = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Read notifications
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Notifications WHERE IsRead = 1");
+    $delivered = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Unread notifications
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Notifications WHERE IsRead = 0");
+    $failed = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Calculate pending and scheduled (for now, use 0)
+    $pending = 0;
+    $scheduled = 0;
+    
+    // Calculate delivery rate
+    $delivery_rate = $total_sent > 0 ? round(($delivered / $total_sent) * 100, 1) : 0;
+    
+    $notificationStats = [
+        'total_sent' => $total_sent,
+        'delivered' => $delivered,
+        'failed' => $failed,
+        'pending' => $pending,
+        'scheduled' => $scheduled,
+        'delivery_rate' => $delivery_rate
+    ];
+    
+} catch (PDOException $e) {
+    error_log("Notification stats error: " . $e->getMessage());
+    $notificationStats = [
+        'total_sent' => 0,
+        'delivered' => 0,
+        'failed' => 0,
+        'pending' => 0,
+        'scheduled' => 0,
+        'delivery_rate' => 0
+    ];
+}
 
-// Notification templates
+// Fetch recent notifications
+try {
+    $stmt = $pdo->prepare("
+        SELECT n.*, m.Name as MemberName 
+        FROM Notifications n
+        LEFT JOIN Member m ON n.MemberNo = m.MemberNo
+        ORDER BY n.CreatedDate DESC
+        LIMIT 50
+    ");
+    $stmt->execute();
+    $sampleNotifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Add Status field (map IsRead to Status for UI)
+    foreach ($sampleNotifications as &$notif) {
+        $notif['Status'] = $notif['IsRead'] == 1 ? 'Sent' : 'Draft';
+        $notif['Recipients'] = $notif['MemberName'] ?? 'Unknown Member';
+        $notif['SentCount'] = 1;
+        $notif['DeliveredCount'] = $notif['IsRead'] ?? 0;
+        $notif['FailedCount'] = 0;
+        $notif['ScheduledDate'] = $notif['CreatedDate'] ?? null;
+        $notif['SentDate'] = $notif['CreatedDate'] ?? null;
+        $notif['CreatedBy'] = $admin_id;
+        $notif['Channels'] = ['Email'];
+        $notif['Priority'] = 'Medium';
+    }
+    
+} catch (PDOException $e) {
+    error_log("Notifications fetch error: " . $e->getMessage());
+    $sampleNotifications = [];
+}
+
+// Notification templates (static for now)
 $notificationTemplates = [
     'due_reminder' => [
         'name' => 'Book Due Reminder',
@@ -148,50 +136,9 @@ $notificationTemplates = [
     ]
 ];
 
-// Notification statistics
-$notificationStats = [
-    'total_sent' => 1248,
-    'delivered' => 1189,
-    'failed' => 59,
-    'pending' => 23,
-    'scheduled' => 5,
-    'delivery_rate' => 95.3
-];
+// Recent delivery logs (empty for now, can be populated from ActivityLog or a new table)
+$deliveryLogs = [];
 
-// Recent delivery logs
-$deliveryLogs = [
-    [
-        'LogID' => 1,
-        'NotificationID' => 1,
-        'MemberNo' => 2024001,
-        'MemberName' => 'Rahul Sharma',
-        'Channel' => 'Email',
-        'Status' => 'Delivered',
-        'SentAt' => '2024-12-19 09:00:15',
-        'DeliveredAt' => '2024-12-19 09:00:47',
-        'ErrorMessage' => null
-    ],
-    [
-        'LogID' => 2,
-        'NotificationID' => 1,
-        'MemberNo' => 2024002,
-        'Channel' => 'SMS',
-        'Status' => 'Failed',
-        'SentAt' => '2024-12-19 09:00:20',
-        'DeliveredAt' => null,
-        'ErrorMessage' => 'Invalid phone number format'
-    ],
-    [
-        'LogID' => 3,
-        'NotificationID' => 2,
-        'MemberNo' => 2024003,
-        'Channel' => 'Email',
-        'Status' => 'Delivered',
-        'SentAt' => '2024-12-19 10:30:08',
-        'DeliveredAt' => '2024-12-19 10:30:32',
-        'ErrorMessage' => null
-    ]
-];
 ?>
 
 <!DOCTYPE html>
