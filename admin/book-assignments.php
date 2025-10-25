@@ -1173,10 +1173,10 @@ $branches = ['Computer Engineering', 'Mechanical Engineering', 'Electronics Engi
     </div>
 
     <script>
-        // Global variables
-        const sampleAssignments = <?php echo json_encode($sampleAssignments); ?>;
-        const sampleCourses = <?php echo json_encode($sampleCourses); ?>;
-        const sampleBooks = <?php echo json_encode($sampleBooks); ?>;
+    // Global variables (deprecated, now using live API)
+    // const sampleAssignments = <?php echo json_encode($sampleAssignments); ?>;
+    // const sampleCourses = <?php echo json_encode($sampleCourses); ?>;
+    // const sampleBooks = <?php echo json_encode($sampleBooks); ?>;
 
         // Tab functionality
         function showTab(tabName) {
@@ -1211,134 +1211,129 @@ $branches = ['Computer Engineering', 'Mechanical Engineering', 'Electronics Engi
         }
 
         function loadAssignmentsTable(searchParams = {}) {
-            let filteredAssignments = sampleAssignments;
-
-            // Apply search filters
-            if (searchParams.course) {
-                filteredAssignments = filteredAssignments.filter(assignment =>
-                    assignment.CourseCode.toLowerCase().includes(searchParams.course.toLowerCase()) ||
-                    assignment.CourseName.toLowerCase().includes(searchParams.course.toLowerCase())
-                );
-            }
-            if (searchParams.branch) {
-                filteredAssignments = filteredAssignments.filter(assignment =>
-                    assignment.Branch === searchParams.branch
-                );
-            }
-            if (searchParams.type) {
-                filteredAssignments = filteredAssignments.filter(assignment =>
-                    assignment.AssignmentType === searchParams.type
-                );
-            }
-            if (searchParams.status) {
-                filteredAssignments = filteredAssignments.filter(assignment =>
-                    assignment.Status === searchParams.status
-                );
-            }
-
-            let tableHTML = `
-                <table class="assignments-table">
-                    <thead>
-                        <tr>
-                            <th>Course</th>
-                            <th>Book Details</th>
-                            <th>Type</th>
-                            <th>Priority</th>
-                            <th>Faculty</th>
-                            <th>Required/Available</th>
-                            <th>Status</th>
-                            <th>Valid Till</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            if (filteredAssignments.length === 0) {
-                tableHTML += `
-                    <tr>
-                        <td colspan="9" style="text-align: center; padding: 40px; color: #6c757d;">
-                            <i class="fas fa-search" style="font-size: 24px; margin-bottom: 10px;"></i>
-                            <p>No assignments found matching your search criteria.</p>
-                        </td>
-                    </tr>
-                `;
-            } else {
-                filteredAssignments.forEach(assignment => {
-                    const statusClass = {
-                        'Active': 'status-active',
-                        'Shortage': 'status-shortage',
-                        'Pending': 'status-pending'
-                    } [assignment.Status] || 'status-active';
-
-                    const priorityClass = {
-                        'High': 'priority-high',
-                        'Medium': 'priority-medium',
-                        'Low': 'priority-low'
-                    } [assignment.Priority] || 'priority-medium';
-
-                    const typeClass = {
-                        'Textbook': 'type-textbook',
-                        'Reference': 'type-reference',
-                        'Lab Manual': 'type-lab'
-                    } [assignment.AssignmentType] || 'type-textbook';
-
-                    const availabilityColor = assignment.AvailableCopies < assignment.RequiredCopies * 0.5 ? '#dc3545' :
-                        assignment.AvailableCopies < assignment.RequiredCopies * 0.8 ? '#ffc107' : '#28a745';
-
-                    tableHTML += `
-                        <tr>
-                            <td>
-                                <strong>${assignment.CourseCode}</strong><br>
-                                <small style="color: #6c757d;">${assignment.CourseName}</small><br>
-                                <small style="color: #6c757d;">${assignment.Branch} - Sem ${assignment.Semester}</small>
-                            </td>
-                            <td>
-                                <strong>${assignment.Title}</strong><br>
-                                <small style="color: #6c757d;">by ${assignment.Author}</small>
-                            </td>
-                            <td><span class="type-badge ${typeClass}">${assignment.AssignmentType}</span></td>
-                            <td><span class="priority-badge ${priorityClass}">${assignment.Priority}</span></td>
-                            <td>${assignment.Faculty}</td>
-                            <td>
-                                <div style="text-align: center;">
-                                    <div style="color: ${availabilityColor}; font-weight: 600; font-size: 16px;">
-                                        ${assignment.AvailableCopies}/${assignment.RequiredCopies}
-                                    </div>
-                                    <small style="color: #6c757d;">Available/Required</small>
-                                </div>
-                            </td>
-                            <td><span class="status-badge ${statusClass}">${assignment.Status}</span></td>
-                            <td>${new Date(assignment.ValidTill).toLocaleDateString('en-IN')}</td>
-                            <td class="action-links">
-                                <a href="#" class="btn-view" onclick="viewAssignment(${assignment.AssignmentID})">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <a href="#" class="btn-edit" onclick="editAssignment(${assignment.AssignmentID})">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <button class="btn-delete" onclick="deleteAssignment(${assignment.AssignmentID})">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
+            fetch('api/book_assignments.php?action=list')
+                .then(res => res.json())
+                .then(result => {
+                    let assignments = Array.isArray(result.data) ? result.data : [];
+                    // Apply search filters client-side (can be moved to backend if needed)
+                    if (searchParams.course) {
+                        assignments = assignments.filter(assignment =>
+                            assignment.CourseCode.toLowerCase().includes(searchParams.course.toLowerCase()) ||
+                            assignment.CourseName.toLowerCase().includes(searchParams.course.toLowerCase())
+                        );
+                    }
+                    if (searchParams.branch) {
+                        assignments = assignments.filter(assignment =>
+                            assignment.Branch === searchParams.branch
+                        );
+                    }
+                    if (searchParams.type) {
+                        assignments = assignments.filter(assignment =>
+                            assignment.AssignmentType === searchParams.type
+                        );
+                    }
+                    if (searchParams.status) {
+                        assignments = assignments.filter(assignment =>
+                            assignment.Status === searchParams.status
+                        );
+                    }
+                    let tableHTML = `
+                        <table class="assignments-table">
+                            <thead>
+                                <tr>
+                                    <th>Course</th>
+                                    <th>Book Details</th>
+                                    <th>Type</th>
+                                    <th>Priority</th>
+                                    <th>Faculty</th>
+                                    <th>Required/Available</th>
+                                    <th>Status</th>
+                                    <th>Valid Till</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                     `;
+                    if (assignments.length === 0) {
+                        tableHTML += `
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 40px; color: #6c757d;">
+                                    <i class="fas fa-search" style="font-size: 24px; margin-bottom: 10px;"></i>
+                                    <p>No assignments found matching your search criteria.</p>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        assignments.forEach(assignment => {
+                            const statusClass = {
+                                'Active': 'status-active',
+                                'Shortage': 'status-shortage',
+                                'Pending': 'status-pending'
+                            } [assignment.Status] || 'status-active';
+                            const priorityClass = {
+                                'High': 'priority-high',
+                                'Medium': 'priority-medium',
+                                'Low': 'priority-low'
+                            } [assignment.Priority] || 'priority-medium';
+                            const typeClass = {
+                                'Textbook': 'type-textbook',
+                                'Reference': 'type-reference',
+                                'Lab Manual': 'type-lab'
+                            } [assignment.AssignmentType] || 'type-textbook';
+                            const availabilityColor = assignment.AvailableCopies < assignment.RequiredCopies * 0.5 ? '#dc3545' :
+                                assignment.AvailableCopies < assignment.RequiredCopies * 0.8 ? '#ffc107' : '#28a745';
+                            tableHTML += `
+                                <tr>
+                                    <td>
+                                        <strong>${assignment.CourseCode}</strong><br>
+                                        <small style="color: #6c757d;">${assignment.CourseName}</small><br>
+                                        <small style="color: #6c757d;">${assignment.Branch} - Sem ${assignment.Semester}</small>
+                                    </td>
+                                    <td>
+                                        <strong>${assignment.Title}</strong><br>
+                                        <small style="color: #6c757d;">by ${assignment.Author}</small>
+                                    </td>
+                                    <td><span class="type-badge ${typeClass}">${assignment.AssignmentType}</span></td>
+                                    <td><span class="priority-badge ${priorityClass}">${assignment.Priority}</span></td>
+                                    <td>${assignment.Faculty}</td>
+                                    <td>
+                                        <div style="text-align: center;">
+                                            <div style="color: ${availabilityColor}; font-weight: 600; font-size: 16px;">
+                                                ${assignment.AvailableCopies}/${assignment.RequiredCopies}
+                                            </div>
+                                            <small style="color: #6c757d;">Available/Required</small>
+                                        </div>
+                                    </td>
+                                    <td><span class="status-badge ${statusClass}">${assignment.Status}</span></td>
+                                    <td>${new Date(assignment.ValidTill).toLocaleDateString('en-IN')}</td>
+                                    <td class="action-links">
+                                        <a href="#" class="btn-view" onclick="viewAssignment(${assignment.AssignmentID})">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="#" class="btn-edit" onclick="editAssignment(${assignment.AssignmentID})">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <button class="btn-delete" onclick="deleteAssignment(${assignment.AssignmentID})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    }
+                    tableHTML += `
+                            </tbody>
+                        </table>
+                        <div class="pagination">
+                            <a href="#" class="page-link">Previous</a>
+                            <a href="#" class="page-link active">1</a>
+                            <a href="#" class="page-link">2</a>
+                            <a href="#" class="page-link">3</a>
+                            <a href="#" class="page-link">Next</a>
+                        </div>
+                    `;
+                    document.getElementById('assignmentsTableContainer').innerHTML = tableHTML;
                 });
-            }
-
-            tableHTML += `
-                    </tbody>
-                </table>
-                <div class="pagination">
-                    <a href="#" class="page-link">Previous</a>
-                    <a href="#" class="page-link active">1</a>
-                    <a href="#" class="page-link">2</a>
-                    <a href="#" class="page-link">3</a>
-                    <a href="#" class="page-link">Next</a>
-                </div>
-            `;
-
-            document.getElementById('assignmentsTableContainer').innerHTML = tableHTML;
         }
 
         function loadReadingLists() {

@@ -1453,6 +1453,9 @@ if (!function_exists('generateQR')) {
         // Only load books table once on initial page load
         let booksTableLoaded = false;
         document.addEventListener('DOMContentLoaded', function() {
+            // Load database-wide statistics
+            loadStatistics();
+            
             if (!booksTableLoaded) {
                 booksTableLoaded = true;
                 loadBooksTable();
@@ -1481,6 +1484,29 @@ if (!function_exists('generateQR')) {
         let booksPageSize = 20;
         let booksTotal = 0;
 
+        // Function to load database-wide statistics
+        async function loadStatistics() {
+            try {
+                const response = await fetch('api/books.php?action=stats');
+                if (!response.ok) throw new Error('API error: ' + response.status);
+                const result = await response.json();
+                
+                if (result.success && result.stats) {
+                    const totalBooksElem = document.getElementById('totalBooks');
+                    const totalCopiesElem = document.getElementById('totalCopies');
+                    const availableCopiesElem = document.getElementById('availableCopies');
+                    const issuedCopiesElem = document.getElementById('issuedCopies');
+                    
+                    if (totalBooksElem) totalBooksElem.textContent = result.stats.totalBooks;
+                    if (totalCopiesElem) totalCopiesElem.textContent = result.stats.totalCopies;
+                    if (availableCopiesElem) availableCopiesElem.textContent = result.stats.availableCopies;
+                    if (issuedCopiesElem) issuedCopiesElem.textContent = result.stats.issuedCopies;
+                }
+            } catch (error) {
+                console.error('Failed to load statistics:', error);
+            }
+        }
+
         async function loadBooksTable(page = 1) {
             booksPage = page;
             const booksTableContainer = document.getElementById('booksTableContainer');
@@ -1497,24 +1523,7 @@ if (!function_exists('generateQR')) {
                     throw new Error('Invalid JSON response from API: ' + e.message);
                 }
                 booksTotal = result.total || 0;
-                // Update real-time stats
-                const totalBooksElem = document.getElementById('totalBooks');
-                if (totalBooksElem) totalBooksElem.textContent = booksTotal;
-                // Also update other stat cards if present
-                const totalCopiesElem = document.getElementById('totalCopies');
-                const availableCopiesElem = document.getElementById('availableCopies');
-                const issuedCopiesElem = document.getElementById('issuedCopies');
-                let totalCopies = 0, availableCopies = 0, issuedCopies = 0;
-                if (result.success && result.data && result.data.length > 0) {
-                    result.data.forEach(book => {
-                        totalCopies += parseInt(book.TotalCopies || 0);
-                        availableCopies += parseInt(book.AvailableCopies || 0);
-                        issuedCopies += parseInt(book.IssuedCopies || 0);
-                    });
-                }
-                if (totalCopiesElem) totalCopiesElem.textContent = totalCopies;
-                if (availableCopiesElem) availableCopiesElem.textContent = availableCopies;
-                if (issuedCopiesElem) issuedCopiesElem.textContent = issuedCopies;
+                
                 let tableHTML = `
                     <table class="books-table">
                         <thead>
@@ -1859,6 +1868,7 @@ if (!function_exists('generateQR')) {
                     // close modal if present and reset inline form
                     try { closeModal('addBookModal'); } catch (e) {}
                     form.reset();
+                    loadStatistics(); // Refresh statistics
                     loadBooksTable();
                 } else {
                     alert('Error: ' + (result && result.message ? result.message : 'Failed to add book.'));
@@ -2015,6 +2025,7 @@ if (!function_exists('generateQR')) {
             if (result.success) {
               alert('Book updated successfully!');
               closeModal('bookDetailsModal');
+              loadStatistics(); // Refresh statistics
               loadBooksTable();
             } else {
               alert('Failed to update book.');
@@ -2213,6 +2224,8 @@ if (!function_exists('generateQR')) {
                     saveBtn.innerHTML = '<i class="fas fa-save"></i>';
                     saveBtn.style.backgroundColor = '';
                     saveBtn.disabled = false;
+                    // Refresh statistics
+                    loadStatistics();
                     // Refresh modal to show updated data
                     const modal = document.getElementById('bookDetailsModal');
                     const catNo = modal.getAttribute('data-catno');
@@ -2256,6 +2269,8 @@ if (!function_exists('generateQR')) {
         .then(result => {
             if (result.success) {
                 alert('Holding added successfully!');
+                // Refresh statistics
+                loadStatistics();
                 // Refresh modal
                 const modal = document.getElementById('bookDetailsModal');
                 const editable = modal.getAttribute('data-editable') === '1';
