@@ -1,93 +1,21 @@
 <?php
 session_start();
+require_once '../includes/db_connect.php';
 
-// No database connection needed for frontend development
-// Sample data will be used to demonstrate functionality
+// Check if admin is logged in
+if (!isset($_SESSION['admin_id'])) {
+    header('Location: admin_login.php');
+    exit();
+}
 
-$admin_id = $_SESSION['admin_id'] ?? 1;
+$admin_id = $_SESSION['admin_id'];
 $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
-// Sample data matching database schema and academic requirements
-$sampleAssignments = [
-    [
-        'AssignmentID' => 1,
-        'CourseCode' => 'CS101',
-        'CourseName' => 'Introduction to Programming',
-        'Branch' => 'Computer Engineering',
-        'Semester' => 1,
-        'Year' => 2024,
-        'Faculty' => 'Dr. Amit Sharma',
-        'CatNo' => 1001,
-        'Title' => 'Programming Fundamentals with C++',
-        'Author' => 'Deitel & Deitel',
-        'AssignmentType' => 'Textbook',
-        'Priority' => 'High',
-        'RequiredCopies' => 50,
-        'AvailableCopies' => 35,
-        'Status' => 'Active',
-        'DateAssigned' => '2024-08-15',
-        'ValidTill' => '2024-12-30'
-    ],
-    [
-        'AssignmentID' => 2,
-        'CourseCode' => 'ME201',
-        'CourseName' => 'Thermodynamics',
-        'Branch' => 'Mechanical Engineering',
-        'Semester' => 3,
-        'Year' => 2024,
-        'Faculty' => 'Prof. Rajesh Kumar',
-        'CatNo' => 1045,
-        'Title' => 'Engineering Thermodynamics',
-        'Author' => 'P.K. Nag',
-        'AssignmentType' => 'Reference',
-        'Priority' => 'Medium',
-        'RequiredCopies' => 25,
-        'AvailableCopies' => 18,
-        'Status' => 'Active',
-        'DateAssigned' => '2024-08-20',
-        'ValidTill' => '2024-12-30'
-    ],
-    [
-        'AssignmentID' => 3,
-        'CourseCode' => 'EE301',
-        'CourseName' => 'Digital Signal Processing',
-        'Branch' => 'Electronics Engineering',
-        'Semester' => 5,
-        'Year' => 2024,
-        'Faculty' => 'Dr. Priya Patel',
-        'CatNo' => 1078,
-        'Title' => 'Digital Signal Processing: Principles and Applications',
-        'Author' => 'Proakis & Manolakis',
-        'AssignmentType' => 'Textbook',
-        'Priority' => 'High',
-        'RequiredCopies' => 30,
-        'AvailableCopies' => 2,
-        'Status' => 'Shortage',
-        'DateAssigned' => '2024-08-10',
-        'ValidTill' => '2024-12-30'
-    ]
-];
-
-$sampleCourses = [
-    ['CourseCode' => 'CS101', 'CourseName' => 'Introduction to Programming', 'Branch' => 'Computer Engineering', 'Semester' => 1],
-    ['CourseCode' => 'CS201', 'CourseName' => 'Data Structures', 'Branch' => 'Computer Engineering', 'Semester' => 3],
-    ['CourseCode' => 'ME201', 'CourseName' => 'Thermodynamics', 'Branch' => 'Mechanical Engineering', 'Semester' => 3],
-    ['CourseCode' => 'EE301', 'CourseName' => 'Digital Signal Processing', 'Branch' => 'Electronics Engineering', 'Semester' => 5],
-    ['CourseCode' => 'CE401', 'CourseName' => 'Structural Analysis', 'Branch' => 'Civil Engineering', 'Semester' => 7],
-];
-
-$sampleBooks = [
-    ['CatNo' => 1001, 'Title' => 'Programming Fundamentals with C++', 'Author1' => 'Deitel & Deitel', 'Subject' => 'Computer Science', 'AvailableCopies' => 35],
-    ['CatNo' => 1045, 'Title' => 'Engineering Thermodynamics', 'Author1' => 'P.K. Nag', 'Subject' => 'Mechanical Engineering', 'AvailableCopies' => 18],
-    ['CatNo' => 1078, 'Title' => 'Digital Signal Processing: Principles and Applications', 'Author1' => 'Proakis & Manolakis', 'Subject' => 'Electronics Engineering', 'AvailableCopies' => 2],
-];
-
+// These will be loaded dynamically via AJAX
 $assignmentTypes = ['Textbook', 'Reference', 'Lab Manual', 'Supplementary', 'Project Guide'];
 $priorities = ['High', 'Medium', 'Low'];
 $branches = ['Computer Engineering', 'Mechanical Engineering', 'Electronics Engineering', 'Civil Engineering', 'Information Technology'];
-?>
-
-<!DOCTYPE html>
+?><!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -1337,29 +1265,34 @@ $branches = ['Computer Engineering', 'Mechanical Engineering', 'Electronics Engi
         }
 
         function loadReadingLists() {
-            // Group assignments by course
-            const courseAssignments = {};
-            sampleAssignments.forEach(assignment => {
-                if (!courseAssignments[assignment.CourseCode]) {
-                    courseAssignments[assignment.CourseCode] = {
-                        course: assignment,
-                        books: []
-                    };
-                }
-                courseAssignments[assignment.CourseCode].books.push(assignment);
-            });
+            fetch('api/book_assignments.php?action=list')
+                .then(res => res.json())
+                .then(result => {
+                    const assignments = Array.isArray(result.data) ? result.data : [];
+                    
+                    // Group assignments by course
+                    const courseAssignments = {};
+                    assignments.forEach(assignment => {
+                        if (!courseAssignments[assignment.CourseCode]) {
+                            courseAssignments[assignment.CourseCode] = {
+                                course: assignment,
+                                books: []
+                            };
+                        }
+                        courseAssignments[assignment.CourseCode].books.push(assignment);
+                    });
 
-            let readingListsHTML = `
-                <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="color: #263c79; margin: 0;">Reading Lists by Course</h3>
-                    <button class="btn btn-primary" onclick="generateAllReadingLists()">
-                        <i class="fas fa-file-pdf"></i>
-                        Generate PDF Lists
-                    </button>
-                </div>
-            `;
+                    let readingListsHTML = `
+                        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                            <h3 style="color: #263c79; margin: 0;">Reading Lists by Course</h3>
+                            <button class="btn btn-primary" onclick="generateAllReadingLists()">
+                                <i class="fas fa-file-pdf"></i>
+                                Generate PDF Lists
+                            </button>
+                        </div>
+                    `;
 
-            Object.values(courseAssignments).forEach(courseData => {
+                    Object.values(courseAssignments).forEach(courseData => {
                 const course = courseData.course;
                 const books = courseData.books;
 
@@ -1408,86 +1341,100 @@ $branches = ['Computer Engineering', 'Mechanical Engineering', 'Electronics Engi
                             </div>
                         </div>
                     `;
+                    });
+
+                    readingListsHTML += `
+                            </div>
+                        </div>
+                    `;
                 });
 
-                readingListsHTML += `
-                        </div>
-                    </div>
-                `;
+                document.getElementById('readingListsContent').innerHTML = readingListsHTML;
+            })
+            .catch(error => {
+                console.error('Error loading reading lists:', error);
+                document.getElementById('readingListsContent').innerHTML = '<div style="padding: 20px; color: #dc3545;">Error loading reading lists</div>';
             });
-
-            document.getElementById('readingListsContent').innerHTML = readingListsHTML;
         }
 
         function loadShortages() {
-            const shortages = sampleAssignments.filter(assignment =>
-                assignment.AvailableCopies < assignment.RequiredCopies
-            );
+            fetch('api/book_assignments.php?action=list')
+                .then(res => res.json())
+                .then(result => {
+                    const assignments = Array.isArray(result.data) ? result.data : [];
+                    const shortages = assignments.filter(assignment =>
+                        assignment.AvailableCopies < assignment.RequiredCopies
+                    );
 
-            let shortagesHTML = `
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: #263c79; margin-bottom: 15px;">
-                        <i class="fas fa-exclamation-triangle" style="color: #dc3545; margin-right: 8px;"></i>
-                        Book Shortages Analysis
-                    </h3>
-                </div>
-            `;
+                    let shortagesHTML = `
+                        <div style="margin-bottom: 20px;">
+                            <h3 style="color: #263c79; margin-bottom: 15px;">
+                                <i class="fas fa-exclamation-triangle" style="color: #dc3545; margin-right: 8px;"></i>
+                                Book Shortages Analysis
+                            </h3>
+                        </div>
+                    `;
 
-            if (shortages.length === 0) {
-                shortagesHTML += `
-                    <div style="text-align: center; padding: 40px; color: #28a745; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
-                        <i class="fas fa-check-circle" style="font-size: 48px; margin-bottom: 15px;"></i>
-                        <h3 style="color: #28a745; margin-bottom: 10px;">No Shortages Found</h3>
-                        <p>All book assignments have adequate copies available.</p>
-                    </div>
-                `;
-            } else {
-                shortagesHTML += `
-                    <div class="shortage-alert">
-                        <h4><i class="fas fa-exclamation-triangle"></i> Critical Shortages Detected</h4>
+                    if (shortages.length === 0) {
+                        shortagesHTML += `
+                            <div style="text-align: center; padding: 40px; color: #28a745; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                                <i class="fas fa-check-circle" style="font-size: 48px; margin-bottom: 15px;"></i>
+                                <h3 style="color: #28a745; margin-bottom: 10px;">No Shortages Found</h3>
+                                <p>All book assignments have adequate copies available.</p>
+                            </div>
+                        `;
+                    } else {
+                        shortagesHTML += `
+                            <div class="shortage-alert">
+                                <h4><i class="fas fa-exclamation-triangle"></i> Critical Shortages Detected</h4>
                         <p>The following book assignments require immediate attention due to insufficient copies:</p>
                         <ul class="shortage-list">
                 `;
 
-                shortages.forEach(shortage => {
-                    const deficit = shortage.RequiredCopies - shortage.AvailableCopies;
-                    const percentageShort = Math.round((deficit / shortage.RequiredCopies) * 100);
+                        shortages.forEach(shortage => {
+                            const deficit = shortage.RequiredCopies - shortage.AvailableCopies;
+                            const percentageShort = Math.round((deficit / shortage.RequiredCopies) * 100);
 
-                    shortagesHTML += `
-                        <li class="shortage-item">
-                            <div>
-                                <strong>${shortage.Title}</strong><br>
-                                <small>${shortage.CourseCode} - ${shortage.CourseName}</small>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="color: #dc3545; font-weight: 600;">
-                                    ${deficit} copies short (${percentageShort}%)
+                            shortagesHTML += `
+                                <li class="shortage-item">
+                                    <div>
+                                        <strong>${shortage.Title}</strong><br>
+                                        <small>${shortage.CourseCode} - ${shortage.CourseName}</small>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="color: #dc3545; font-weight: 600;">
+                                            ${deficit} copies short (${percentageShort}%)
+                                        </div>
+                                        <div style="font-size: 12px; color: #6c757d;">
+                                            Need: ${shortage.RequiredCopies} | Have: ${shortage.AvailableCopies}
+                                        </div>
+                                    </div>
+                                </li>
+                            `;
+                        });
+
+                        shortagesHTML += `
+                                </ul>
+                                <div style="margin-top: 15px; text-align: center;">
+                                    <button class="btn btn-warning" onclick="generatePurchaseOrder()">
+                                        <i class="fas fa-shopping-cart"></i>
+                                        Generate Purchase Order
+                                    </button>
+                                    <button class="btn btn-info" onclick="notifyAcquisition()">
+                                        <i class="fas fa-bell"></i>
+                                        Notify Acquisition Team
+                                    </button>
                                 </div>
-                                <div style="font-size: 12px; color: #6c757d;">
-                                    Need: ${shortage.RequiredCopies} | Have: ${shortage.AvailableCopies}
-                                </div>
                             </div>
-                        </li>
-                    `;
+                        `;
+                    }
+
+                    document.getElementById('shortagesContent').innerHTML = shortagesHTML;
+                })
+                .catch(error => {
+                    console.error('Error loading shortages:', error);
+                    document.getElementById('shortagesContent').innerHTML = '<div style="padding: 20px; color: #dc3545;">Error loading shortage data</div>';
                 });
-
-                shortagesHTML += `
-                        </ul>
-                        <div style="margin-top: 15px; text-align: center;">
-                            <button class="btn btn-warning" onclick="generatePurchaseOrder()">
-                                <i class="fas fa-shopping-cart"></i>
-                                Generate Purchase Order
-                            </button>
-                            <button class="btn btn-info" onclick="notifyAcquisition()">
-                                <i class="fas fa-bell"></i>
-                                Notify Acquisition Team
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }
-
-            document.getElementById('shortagesContent').innerHTML = shortagesHTML;
         }
 
         function loadReports() {
@@ -1574,28 +1521,39 @@ $branches = ['Computer Engineering', 'Mechanical Engineering', 'Electronics Engi
                 return;
             }
 
-            const matchingBooks = sampleBooks.filter(book =>
-                book.Title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                book.Author1.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-
-            if (matchingBooks.length > 0) {
-                let resultsHTML = '';
-                matchingBooks.forEach(book => {
-                    resultsHTML += `
-                        <div onclick="selectBook(${book.CatNo}, '${book.Title}', '${book.Author1}')" 
-                             style="padding: 10px; border-bottom: 1px solid #f0f0f0; cursor: pointer; hover:background-color: #f8f9fa;">
-                            <strong>${book.Title}</strong><br>
-                            <small style="color: #6c757d;">by ${book.Author1} | Available: ${book.AvailableCopies} copies</small>
-                        </div>
-                    `;
+            // Fetch books from API
+            fetch(`api/book_assignments.php?action=books&search=${encodeURIComponent(searchTerm)}`)
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success && result.data && result.data.length > 0) {
+                        let resultsHTML = '';
+                        result.data.forEach(book => {
+                            resultsHTML += `
+                                <div onclick="selectBook(${book.CatNo}, '${escapeHtml(book.Title)}', '${escapeHtml(book.Author1)}')" 
+                                     style="padding: 10px; border-bottom: 1px solid #f0f0f0; cursor: pointer; hover:background-color: #f8f9fa;">
+                                    <strong>${escapeHtml(book.Title)}</strong><br>
+                                    <small style="color: #6c757d;">by ${escapeHtml(book.Author1)} | Available: ${book.AvailableCopies} copies</small>
+                                </div>
+                            `;
+                        });
+                        resultsDiv.innerHTML = resultsHTML;
+                        resultsDiv.style.display = 'block';
+                    } else {
+                        resultsDiv.innerHTML = '<div style="padding: 10px; color: #6c757d;">No books found</div>';
+                        resultsDiv.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error searching books:', error);
+                    resultsDiv.innerHTML = '<div style="padding: 10px; color: #dc3545;">Error loading books</div>';
+                    resultsDiv.style.display = 'block';
                 });
-                resultsDiv.innerHTML = resultsHTML;
-                resultsDiv.style.display = 'block';
-            } else {
-                resultsDiv.innerHTML = '<div style="padding: 10px; color: #6c757d;">No books found</div>';
-                resultsDiv.style.display = 'block';
-            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function selectBook(catNo, title, author) {
@@ -1614,10 +1572,27 @@ $branches = ['Computer Engineering', 'Mechanical Engineering', 'Electronics Engi
                 return;
             }
 
-            console.log('Creating assignment:', assignmentData);
-            alert('Assignment created successfully!');
-            closeModal('addAssignmentModal');
-            loadAssignmentsTable();
+            // Send to API
+            fetch('api/book_assignments.php?action=create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(assignmentData)
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) {
+                    alert('Assignment created successfully!');
+                    closeModal('addAssignmentModal');
+                    loadStatistics();
+                    loadAssignmentsTable();
+                } else {
+                    alert('Error creating assignment: ' + (result.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error creating assignment. Please try again.');
+            });
         }
 
             function saveAssignmentInline() {
@@ -1629,10 +1604,27 @@ $branches = ['Computer Engineering', 'Mechanical Engineering', 'Electronics Engi
                     return;
                 }
 
-                console.log('Creating assignment:', assignmentData);
-                alert('Assignment created successfully!');
-                document.getElementById('addAssignmentInlineForm').reset();
-                loadAssignmentsTable();
+                // Send to API
+                fetch('api/book_assignments.php?action=create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(assignmentData)
+                })
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success) {
+                        alert('Assignment created successfully!');
+                        document.getElementById('addAssignmentInlineForm').reset();
+                        loadStatistics();
+                        loadAssignmentsTable();
+                    } else {
+                        alert('Error creating assignment: ' + (result.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error creating assignment. Please try again.');
+                });
             }
 
         // Assignment actions
@@ -1647,10 +1639,29 @@ $branches = ['Computer Engineering', 'Mechanical Engineering', 'Electronics Engi
         }
 
         function deleteAssignment(assignmentId) {
-            if (confirm(`Are you sure you want to delete Assignment ID: ${assignmentId}?`)) {
-                console.log('Deleting assignment:', assignmentId);
-                alert('Assignment deleted successfully!');
-                loadAssignmentsTable();
+            if (confirm(`Are you sure you want to delete this assignment?`)) {
+                // Send delete request to API
+                const formData = new FormData();
+                formData.append('AssignmentID', assignmentId);
+                
+                fetch('api/book_assignments.php?action=delete', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success) {
+                        alert('Assignment deleted successfully!');
+                        loadStatistics();
+                        loadAssignmentsTable();
+                    } else {
+                        alert('Error deleting assignment: ' + (result.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting assignment. Please try again.');
+                });
             }
         }
 
@@ -1697,15 +1708,19 @@ $branches = ['Computer Engineering', 'Mechanical Engineering', 'Electronics Engi
 
         // Load statistics
         function loadStatistics() {
-            const totalAssignments = sampleAssignments.length;
-            const activeAssignments = sampleAssignments.filter(a => a.Status === 'Active').length;
-            const shortageItems = sampleAssignments.filter(a => a.Status === 'Shortage').length;
-            const totalCourses = new Set(sampleAssignments.map(a => a.CourseCode)).size;
-
-            document.getElementById('totalAssignments').textContent = totalAssignments;
-            document.getElementById('activeAssignments').textContent = activeAssignments;
-            document.getElementById('shortageItems').textContent = shortageItems;
-            document.getElementById('totalCourses').textContent = totalCourses;
+            fetch('api/book_assignments.php?action=stats')
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success && result.stats) {
+                        document.getElementById('totalAssignments').textContent = result.stats.totalAssignments;
+                        document.getElementById('activeAssignments').textContent = result.stats.activeAssignments;
+                        document.getElementById('shortageItems').textContent = result.stats.shortageItems;
+                        document.getElementById('totalCourses').textContent = result.stats.totalCourses;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading statistics:', error);
+                });
         }
 
         // Close modals when clicking outside

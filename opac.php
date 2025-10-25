@@ -2,57 +2,65 @@
 // OPAC - Online Public Access Catalog
 // Public search interface for library books - no login required
 
-// Mock data for demonstration - replace with actual database queries
-$categories = [
-    'Computer Science',
-    'Programming',
-    'Software Engineering',
-    'Data Science',
-    'Artificial Intelligence',
-    'Cybersecurity',
-    'Web Development',
-    'Mobile Development',
-    'Mathematics',
-    'Physics',
-    'Chemistry',
-    'Biology',
-    'Engineering',
-    'Literature'
-];
+// Include database connection
+require_once 'includes/db_connect.php';
 
-$featured_books = [
-    [
-        'title' => 'Clean Code: A Handbook of Agile Software Craftsmanship',
-        'author' => 'Robert C. Martin',
-        'isbn' => '978-0132350884',
-        'category' => 'Programming',
-        'status' => 'Available',
-        'copies_available' => 3,
-        'total_copies' => 5,
-        'location' => 'CS-Section-A, Shelf 12'
-    ],
-    [
-        'title' => 'Introduction to Algorithms',
-        'author' => 'Thomas H. Cormen',
-        'isbn' => '978-0262033848',
-        'category' => 'Computer Science',
-        'status' => 'Available',
-        'copies_available' => 2,
-        'total_copies' => 3,
-        'location' => 'CS-Section-B, Shelf 8'
-    ],
-    [
-        'title' => 'Design Patterns: Elements of Reusable Object-Oriented Software',
-        'author' => 'Gang of Four',
-        'isbn' => '978-0201633610',
-        'category' => 'Software Engineering',
-        'status' => 'Limited',
-        'copies_available' => 1,
-        'total_copies' => 2,
-        'location' => 'CS-Section-C, Shelf 15'
-    ]
-];
+// Fetch unique categories/subjects from database
+$categories = [];
+try {
+    $stmt = $pdo->query("SELECT DISTINCT Subject FROM Books WHERE Subject IS NOT NULL AND Subject != '' ORDER BY Subject");
+    $categories = $stmt->fetchAll(PDO::FETCH_COLUMN);
+} catch (Exception $e) {
+    error_log("OPAC - Error fetching categories: " . $e->getMessage());
+}
+
+// Fetch featured books (recently added or popular books)
+$featured_books = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT 
+            b.CatNo,
+            b.Title,
+            b.Author1,
+            b.ISBN,
+            b.Subject as category,
+            b.Publisher,
+            b.Year,
+            COUNT(h.AccNo) as total_copies,
+            SUM(CASE WHEN h.Status = 'Available' THEN 1 ELSE 0 END) as copies_available
+        FROM Books b
+        LEFT JOIN Holding h ON b.CatNo = h.CatNo
+        GROUP BY b.CatNo
+        ORDER BY b.CatNo DESC
+        LIMIT 12
+    ");
+    $stmt->execute();
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($results as $row) {
+        $status = 'Not Available';
+        if ($row['copies_available'] > 0) {
+            $status = $row['copies_available'] > 2 ? 'Available' : 'Limited';
+        }
+        
+        $featured_books[] = [
+            'catno' => $row['CatNo'],
+            'title' => $row['Title'],
+            'author' => $row['Author1'] ?? 'Unknown Author',
+            'isbn' => $row['ISBN'] ?? 'N/A',
+            'category' => $row['category'] ?? 'Uncategorized',
+            'status' => $status,
+            'copies_available' => (int)$row['copies_available'],
+            'total_copies' => (int)$row['total_copies'],
+            'publisher' => $row['Publisher'] ?? '',
+            'year' => $row['Year'] ?? ''
+        ];
+    }
+} catch (Exception $e) {
+    error_log("OPAC - Error fetching featured books: " . $e->getMessage());
+}
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -393,23 +401,33 @@ $featured_books = [
     }
 
     .book-card {
-        border: 2px solid #cfac69;
-        border-radius: 16px;
-        padding: 15px;
-        background: linear-gradient(145deg, #ffffff 0%, #fefefe 100%);
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 0;
+        background: white;
         position: relative;
         overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .book-card:hover {
+        box-shadow: 0 6px 20px rgba(38, 60, 121, 0.15);
+        transform: translateY(-4px);
+        border-color: #263c79;
     }
 
     .book-card-header {
-        margin-bottom: 12px;
-        position: relative;
-        z-index: 2;
+        padding: 20px;
+        background: linear-gradient(135deg, #263c79 0%, #1e2d5f 100%);
+        color: white;
+        border-bottom: 3px solid #cfac69;
     }
 
     .book-card-title {
-        color: #263c79;
+        color: white;
         font-size: 18px;
         font-weight: 700;
         margin-bottom: 8px;
@@ -419,51 +437,53 @@ $featured_books = [
     }
 
     .book-card-author {
-        color: #6c757d;
-        font-size: 15px;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 14px;
         font-weight: 500;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
         font-style: italic;
-        margin-bottom: 3px;
     }
 
     .book-card-isbn {
-        color: #888;
-        font-size: 12px;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 11px;
         font-family: monospace;
+        background: rgba(255, 255, 255, 0.1);
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
     }
 
     .book-card-details {
-        display: inline-block;
-        min-width: 0;
-        width: auto;
-        padding: 8px 16px;
-        margin-bottom: 12px;
-        background: linear-gradient(135deg, #cfac69 0%, #d4b574 100%);
-        border-radius: 8px;
-        border: none;
-        box-sizing: border-box;
-        text-align: center;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-        position: relative;
+        padding: 20px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        background: #f8f9fa;
     }
 
     .detail-item {
-        text-align: center;
+        text-align: left;
+    }
+
+    .detail-item.full-width {
+        grid-column: 1 / -1;
     }
 
     .detail-label {
-        font-size: 10px;
-        color: #263c79;
+        font-size: 11px;
+        color: #6c757d;
         text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 4px;
+        letter-spacing: 0.8px;
+        margin-bottom: 5px;
         font-weight: 600;
-        opacity: 0.8;
+        display: flex;
+        align-items: center;
+        gap: 5px;
     }
 
     .detail-value {
-        font-weight: 700;
+        font-weight: 600;
         color: #263c79;
         font-size: 14px;
         font-family: 'Poppins', sans-serif;
@@ -484,16 +504,28 @@ $featured_books = [
         text-transform: uppercase;
     }
 
+    .status-badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .status-badge.available,
     .status-available {
         background: #d4edda;
         color: #155724;
     }
 
+    .status-badge.limited,
     .status-limited {
         background: #fff3cd;
         color: #856404;
     }
 
+    .status-badge.unavailable,
     .status-unavailable {
         background: #f8d7da;
         color: #721c24;
@@ -518,14 +550,36 @@ $featured_books = [
     }
 
     .login-prompt {
-        background: linear-gradient(135deg, rgba(207, 172, 105, 0.1) 0%, rgba(207, 172, 105, 0.05) 100%);
-        color: #263c79;
-        padding: 10px 14px;
-        border-radius: 8px;
-        font-size: 12px;
+        background: linear-gradient(135deg, #263c79 0%, #1e2d5f 100%);
+        color: white;
+        padding: 15px 20px;
         text-align: center;
-        border: 2px solid #cfac69;
-        margin-top: 10px;
+        border-top: 2px solid #cfac69;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: auto;
+    }
+
+    .login-prompt i {
+        font-size: 16px;
+        color: #cfac69;
+    }
+
+    .login-prompt a {
+        color: #cfac69;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border-bottom: 1px solid transparent;
+    }
+
+    .login-prompt a:hover {
+        color: #d4b574;
+        border-bottom-color: #d4b574;
+    }
         font-weight: 500;
         position: relative;
         overflow: hidden;
@@ -950,102 +1004,117 @@ $featured_books = [
                 });
             }, 100);
 
-            // Simulate search - replace with actual API call
-            setTimeout(() => {
-                // Mock search results based on form input
-                const mockResults = [];
-                
-                // Add some mock results based on search terms
-                if (title.toLowerCase().includes('algorithm') || keywords.toLowerCase().includes('algorithm')) {
-                    mockResults.push({
-                        title: 'Introduction to Algorithms',
-                        author: 'Thomas H. Cormen',
-                        isbn: '978-0262033848',
-                        category: 'Computer Science',
-                        status: 'Available',
-                        copies_available: 2,
-                        total_copies: 3,
-                        location: 'CS-Section-B, Shelf 8'
-                    });
-                }
+            // Build query parameters
+            const params = new URLSearchParams();
+            if (title) params.append('title', title);
+            if (author) params.append('author', author);
+            if (isbn) params.append('isbn', isbn);
+            if (category) params.append('subject', category);
+            if (keywords) params.append('keywords', keywords);
 
-                if (title.toLowerCase().includes('code') || keywords.toLowerCase().includes('programming')) {
-                    mockResults.push({
-                        title: 'Clean Code: A Handbook of Agile Software Craftsmanship',
-                        author: 'Robert C. Martin',
-                        isbn: '978-0132350884',
-                        category: 'Programming',
-                        status: 'Available',
-                        copies_available: 3,
-                        total_copies: 5,
-                        location: 'CS-Section-A, Shelf 12'
-                    });
-                }
+            // Make API call to search books
+            fetch(`admin/api/books.php?action=list&${params.toString()}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success && data.data) {
+                        const books = data.data;
+                        resultsCount.textContent = `${books.length} book${books.length !== 1 ? 's' : ''} found`;
 
-                if (category === 'Software Engineering' || keywords.toLowerCase().includes('pattern')) {
-                    mockResults.push({
-                        title: 'Design Patterns: Elements of Reusable Object-Oriented Software',
-                        author: 'Gang of Four',
-                        isbn: '978-0201633610',
-                        category: 'Software Engineering',
-                        status: 'Limited',
-                        copies_available: 1,
-                        total_copies: 2,
-                        location: 'CS-Section-C, Shelf 15'
-                    });
-                }
-
-                // If no specific matches, add a generic result
-                if (mockResults.length === 0 && (title || author || isbn || keywords)) {
-                    mockResults.push({
-                        title: 'Advanced Data Structures and Algorithms',
-                        author: 'Peter Brass',
-                        isbn: '978-0521880374',
-                        category: 'Computer Science',
-                        status: 'Available',
-                        copies_available: 2,
-                        total_copies: 3,
-                        location: 'CS-Section-A, Shelf 10'
-                    });
-                }
-
-                resultsCount.textContent = `${mockResults.length} books found`;
-
-                if (mockResults.length > 0) {
+                        if (books.length > 0) {
+                            resultsContainer.innerHTML = `
+                                <div class="book-grid">
+                                    ${books.map(book => {
+                                        const copiesAvailable = parseInt(book.AvailableCopies) || 0;
+                                        const totalCopies = parseInt(book.TotalCopies) || 0;
+                                        let status = 'Not Available';
+                                        let statusClass = 'unavailable';
+                                        
+                                        if (copiesAvailable > 0) {
+                                            if (copiesAvailable > 2) {
+                                                status = 'Available';
+                                                statusClass = 'available';
+                                            } else {
+                                                status = 'Limited';
+                                                statusClass = 'limited';
+                                            }
+                                        }
+                                        
+                                        return `
+                                            <div class="book-card">
+                                                <div class="book-card-header">
+                                                    <h4 class="book-card-title">${book.Title || 'Untitled'}</h4>
+                                                    <div class="book-card-author">by ${book.Author1 || 'Unknown Author'}</div>
+                                                    ${book.ISBN ? `<div class="book-card-isbn">ISBN: ${book.ISBN}</div>` : ''}
+                                                </div>
+                                                <div class="book-card-details">
+                                                    ${book.Subject ? `
+                                                        <div class="detail-item">
+                                                            <div class="detail-label"><i class="fas fa-tag"></i> CATEGORY</div>
+                                                            <div class="detail-value">${book.Subject}</div>
+                                                        </div>
+                                                    ` : ''}
+                                                    ${book.Publisher ? `
+                                                        <div class="detail-item">
+                                                            <div class="detail-label"><i class="fas fa-building"></i> PUBLISHER</div>
+                                                            <div class="detail-value">${book.Publisher}</div>
+                                                        </div>
+                                                    ` : ''}
+                                                    ${book.Year ? `
+                                                        <div class="detail-item">
+                                                            <div class="detail-label"><i class="fas fa-calendar"></i> YEAR</div>
+                                                            <div class="detail-value">${book.Year}</div>
+                                                        </div>
+                                                    ` : ''}
+                                                    <div class="detail-item ${!book.Subject && !book.Publisher && !book.Year ? 'full-width' : ''}">
+                                                        <div class="detail-label"><i class="fas fa-check-circle"></i> AVAILABILITY</div>
+                                                        <div class="detail-value">
+                                                            <span class="status-badge ${statusClass}">${status}</span>
+                                                            <small style="display:block; margin-top:6px; color:#6c757d; font-weight:400; font-size:12px;">
+                                                                ${copiesAvailable} of ${totalCopies} ${totalCopies === 1 ? 'copy' : 'copies'} available
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="login-prompt">
+                                                    <i class="fas fa-info-circle"></i>
+                                                    <span><a href="student/student_login.php">Login as Student</a> to reserve this book</span>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            `;
+                        } else {
+                            resultsContainer.innerHTML = `
+                                <div class="no-results">
+                                    <i class="fas fa-search"></i>
+                                    <h3>No Books Found</h3>
+                                    <p>We couldn't find any books matching your search criteria.</p>
+                                    <p>Try adjusting your search terms or browse our featured books below.</p>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        throw new Error(data.message || 'Failed to search books');
+                    }
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    resultsCount.textContent = 'Error';
                     resultsContainer.innerHTML = `
-                    <div class="book-grid">
-                        ${mockResults.map(book => `
-                            <div class="book-card">
-                                <div class="book-card-header">
-                                    <h4 class="book-card-title">${book.title}</h4>
-                                    <div class="book-card-author">by ${book.author}</div>
-                                    <div class="book-card-isbn">ISBN: ${book.isbn}</div>
-                                </div>
-                                <div class="book-card-details">
-                                    <div class="detail-item">
-                                        <div class="detail-label">Category</div>
-                                        <div class="detail-value">${book.category}</div>
-                                    </div>
-                                </div>
-                                <div class="login-prompt">
-                                    <i class="fas fa-info-circle"></i>
-                                    <a href="student_login.php">Login as Student</a> to reserve this book
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-                } else {
-                    resultsContainer.innerHTML = `
-                    <div class="no-results">
-                        <i class="fas fa-search"></i>
-                        <h3>No Books Found</h3>
-                        <p>We couldn't find any books matching your search criteria.</p>
-                        <p>Try adjusting your search terms or browse our featured books below.</p>
-                    </div>
-                `;
-                }
-            }, 1500);
+                        <div class="no-results">
+                            <i class="fas fa-exclamation-triangle" style="color:#dc3545;"></i>
+                            <h3>Search Error</h3>
+                            <p>There was an error searching for books. Please try again later.</p>
+                            <p style="color:#6c757d; font-size:12px;">${error.message}</p>
+                        </div>
+                    `;
+                });
         }
 
         // Form submission handler
