@@ -160,6 +160,9 @@ try {
         case 'list':
             // Get all books with holding information, with pagination
             $search = $_GET['search'] ?? '';
+            $title = $_GET['title'] ?? '';
+            $author = $_GET['author'] ?? '';
+            $isbn = $_GET['isbn'] ?? '';
             $subject = $_GET['subject'] ?? '';
             $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
             $pageSize = isset($_GET['pageSize']) ? max(1, intval($_GET['pageSize'])) : 20;
@@ -168,6 +171,8 @@ try {
             // Count total books for pagination
             $countSql = "SELECT COUNT(DISTINCT b.CatNo) as total FROM Books b WHERE 1=1";
             $countParams = [];
+            
+            // General search (legacy support)
             if ($search) {
                 $countSql .= " AND (b.Title LIKE ? OR b.Author1 LIKE ? OR b.ISBN LIKE ?)";
                 $searchTerm = "%{$search}%";
@@ -175,10 +180,28 @@ try {
                 $countParams[] = $searchTerm;
                 $countParams[] = $searchTerm;
             }
-            if ($subject) {
-                $countSql .= " AND b.Subject = ?";
-                $countParams[] = $subject;
+            
+            // Specific field searches
+            if ($title) {
+                $countSql .= " AND b.Title LIKE ?";
+                $countParams[] = "%{$title}%";
             }
+            if ($author) {
+                $countSql .= " AND (b.Author1 LIKE ? OR b.Author2 LIKE ? OR b.Author3 LIKE ?)";
+                $authorTerm = "%{$author}%";
+                $countParams[] = $authorTerm;
+                $countParams[] = $authorTerm;
+                $countParams[] = $authorTerm;
+            }
+            if ($isbn) {
+                $countSql .= " AND b.ISBN LIKE ?";
+                $countParams[] = "%{$isbn}%";
+            }
+            if ($subject) {
+                $countSql .= " AND b.Subject LIKE ?";
+                $countParams[] = "%{$subject}%";
+            }
+            
             $countStmt = $pdo->prepare($countSql);
             $countStmt->execute($countParams);
             $total = $countStmt->fetchColumn();
@@ -194,6 +217,8 @@ try {
                 WHERE 1=1
             ";
             $params = [];
+            
+            // General search (legacy support)
             if ($search) {
                 $sql .= " AND (b.Title LIKE ? OR b.Author1 LIKE ? OR b.ISBN LIKE ?)";
                 $searchTerm = "%{$search}%";
@@ -201,10 +226,28 @@ try {
                 $params[] = $searchTerm;
                 $params[] = $searchTerm;
             }
-            if ($subject) {
-                $sql .= " AND b.Subject = ?";
-                $params[] = $subject;
+            
+            // Specific field searches
+            if ($title) {
+                $sql .= " AND b.Title LIKE ?";
+                $params[] = "%{$title}%";
             }
+            if ($author) {
+                $sql .= " AND (b.Author1 LIKE ? OR b.Author2 LIKE ? OR b.Author3 LIKE ?)";
+                $authorTerm = "%{$author}%";
+                $params[] = $authorTerm;
+                $params[] = $authorTerm;
+                $params[] = $authorTerm;
+            }
+            if ($isbn) {
+                $sql .= " AND b.ISBN LIKE ?";
+                $params[] = "%{$isbn}%";
+            }
+            if ($subject) {
+                $sql .= " AND b.Subject LIKE ?";
+                $params[] = "%{$subject}%";
+            }
+            
             $sql .= " GROUP BY b.CatNo ORDER BY b.Title LIMIT ? OFFSET ?";
             $params[] = $pageSize;
             $params[] = $offset;
@@ -289,18 +332,22 @@ try {
 
                 // Insert book
                 $stmt = $pdo->prepare("
-                    INSERT INTO Books (Title, SubTitle, Author1, Author2, Author3, Publisher, 
-                                      Place, Year, Edition, Vol, Pages, ISBN, Subject, Language, 
-                                      DocumentType, CreatedBy)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO Books (Title, SubTitle, VarTitle, Author1, Author2, Author3, CorpAuthor, Editors,
+                                      Publisher, Place, Year, Edition, Vol, Pages, ISBN, Subject, Keywords, Language, 
+                                      Format, DocumentType, Country, BillNo, BillDate, Currency, ItemPrice, ItemCost, 
+                                      Source, ModeOfAcquisition, CreatedBy)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
 
                 $stmt->execute([
                     $data['Title'],
                     $data['SubTitle'] ?? null,
+                    $data['VarTitle'] ?? null,
                     $data['Author1'] ?? null,
                     $data['Author2'] ?? null,
                     $data['Author3'] ?? null,
+                    $data['CorpAuthor'] ?? null,
+                    $data['Editors'] ?? null,
                     $data['Publisher'] ?? null,
                     $data['Place'] ?? null,
                     $data['Year'] ?? null,
@@ -309,8 +356,18 @@ try {
                     $data['Pages'] ?? null,
                     $data['ISBN'] ?? null,
                     $data['Subject'] ?? null,
+                    $data['Keywords'] ?? null,
                     $data['Language'] ?? 'English',
+                    $data['Format'] ?? null,
                     $data['DocumentType'] ?? 'BK',
+                    $data['Country'] ?? null,
+                    $data['BillNo'] ?? null,
+                    $data['BillDate'] ?? null,
+                    $data['Currency'] ?? 'INR',
+                    $data['ItemPrice'] ?? null,
+                    $data['ItemCost'] ?? null,
+                    $data['Source'] ?? null,
+                    $data['ModeOfAcquisition'] ?? null,
                     $adminId
                 ]);
 
@@ -334,29 +391,38 @@ try {
                 };
 
                 // Insert holdings if provided
-                if (!empty($data['holdings']) && is_array($data['holdings'])) {
-                    $insertSql = "INSERT INTO Holding (AccNo, CatNo, AccDate, ClassNo, BookNo, Status, Location, Section, Collection, QRCode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $holdingsData = null;
+                if (!empty($data['holdings'])) {
+                    // Handle JSON string or array
+                    if (is_string($data['holdings'])) {
+                        $holdingsData = json_decode($data['holdings'], true);
+                    } elseif (is_array($data['holdings'])) {
+                        $holdingsData = $data['holdings'];
+                    }
+                }
+                
+                if (!empty($holdingsData) && is_array($holdingsData)) {
+                    $insertSql = "INSERT INTO Holding (AccNo, CatNo, AccDate, ClassNo, BookNo, Status, Location, Section, Collection, Binding, Remarks, QRCode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                     $stmt = $pdo->prepare($insertSql);
 
-                    foreach ($data['holdings'] as $idx => $holding) {
-                        // Determine AccNo (use provided or generate)
-                        $accNo = $holding['AccNo'] ?? null;
+                    foreach ($holdingsData as $idx => $holding) {
+                        // Use provided AccNo (manual entry) - REQUIRED
+                        $accNo = $holding['accNo'] ?? $holding['AccNo'] ?? null;
                         if (empty($accNo)) {
-                            // Try to generate using helper in includes/functions.php
-                            if (function_exists('generateAccNo')) {
-                                $accNo = generateAccNo($catNo, $idx + 1);
-                            } else {
-                                $accNo = $catNo . '-' . str_pad(($idx + 1), 3, '0', STR_PAD_LEFT);
-                            }
+                            // AccNo is now required - user must enter manually
+                            $pdo->rollBack();
+                            sendJson(['success' => false, 'message' => 'Accession Number (AccNo) is required for all holdings'], 400);
                         }
 
-                        $accDate = $holding['AccDate'] ?? date('Y-m-d');
-                        $classNo = $holding['ClassNo'] ?? null;
-                        $bookNo = $holding['BookNo'] ?? null;
+                        $accDate = $holding['accDate'] ?? $holding['AccDate'] ?? date('Y-m-d');
+                        $classNo = $holding['classNo'] ?? $holding['ClassNo'] ?? null;
+                        $bookNo = $holding['bookNo'] ?? $holding['BookNo'] ?? null;
                         $status = 'Available';
-                        $location = $holding['Location'] ?? null;
-                        $section = $holding['Section'] ?? null;
-                        $collection = $holding['Collection'] ?? null;
+                        $location = $holding['location'] ?? $holding['Location'] ?? null;
+                        $section = $holding['section'] ?? $holding['Section'] ?? null;
+                        $collection = $holding['collection'] ?? $holding['Collection'] ?? null;
+                        $binding = $holding['binding'] ?? $holding['Binding'] ?? null;
+                        $remarks = $holding['remarks'] ?? $holding['Remarks'] ?? null;
 
                         // Generate QR binary and insert as BLOB if available
                         $qrBinary = $generateQrBinary($accNo);
@@ -370,7 +436,7 @@ try {
                                 $colCheck2->execute();
                                 $hasBlobCol = $colCheck2->fetch();
                                 if ($hasBlobCol) {
-                                    $ins = $pdo->prepare("INSERT INTO Holding (AccNo, CatNo, AccDate, ClassNo, BookNo, Status, Location, Section, Collection, QrCodeImg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                    $ins = $pdo->prepare("INSERT INTO Holding (AccNo, CatNo, AccDate, ClassNo, BookNo, Status, Location, Section, Collection, Binding, Remarks, QrCodeImg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                                     $ins->bindParam(1, $accNo);
                                     $ins->bindParam(2, $catNo);
                                     $ins->bindParam(3, $accDate);
@@ -380,7 +446,9 @@ try {
                                     $ins->bindParam(7, $location);
                                     $ins->bindParam(8, $section);
                                     $ins->bindParam(9, $collection);
-                                    $ins->bindParam(10, $qrBinary, PDO::PARAM_LOB);
+                                    $ins->bindParam(10, $binding);
+                                    $ins->bindParam(11, $remarks);
+                                    $ins->bindParam(12, $qrBinary, PDO::PARAM_LOB);
                                     $ins->execute();
                                     // We've inserted including blob; skip the later insert
                                     continue;
@@ -401,6 +469,8 @@ try {
                             $location,
                             $section,
                             $collection,
+                            $binding,
+                            $remarks,
                             $qrPath
                         ]);
                     }

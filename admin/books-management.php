@@ -178,13 +178,33 @@ if (!function_exists('generateQR')) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Books Management</title>
+    <title>Books Management - Library System</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
         .books-header {
             margin-bottom: 25px;
             padding-bottom: 15px;
-            border-bottom: 2px solid #cfac69;
+            border-bottom: 3px solid #cfac69;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
         .books-title {
@@ -192,13 +212,16 @@ if (!function_exists('generateQR')) {
             font-size: 28px;
             font-weight: 700;
             margin: 0 0 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
         .action-buttons {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             flex-wrap: wrap;
-            align-items: flex-start;
+            align-items: center;
         }
 
         /* Desktop view */
@@ -215,9 +238,9 @@ if (!function_exists('generateQR')) {
         }
 
         .btn {
-            padding: 10px 20px;
+            padding: 11px 22px;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 600;
@@ -228,24 +251,63 @@ if (!function_exists('generateQR')) {
             transition: all 0.3s ease;
             flex-shrink: 0;
             white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:active {
+            transform: translateY(0);
         }
 
         .btn-primary {
-            background-color: #263c79;
+            background: linear-gradient(135deg, #263c79 0%, #1a2d5a 100%);
             color: white;
         }
 
         .btn-primary:hover {
-            background-color: #1e2d5f;
+            background: linear-gradient(135deg, #1a2d5a 0%, #142349 100%);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #5a6268 0%, #545b62 100%);
         }
 
         .btn-success {
-            background-color: #28a745;
+            background: linear-gradient(135deg, #28a745 0%, #218838 100%);
             color: white;
         }
 
         .btn-success:hover {
-            background-color: #218838;
+            background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
         }
 
         .tabs-container {
@@ -254,26 +316,54 @@ if (!function_exists('generateQR')) {
 
         .tab-buttons {
             display: flex;
-            border-bottom: 2px solid #e9ecef;
-            margin-bottom: 20px;
+            border-bottom: 3px solid #e9ecef;
+            margin-bottom: 25px;
+            background: white;
+            border-radius: 8px 8px 0 0;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         .tab-btn {
             background: none;
             border: none;
-            padding: 12px 20px;
+            padding: 16px 24px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 500;
             color: #6c757d;
             border-bottom: 3px solid transparent;
             transition: all 0.3s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 0;
+            background: linear-gradient(135deg, #cfac69 0%, #263c79 100%);
+            transition: height 0.3s ease;
+        }
+
+        .tab-btn:hover {
+            background-color: rgba(38, 60, 121, 0.05);
+            color: #263c79;
         }
 
         .tab-btn.active {
             color: #263c79;
-            border-bottom-color: #cfac69;
-            font-weight: 600;
+            font-weight: 700;
+            background-color: rgba(207, 172, 105, 0.1);
+        }
+
+        .tab-btn.active::before {
+            height: 3px;
         }
 
         .tab-btn:hover {
@@ -283,18 +373,31 @@ if (!function_exists('generateQR')) {
 
         .tab-content {
             display: none;
+            animation: fadeIn 0.4s ease;
         }
 
         .tab-content.active {
             display: block;
         }
 
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .search-filters {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border: 1px solid #e9ecef;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            border: 2px solid #263c79;
+            box-shadow: 0 4px 12px rgba(38, 60, 121, 0.1);
         }
 
         .search-row {
@@ -308,131 +411,234 @@ if (!function_exists('generateQR')) {
             display: flex;
             flex-direction: column;
             min-width: 200px;
+            flex: 1;
         }
 
         .form-group label {
             font-weight: 600;
             color: #263c79;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             font-size: 14px;
+            display: flex;
+            align-items: center;
         }
 
         .form-control {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 10px 14px;
+            border: 2px solid #d0d7de;
+            border-radius: 6px;
             font-size: 14px;
+            transition: all 0.3s ease;
+            background: white;
         }
 
         .form-control:focus {
             outline: none;
-            border-color: #cfac69;
-            box-shadow: 0 0 0 2px rgba(207, 172, 105, 0.2);
+            border-color: #263c79;
+            box-shadow: 0 0 0 3px rgba(38, 60, 121, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .form-control:hover {
+            border-color: #4a90e2;
         }
 
         .books-table {
             width: 100%;
             border-collapse: collapse;
             background: white;
-            border-radius: 8px;
+            border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
 
         .books-table th {
-            background-color: #263c79;
+            background: linear-gradient(135deg, #263c79 0%, #1a2d5a 100%);
             color: white;
-            padding: 12px;
+            padding: 16px 12px;
             text-align: left;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 3px solid #cfac69;
         }
 
         .books-table td {
-            padding: 12px;
+            padding: 14px 12px;
             border-bottom: 1px solid #e9ecef;
             font-size: 14px;
+            color: #2c3e50;
+        }
+
+        .books-table tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        .books-table tbody tr:nth-child(even) {
+            background-color: rgba(248, 249, 250, 0.5);
         }
 
         .books-table tr:hover {
-            background-color: rgba(207, 172, 105, 0.1);
+            background-color: rgba(38, 60, 121, 0.08) !important;
+            transform: scale(1.002);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+        }
+
+        .books-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .books-table td:first-child {
+            font-weight: 600;
+            color: #263c79;
+        }
+
+        .books-table td strong {
+            color: #1a2d5a;
+            font-weight: 600;
         }
 
         .action-links {
             display: flex;
             gap: 8px;
+            justify-content: center;
         }
 
         .action-links a {
-            padding: 4px 8px;
-            border-radius: 3px;
+            padding: 6px 12px;
+            border-radius: 6px;
             text-decoration: none;
             font-size: 12px;
-            font-weight: 500;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .action-links a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
 
         .btn-view {
-            background-color: #17a2b8;
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
             color: white;
+        }
+
+        .btn-view:hover {
+            background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
         }
 
         .btn-edit {
-            background-color: #ffc107;
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
             color: #212529;
         }
 
+        .btn-edit:hover {
+            background: linear-gradient(135deg, #e0a800 0%, #d39e00 100%);
+        }
+
         .btn-delete {
-            background-color: #dc3545;
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
             color: white;
+        }
+
+        .btn-delete:hover {
+            background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
         }
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
 
         .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            border-left: 4px solid #cfac69;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border-left: 5px solid #cfac69;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle, rgba(207, 172, 105, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            transform: translate(30%, -30%);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+            border-left-color: #263c79;
         }
 
         .stat-number {
-            font-size: 32px;
+            font-size: 36px;
             font-weight: 700;
             color: #263c79;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
         }
 
         .stat-label {
             color: #6c757d;
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+            z-index: 1;
         }
 
         .pagination {
             display: flex;
             justify-content: center;
-            gap: 5px;
-            margin-top: 20px;
+            gap: 8px;
+            margin-top: 25px;
+            flex-wrap: wrap;
         }
 
         .page-link {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
+            padding: 10px 16px;
+            border: 2px solid #d0d7de;
             color: #263c79;
             text-decoration: none;
-            border-radius: 4px;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: white;
+            min-width: 40px;
+            text-align: center;
         }
 
-        .page-link:hover,
+        .page-link:hover {
+            background-color: #f0f4f8;
+            border-color: #263c79;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(38, 60, 121, 0.15);
+        }
+
         .page-link.active {
-            background-color: #263c79;
+            background: linear-gradient(135deg, #263c79 0%, #1a2d5a 100%);
             color: white;
+            border-color: #263c79;
+            box-shadow: 0 4px 8px rgba(38, 60, 121, 0.3);
         }
 
         .alert {
@@ -764,11 +970,24 @@ if (!function_exists('generateQR')) {
 
         /* Inline Form Styles */
         .form-section {
-            background: #f8f9fa;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border: 2px solid #263c79;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(38, 60, 121, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .form-section h3 {
+            color: #263c79;
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 25px 0;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #cfac69;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         /* QR Lightbox */
@@ -802,80 +1021,121 @@ if (!function_exists('generateQR')) {
 
         .section-title {
             font-size: 18px;
-            font-weight: 600;
+            font-weight: 700;
             color: #263c79;
             margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #cfac69;
+            padding-bottom: 12px;
+            border-bottom: 3px solid #cfac69;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .form-row {
             display: flex;
             gap: 15px;
-            margin-bottom: 15px;
+            margin-bottom: 18px;
             flex-wrap: wrap;
         }
 
         .form-group-modal {
             flex: 1;
-            min-width: 200px;
+            min-width: 220px;
         }
 
         .form-group-modal label {
             display: block;
-            font-weight: 600;
+            margin-bottom: 8px;
             color: #263c79;
-            margin-bottom: 5px;
+            font-weight: 600;
             font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
         .form-group-modal input,
-        .form-group-modal select {
+        .form-group-modal select,
+        .form-group-modal textarea {
             width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 10px 14px;
+            border: 2px solid #d0d7de;
+            border-radius: 6px;
             font-size: 14px;
-            box-sizing: border-box;
+            transition: all 0.3s ease;
+            background: white;
+            font-family: inherit;
         }
 
         .form-group-modal input:focus,
-        .form-group-modal select:focus {
+        .form-group-modal select:focus,
+        .form-group-modal textarea:focus {
             outline: none;
-            border-color: #cfac69;
-            box-shadow: 0 0 0 2px rgba(207, 172, 105, 0.2);
+            border-color: #263c79;
+            box-shadow: 0 0 0 3px rgba(38, 60, 121, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .form-group-modal input:hover,
+        .form-group-modal select:hover,
+        .form-group-modal textarea:hover {
+            border-color: #4a90e2;
+        }
+
+        .form-group-modal input[required] + label::after,
+        .form-group-modal label:has(+ input[required])::after {
+            content: ' *';
+            color: #dc3545;
+            font-weight: bold;
         }
 
         .required {
             color: #dc3545;
+            font-weight: bold;
+            margin-left: 2px;
         }
 
         .form-actions {
             display: flex;
-            gap: 10px;
-            margin-top: 20px;
+            gap: 12px;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            justify-content: flex-start;
         }
 
-        .btn {
-            padding: 8px 16px !important;
-            font-size: 14px !important;
+        .btn-link {
+            background: none !important;
+            border: none !important;
+            color: #263c79 !important;
+            text-decoration: underline;
+            cursor: pointer;
+            padding: 8px 12px !important;
+            font-weight: 600;
+        }
+
+        .btn-link:hover {
+            color: #4a90e2 !important;
+            background: rgba(38, 60, 121, 0.05) !important;
         }
     </style>
 </head>
 
 <body>
-    <div class="books-header">
-        <div class="books-title">
-            <i class="fas fa-book"></i> Books Management
+    <div class="books-header" style="margin-bottom: 30px;">
+        <div class="books-title" style="font-size: 28px; font-weight: 700; color: #263c79;">
+            <i class="fas fa-book-open"></i> Books Management
         </div>
-        <div class="action-buttons" style="gap: 8px;">
-            <button class="btn btn-success" onclick="openAddBookModal()">
+        <div class="action-buttons">
+            <!-- <button class="btn btn-success" onclick="openAddBookModal()">
                 <i class="fas fa-plus"></i> Add Book
-            </button>
-            <button class="btn btn-primary" onclick="openBulkImportModal()">
+            </button> -->
+            <!-- <button class="btn btn-primary" onclick="openBulkImportModal()">
                 <i class="fas fa-upload"></i> Bulk Import
-            </button>
-            <a href="?export_books_csv=1" class="btn btn-success" style="min-width:120px;">Export CSV</a>
+            </button> -->
+            <a href="export_books_pdf.php" class="btn btn-primary" target="_blank">
+                <i class="fas fa-file-pdf"></i> Export PDF
+            </a>
         </div>
     </div>
 
@@ -1089,29 +1349,46 @@ if (!function_exists('generateQR')) {
         <!-- Books Catalog Tab -->
         <div id="catalog" class="tab-content active">
             <div class="search-filters">
+                <h4 style="margin: 0 0 20px 0; color: #263c79; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-filter"></i> Search & Filter Books
+                </h4>
                 <div class="search-row">
                     <div class="form-group">
-                        <label for="searchTitle">Title</label>
+                        <label for="searchTitle">
+                            <i class="fas fa-book" style="margin-right: 5px;"></i>Title
+                        </label>
                         <input type="text" id="searchTitle" class="form-control" placeholder="Search by title...">
                     </div>
                     <div class="form-group">
-                        <label for="searchAuthor">Author</label>
+                        <label for="searchAuthor">
+                            <i class="fas fa-user-edit" style="margin-right: 5px;"></i>Author
+                        </label>
                         <input type="text" id="searchAuthor" class="form-control" placeholder="Search by author...">
                     </div>
                     <div class="form-group">
-                        <label for="searchISBN">ISBN</label>
+                        <label for="searchISBN">
+                            <i class="fas fa-barcode" style="margin-right: 5px;"></i>ISBN
+                        </label>
                         <input type="text" id="searchISBN" class="form-control" placeholder="Search by ISBN...">
                     </div>
                     <div class="form-group">
-                        <label for="searchSubject">Subject</label>
+                        <label for="searchSubject">
+                            <i class="fas fa-tag" style="margin-right: 5px;"></i>Subject
+                        </label>
                         <input type="text" id="searchSubject" class="form-control" placeholder="Search by subject...">
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="min-width: auto;">
                         <label>&nbsp;</label>
-                        <button type="button" class="btn btn-primary" onclick="searchBooks()">
-                            <i class="fas fa-search"></i>
-                            Search
-                        </button>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" class="btn btn-primary" onclick="searchBooks()">
+                                <i class="fas fa-search"></i>
+                                Search
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearSearch()">
+                                <i class="fas fa-times"></i>
+                                Clear
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1166,26 +1443,33 @@ if (!function_exists('generateQR')) {
                 <h3 class="modal-title">Add New Book</h3>
                 <button class="close" onclick="closeModal('addBookModal')">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="background: #f0f4f8; padding: 25px;">
                 <form id="addBookForm">
+                    
+                    <!-- Basic Information Section -->
+                    <div style="border:2px solid #263c79; padding:20px; margin-bottom:20px; border-radius:8px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="margin-top:0; color:#263c79; font-size:18px; margin-bottom:20px; font-weight:600; border-bottom:2px solid #263c79; padding-bottom:10px;">
+                            <i class="fas fa-info-circle" style="margin-right:10px;"></i>Basic Information
+                        </div>
+                    
                     <div class="form-row">
                         <div class="form-group-modal">
-                            <label for="bookTitle">Title *</label>
-                            <input type="text" id="bookTitle" name="Title" required>
+                            <label for="bookTitle"><i class="fas fa-book"></i> Title <span class="required">*</span></label>
+                            <input type="text" id="bookTitle" name="Title" required placeholder="Enter book title">
                         </div>
                         <div class="form-group-modal">
-                            <label for="bookSubTitle">Sub Title</label>
-                            <input type="text" id="bookSubTitle" name="SubTitle">
+                            <label for="bookSubTitle"><i class="fas fa-heading"></i> Sub Title</label>
+                            <input type="text" id="bookSubTitle" name="SubTitle" placeholder="Enter subtitle">
                         </div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group-modal">
-                            <label for="bookVarTitle">Variant Title</label>
-                            <input type="text" id="bookVarTitle" name="VarTitle">
+                            <label for="bookVarTitle"><i class="fas fa-font"></i> Variant Title</label>
+                            <input type="text" id="bookVarTitle" name="VarTitle" placeholder="Alternate title">
                         </div>
                         <div class="form-group-modal">
-                            <label for="bookFormat">Format</label>
+                            <label for="bookFormat"><i class="fas fa-file-alt"></i> Format</label>
                             <select id="bookFormat" name="Format">
                                 <option value="Book">Book</option>
                                 <option value="Journal">Journal</option>
@@ -1195,40 +1479,54 @@ if (!function_exists('generateQR')) {
                             </select>
                         </div>
                     </div>
+                    </div>
+
+                    <!-- Author Information Section -->
+                    <div style="border:2px solid #263c79; padding:20px; margin-bottom:20px; border-radius:8px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="margin-top:0; color:#263c79; font-size:18px; margin-bottom:20px; font-weight:600; border-bottom:2px solid #263c79; padding-bottom:10px;">
+                            <i class="fas fa-user-edit" style="margin-right:10px;"></i>Author Information
+                        </div>
 
                     <div class="form-row">
                         <div class="form-group-modal">
-                            <label for="bookAuthor1">Primary Author *</label>
-                            <input type="text" id="bookAuthor1" name="Author1" required>
+                            <label for="bookAuthor1"><i class="fas fa-user"></i> Primary Author <span class="required">*</span></label>
+                            <input type="text" id="bookAuthor1" name="Author1" required placeholder="First author name">
                         </div>
                         <div class="form-group-modal">
-                            <label for="bookAuthor2">Secondary Author</label>
-                            <input type="text" id="bookAuthor2" name="Author2">
+                            <label for="bookAuthor2"><i class="fas fa-user"></i> Secondary Author</label>
+                            <input type="text" id="bookAuthor2" name="Author2" placeholder="Second author name">
                         </div>
                         <div class="form-group-modal">
-                            <label for="bookAuthor3">Third Author</label>
-                            <input type="text" id="bookAuthor3" name="Author3">
+                            <label for="bookAuthor3"><i class="fas fa-user"></i> Third Author</label>
+                            <input type="text" id="bookAuthor3" name="Author3" placeholder="Third author name">
                         </div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group-modal">
-                            <label for="bookCorpAuthor">Corporate Author</label>
-                            <input type="text" id="bookCorpAuthor" name="CorpAuthor">
+                            <label for="bookCorpAuthor"><i class="fas fa-building"></i> Corporate Author</label>
+                            <input type="text" id="bookCorpAuthor" name="CorpAuthor" placeholder="Organization name">
                         </div>
                         <div class="form-group-modal">
-                            <label for="bookEditors">Editors</label>
-                            <input type="text" id="bookEditors" name="Editors">
+                            <label for="bookEditors"><i class="fas fa-user-tie"></i> Editors</label>
+                            <input type="text" id="bookEditors" name="Editors" placeholder="Editor names">
                         </div>
                     </div>
+                    </div>
+
+                    <!-- Publication Details Section -->
+                    <div style="border:2px solid #263c79; padding:20px; margin-bottom:20px; border-radius:8px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="margin-top:0; color:#263c79; font-size:18px; margin-bottom:20px; font-weight:600; border-bottom:2px solid #263c79; padding-bottom:10px;">
+                            <i class="fas fa-print" style="margin-right:10px;"></i>Publication Details
+                        </div>
 
                     <div class="form-row">
                         <div class="form-group-modal">
-                            <label for="bookISBN">ISBN</label>
+                            <label for="bookISBN"><i class="fas fa-barcode"></i> ISBN</label>
                             <input type="text" id="bookISBN" name="ISBN" placeholder="978-0-123456-78-9">
                         </div>
                         <div class="form-group-modal">
-                            <label for="bookLanguage">Language</label>
+                            <label for="bookLanguage"><i class="fas fa-language"></i> Language</label>
                             <select id="bookLanguage" name="Language">
                                 <option value="English">English</option>
                                 <option value="Hindi">Hindi</option>
@@ -1243,89 +1541,113 @@ if (!function_exists('generateQR')) {
 
                     <div class="form-row">
                         <div class="form-group-modal">
-                            <label for="bookPublisher">Publisher</label>
-                            <input type="text" id="bookPublisher" name="Publisher">
+                            <label for="bookPublisher"><i class="fas fa-building"></i> Publisher</label>
+                            <input type="text" id="bookPublisher" name="Publisher" placeholder="Publisher name">
                         </div>
                         <div class="form-group-modal">
-                            <label for="bookPlace">Place of Publication</label>
-                            <input type="text" id="bookPlace" name="Place">
+                            <label for="bookPlace"><i class="fas fa-map-marker-alt"></i> Place of Publication</label>
+                            <input type="text" id="bookPlace" name="Place" placeholder="City, Country">
                         </div>
                         <div class="form-group-modal">
-                            <label for="bookYear">Publication Year</label>
-                            <input type="number" id="bookYear" name="Year" min="1900" max="2030">
+                            <label for="bookYear"><i class="fas fa-calendar-alt"></i> Publication Year</label>
+                            <input type="number" id="bookYear" name="Year" min="1900" max="2030" placeholder="2024">
                         </div>
                     </div>
+                    </div>
+
+                    <!-- Subject & Classification Section -->
+                    <div style="border:2px solid #263c79; padding:20px; margin-bottom:20px; border-radius:8px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="margin-top:0; color:#263c79; font-size:18px; margin-bottom:20px; font-weight:600; border-bottom:2px solid #263c79; padding-bottom:10px;">
+                            <i class="fas fa-tag" style="margin-right:10px;"></i>Subject & Classification
+                        </div>
 
                     <div class="form-row">
                         <div class="form-group-modal">
-                            <label for="bookSubject">Subject</label>
-                            <input type="text" id="bookSubject" name="Subject">
+                            <label for="bookSubject"><i class="fas fa-tags"></i> Subject</label>
+                            <input type="text" id="bookSubject" name="Subject" placeholder="Subject area">
                         </div>
                         <div class="form-group-modal">
-                            <label for="bookEdition">Edition</label>
-                            <input type="text" id="bookEdition" name="Edition">
+                            <label for="bookEdition"><i class="fas fa-layer-group"></i> Edition</label>
+                            <input type="text" id="bookEdition" name="Edition" placeholder="1st, 2nd, etc.">
                         </div>
                         <div class="form-group-modal">
-                            <label for="bookVol">Volume</label>
-                            <input type="text" id="bookVol" name="Vol">
+                            <label for="bookVol"><i class="fas fa-book-open"></i> Volume</label>
+                            <input type="text" id="bookVol" name="Vol" placeholder="Volume number">
                         </div>
                         <div class="form-group-modal">
-                            <label for="bookPages">Pages</label>
-                            <input type="number" id="bookPages" name="Pages" min="1">
+                            <label for="bookPages"><i class="fas fa-file"></i> Pages</label>
+                            <input type="number" id="bookPages" name="Pages" min="1" placeholder="Total pages">
                         </div>
                     </div>
+                    </div>
+
+                    <!-- Holdings Section -->
+                    <div style="border:2px solid #263c79; padding:20px; margin-bottom:20px; border-radius:8px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="margin-top:0; color:#263c79; font-size:18px; margin-bottom:20px; font-weight:600; border-bottom:2px solid #263c79; padding-bottom:10px;">
+                            <i class="fas fa-boxes" style="margin-right:10px;"></i>Holdings & Copies
+                        </div>
 
                     <div class="form-row">
                         <div class="form-group-modal">
-                            <label for="numCopies">Number of Copies</label>
+                            <label for="numCopies"><i class="fas fa-copy"></i> Number of Copies</label>
                             <input type="number" id="numCopies" name="numCopies" min="1" value="1" onchange="renderHoldingsSection()">
                         </div>
                     </div>
 
                     <div id="holdingsSection"></div>
-
-                    <div class="form-row">
-                        <button type="button" class="btn btn-link" onclick="toggleAcquisitionSection()">Acquisition Details</button>
                     </div>
-                    <div id="acquisitionSection" style="display:none; border:1px solid #eee; padding:15px; margin-bottom:10px; border-radius:6px; background:#faf9f6;">
+
+                    <!-- Acquisition Details Section -->
+                    <div style="border:2px solid #263c79; padding:20px; margin-bottom:20px; border-radius:8px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="margin-top:0; color:#263c79; font-size:18px; margin-bottom:20px; font-weight:600; border-bottom:2px solid #263c79; padding-bottom:10px;">
+                            <i class="fas fa-shopping-cart" style="margin-right:10px;"></i>Acquisition Details
+                        </div>
+                    
+                    <div class="form-row">
+                        <button type="button" class="btn btn-link" onclick="toggleAcquisitionSection()">
+                            <i class="fas fa-angle-down"></i> Toggle Acquisition Fields
+                        </button>
+                    </div>
+                    <div id="acquisitionSection" style="display:none; border:2px solid #d0d7de; padding:20px; margin-bottom:15px; border-radius:8px; background:linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
                         <div class="form-row">
                             <div class="form-group-modal">
-                                <label for="acqSupplier">Supplier</label>
-                                <input type="text" id="acqSupplier" name="Supplier">
+                                <label for="acqSupplier"><i class="fas fa-truck"></i> Supplier</label>
+                                <input type="text" id="acqSupplier" name="Supplier" placeholder="Supplier name">
                             </div>
                             <div class="form-group-modal">
-                                <label for="acqInvoiceNo">Invoice No</label>
-                                <input type="text" id="acqInvoiceNo" name="InvoiceNo">
+                                <label for="acqInvoiceNo"><i class="fas fa-file-invoice"></i> Invoice No</label>
+                                <input type="text" id="acqInvoiceNo" name="InvoiceNo" placeholder="Invoice number">
                             </div>
                             <div class="form-group-modal">
-                                <label for="acqInvoiceDate">Invoice Date</label>
+                                <label for="acqInvoiceDate"><i class="fas fa-calendar"></i> Invoice Date</label>
                                 <input type="date" id="acqInvoiceDate" name="InvoiceDate">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group-modal">
-                                <label for="acqOrderNo">Order No</label>
-                                <input type="text" id="acqOrderNo" name="OrderNo">
+                                <label for="acqOrderNo"><i class="fas fa-receipt"></i> Order No</label>
+                                <input type="text" id="acqOrderNo" name="OrderNo" placeholder="Order number">
                             </div>
                             <div class="form-group-modal">
-                                <label for="acqOrderDate">Order Date</label>
+                                <label for="acqOrderDate"><i class="fas fa-calendar-check"></i> Order Date</label>
                                 <input type="date" id="acqOrderDate" name="OrderDate">
                             </div>
                             <div class="form-group-modal">
-                                <label for="acqReceivedDate">Received Date</label>
+                                <label for="acqReceivedDate"><i class="fas fa-calendar-plus"></i> Received Date</label>
                                 <input type="date" id="acqReceivedDate" name="ReceivedDate">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group-modal">
-                                <label for="acqQuantity">Quantity</label>
-                                <input type="number" id="acqQuantity" name="Quantity" min="1">
+                                <label for="acqQuantity"><i class="fas fa-sort-numeric-up"></i> Quantity</label>
+                                <input type="number" id="acqQuantity" name="Quantity" min="1" placeholder="Number of items">
                             </div>
                             <div class="form-group-modal">
-                                <label for="acqTotalCost">Total Cost</label>
-                                <input type="number" id="acqTotalCost" name="TotalCost" min="0" step="0.01">
+                                <label for="acqTotalCost"><i class="fas fa-rupee-sign"></i> Total Cost</label>
+                                <input type="number" id="acqTotalCost" name="TotalCost" min="0" step="0.01" placeholder="0.00">
                             </div>
                         </div>
+                    </div>
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn btn-secondary" onclick="closeModal('addBookModal')">Cancel</button>
@@ -1334,7 +1656,7 @@ if (!function_exists('generateQR')) {
                 </form>
             </div>
         </div>
-    </div> 
+    </div>  
 
     <!-- Book Details/Edit Modal -->
             <div id="bookDetailsModal" class="modal" style="display:none; align-items:center; justify-content:center; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1000; background:rgba(0,0,0,0.5);">
@@ -1375,43 +1697,7 @@ if (!function_exists('generateQR')) {
         }
 </style>
     <!-- Bulk Import Modal (info only, real import is via action-buttons form) -->
-    <div id="bulkImportModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">Bulk Import Books</h3>
-                <button class="close" onclick="closeModal('bulkImportModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div style="text-align: center; padding: 20px;">
-                    <i class="fas fa-file-excel" style="font-size: 48px; color: #28a745; margin-bottom: 15px;"></i>
-                    <h4 style="color: #263c79; margin-bottom: 15px;">Import Books from CSV</h4>
-                    <p style="margin-bottom: 20px; color: #6c757d;">Use the Import CSV button in the action bar above to upload a CSV file containing book information.</p>
-                    <div style="text-align: left; margin-top: 20px;">
-                        <h5 style="color: #263c79;">Required Columns:</h5>
-                        <ul style="color: #6c757d; font-size: 14px;">
-                            <li>CatNo</li>
-                            <li>Title (required)</li>
-                            <li>Author1 (required)</li>
-                            <li>Author2</li>
-                            <li>Author3</li>
-                            <li>Publisher</li>
-                            <li>Year</li>
-                            <li>ISBN</li>
-                            <li>Edition</li>
-                            <li>Language</li>
-                            <li>Subject</li>
-                            <li>Keywords</li>
-                            <li>Pages</li>
-                            <li>Price</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('bulkImportModal')">Close</button>
-            </div>
-        </div>
-    </div>
+    
 
     <!-- QR Lightbox -->
     <div id="qrLightbox" class="qr-lightbox" onclick="closeQrLightbox(event)">
@@ -1507,12 +1793,39 @@ if (!function_exists('generateQR')) {
             }
         }
 
-        async function loadBooksTable(page = 1) {
+        // Search functionality
+        function searchBooks() {
+            const title = document.getElementById('searchTitle')?.value.trim() || '';
+            const author = document.getElementById('searchAuthor')?.value.trim() || '';
+            const isbn = document.getElementById('searchISBN')?.value.trim() || '';
+            const subject = document.getElementById('searchSubject')?.value.trim() || '';
+            
+            // Load books with search filters
+            loadBooksTable(1, { title, author, isbn, subject });
+        }
+        
+        // Clear search filters
+        function clearSearch() {
+            document.getElementById('searchTitle').value = '';
+            document.getElementById('searchAuthor').value = '';
+            document.getElementById('searchISBN').value = '';
+            document.getElementById('searchSubject').value = '';
+            loadBooksTable(1);
+        }
+
+        async function loadBooksTable(page = 1, filters = {}) {
             booksPage = page;
             const booksTableContainer = document.getElementById('booksTableContainer');
             booksTableContainer.innerHTML = '<div style="text-align: center; padding: 40px;"><i class="fas fa-spinner fa-spin" style="font-size: 32px; color: #263c79;"></i><p>Loading books...</p></div>';
             try {
-                const response = await fetch(`api/books.php?action=list&page=${booksPage}&pageSize=${booksPageSize}`);
+                // Build query string with filters
+                let queryParams = `action=list&page=${booksPage}&pageSize=${booksPageSize}`;
+                if (filters.title) queryParams += `&title=${encodeURIComponent(filters.title)}`;
+                if (filters.author) queryParams += `&author=${encodeURIComponent(filters.author)}`;
+                if (filters.isbn) queryParams += `&isbn=${encodeURIComponent(filters.isbn)}`;
+                if (filters.subject) queryParams += `&subject=${encodeURIComponent(filters.subject)}`;
+                
+                const response = await fetch(`api/books.php?${queryParams}`);
                 if (!response.ok) throw new Error('API error: ' + response.status);
                 const text = await response.text();
                 let result;
@@ -1757,10 +2070,16 @@ if (!function_exists('generateQR')) {
                 inlineForm.scrollIntoView({behavior:'smooth', block:'center'});
                 const firstInput = inlineForm.querySelector('input, select, textarea, button');
                 if (firstInput) firstInput.focus();
+                // Render holdings section when form opens
+                renderHoldingsSection();
             } else {
                 // fallback to modal if inline not present
                 const m = document.getElementById('addBookModal');
-                if (m) m.style.display = 'flex';
+                if (m) {
+                    m.style.display = 'flex';
+                    // Render holdings section when modal opens
+                    setTimeout(() => renderHoldingsSection(), 100);
+                }
             }
         }
 
@@ -1778,11 +2097,201 @@ if (!function_exists('generateQR')) {
             }
         }
 
+        // Render holdings section based on number of copies
+        function renderHoldingsSection() {
+            const numCopiesInput = document.getElementById('numCopies');
+            const holdingsSection = document.getElementById('holdingsSection');
+            
+            if (!numCopiesInput || !holdingsSection) return;
+            
+            const numCopies = parseInt(numCopiesInput.value) || 1;
+            
+            // Clear existing holdings
+            holdingsSection.innerHTML = '';
+            
+            if (numCopies < 1) return;
+            
+            // Create a container with improved styling
+            const container = document.createElement('div');
+            container.style.cssText = 'border:2px solid #263c79; padding:20px; margin:20px 0; border-radius:8px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
+            
+            const heading = document.createElement('h4');
+            heading.innerHTML = '<i class="fas fa-books" style="margin-right:10px;"></i>Holdings Details - Physical Copies';
+            heading.style.cssText = 'margin-top:0; color:#263c79; font-size:18px; margin-bottom:20px; font-weight:600; border-bottom:2px solid #263c79; padding-bottom:10px;';
+            container.appendChild(heading);
+            
+            const infoText = document.createElement('p');
+            infoText.innerHTML = '<i class="fas fa-info-circle"></i> Please enter <strong>unique Accession Numbers (AccNo)</strong> for each copy manually.';
+            infoText.style.cssText = 'color:#555; font-size:13px; margin-bottom:15px; background:#fff; padding:10px; border-left:4px solid #263c79; border-radius:4px;';
+            container.appendChild(infoText);
+            
+            // Create input fields for each copy
+            for (let i = 1; i <= numCopies; i++) {
+                const copyDiv = document.createElement('div');
+                copyDiv.style.cssText = 'background:white; border:2px solid #d0d7de; padding:15px; margin-bottom:15px; border-radius:6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.3s ease;';
+                copyDiv.onmouseenter = function() { this.style.borderColor = '#263c79'; this.style.boxShadow = '0 4px 8px rgba(38,60,121,0.15)'; };
+                copyDiv.onmouseleave = function() { this.style.borderColor = '#d0d7de'; this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)'; };
+                
+                const copyTitle = document.createElement('div');
+                copyTitle.innerHTML = `<i class="fas fa-book"></i> Copy ${i} of ${numCopies}`;
+                copyTitle.style.cssText = 'font-weight:bold; color:#263c79; margin-bottom:15px; font-size:15px; background:#f0f4f8; padding:8px 12px; border-radius:4px; display:inline-block;';
+                copyDiv.appendChild(copyTitle);
+                
+                // Create form row for each holding
+                const formRow = document.createElement('div');
+                formRow.className = 'form-row';
+                formRow.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:15px; margin-top:10px;';
+                
+                // AccNo field - MANUAL ENTRY (not auto-generated) - HIGHLIGHTED
+                const accNoGroup = document.createElement('div');
+                accNoGroup.className = 'form-group-modal';
+                accNoGroup.innerHTML = `
+                    <label for="holdingAccNo_${i}" style="font-weight:600; color:#263c79;">
+                        <i class="fas fa-key" style="margin-right:5px;"></i>Accession No <span style="color:#dc3545; font-size:16px;">*</span>
+                    </label>
+                    <input type="text" id="holdingAccNo_${i}" name="holdingAccNo_${i}" 
+                           placeholder="e.g., ACC${String(i).padStart(4, '0')}" required 
+                           style="width:100%; padding:10px; border:2px solid #263c79; border-radius:6px; font-weight:500; font-size:14px; transition: all 0.3s ease;"
+                           onfocus="this.style.borderColor='#4a90e2'; this.style.boxShadow='0 0 8px rgba(74,144,226,0.3)';"
+                           onblur="this.style.borderColor='#263c79'; this.style.boxShadow='none';">
+                `;
+                formRow.appendChild(accNoGroup);
+                
+                // Location field
+                const locationGroup = document.createElement('div');
+                locationGroup.className = 'form-group-modal';
+                locationGroup.innerHTML = `
+                    <label for="holdingLocation_${i}" style="font-weight:500; color:#555;">
+                        <i class="fas fa-map-marker-alt" style="margin-right:5px;"></i>Location
+                    </label>
+                    <input type="text" id="holdingLocation_${i}" name="holdingLocation_${i}" 
+                           placeholder="e.g., Main Library" 
+                           style="width:100%; padding:10px; border:1px solid #d0d7de; border-radius:6px; font-size:14px; transition: border-color 0.3s;"
+                           onfocus="this.style.borderColor='#4a90e2';"
+                           onblur="this.style.borderColor='#d0d7de';">
+                `;
+                formRow.appendChild(locationGroup);
+                
+                // Section field
+                const sectionGroup = document.createElement('div');
+                sectionGroup.className = 'form-group-modal';
+                sectionGroup.innerHTML = `
+                    <label for="holdingSection_${i}" style="font-weight:500; color:#555;">
+                        <i class="fas fa-layer-group" style="margin-right:5px;"></i>Section
+                    </label>
+                    <input type="text" id="holdingSection_${i}" name="holdingSection_${i}" 
+                           placeholder="e.g., Reference" 
+                           style="width:100%; padding:10px; border:1px solid #d0d7de; border-radius:6px; font-size:14px; transition: border-color 0.3s;"
+                           onfocus="this.style.borderColor='#4a90e2';"
+                           onblur="this.style.borderColor='#d0d7de';">
+                `;
+                formRow.appendChild(sectionGroup);
+                
+                // Collection field
+                const collectionGroup = document.createElement('div');
+                collectionGroup.className = 'form-group-modal';
+                collectionGroup.innerHTML = `
+                    <label for="holdingCollection_${i}" style="font-weight:500; color:#555;">
+                        <i class="fas fa-folder-open" style="margin-right:5px;"></i>Collection
+                    </label>
+                    <input type="text" id="holdingCollection_${i}" name="holdingCollection_${i}" 
+                           placeholder="e.g., General" 
+                           style="width:100%; padding:10px; border:1px solid #d0d7de; border-radius:6px; font-size:14px; transition: border-color 0.3s;"
+                           onfocus="this.style.borderColor='#4a90e2';"
+                           onblur="this.style.borderColor='#d0d7de';">
+                `;
+                formRow.appendChild(collectionGroup);
+                
+                // AccDate field
+                const accDateGroup = document.createElement('div');
+                accDateGroup.className = 'form-group-modal';
+                accDateGroup.innerHTML = `
+                    <label for="holdingAccDate_${i}" style="font-weight:500; color:#555;">
+                        <i class="fas fa-calendar-alt" style="margin-right:5px;"></i>Accession Date
+                    </label>
+                    <input type="date" id="holdingAccDate_${i}" name="holdingAccDate_${i}" 
+                           style="width:100%; padding:10px; border:1px solid #d0d7de; border-radius:6px; font-size:14px; transition: border-color 0.3s;"
+                           onfocus="this.style.borderColor='#4a90e2';"
+                           onblur="this.style.borderColor='#d0d7de';">
+                `;
+                formRow.appendChild(accDateGroup);
+                
+                // ClassNo field
+                const classNoGroup = document.createElement('div');
+                classNoGroup.className = 'form-group-modal';
+                classNoGroup.innerHTML = `
+                    <label for="holdingClassNo_${i}" style="font-weight:500; color:#555;">
+                        <i class="fas fa-tag" style="margin-right:5px;"></i>Class No
+                    </label>
+                    <input type="text" id="holdingClassNo_${i}" name="holdingClassNo_${i}" 
+                           placeholder="e.g., 005.1" 
+                           style="width:100%; padding:10px; border:1px solid #d0d7de; border-radius:6px; font-size:14px; transition: border-color 0.3s;"
+                           onfocus="this.style.borderColor='#4a90e2';"
+                           onblur="this.style.borderColor='#d0d7de';">
+                `;
+                formRow.appendChild(classNoGroup);
+                
+                // BookNo field
+                const bookNoGroup = document.createElement('div');
+                bookNoGroup.className = 'form-group-modal';
+                bookNoGroup.innerHTML = `
+                    <label for="holdingBookNo_${i}" style="font-weight:500; color:#555;">
+                        <i class="fas fa-barcode" style="margin-right:5px;"></i>Book No
+                    </label>
+                    <input type="text" id="holdingBookNo_${i}" name="holdingBookNo_${i}" 
+                           placeholder="e.g., B001" 
+                           style="width:100%; padding:10px; border:1px solid #d0d7de; border-radius:6px; font-size:14px; transition: border-color 0.3s;"
+                           onfocus="this.style.borderColor='#4a90e2';"
+                           onblur="this.style.borderColor='#d0d7de';">
+                `;
+                formRow.appendChild(bookNoGroup);
+                
+                // Binding field
+                const bindingGroup = document.createElement('div');
+                bindingGroup.className = 'form-group-modal';
+                bindingGroup.innerHTML = `
+                    <label for="holdingBinding_${i}" style="font-weight:500; color:#555;">
+                        <i class="fas fa-book-open" style="margin-right:5px;"></i>Binding
+                    </label>
+                    <input type="text" id="holdingBinding_${i}" name="holdingBinding_${i}" 
+                           placeholder="e.g., Hardcover" 
+                           style="width:100%; padding:10px; border:1px solid #d0d7de; border-radius:6px; font-size:14px; transition: border-color 0.3s;"
+                           onfocus="this.style.borderColor='#4a90e2';"
+                           onblur="this.style.borderColor='#d0d7de';">
+                `;
+                formRow.appendChild(bindingGroup);
+                
+                // Remarks field (full width)
+                const remarksGroup = document.createElement('div');
+                remarksGroup.className = 'form-group-modal';
+                remarksGroup.style.cssText = 'grid-column: 1 / -1; margin-top:10px;';
+                remarksGroup.innerHTML = `
+                    <label for="holdingRemarks_${i}" style="font-weight:500; color:#555;">
+                        <i class="fas fa-comment-alt" style="margin-right:5px;"></i>Remarks / Notes
+                    </label>
+                    <textarea id="holdingRemarks_${i}" name="holdingRemarks_${i}" 
+                              rows="2" placeholder="Enter any additional notes or remarks about this copy..." 
+                              style="width:100%; padding:10px; border:1px solid #d0d7de; border-radius:6px; resize:vertical; font-size:14px; transition: border-color 0.3s; font-family: inherit;"
+                              onfocus="this.style.borderColor='#4a90e2';"
+                              onblur="this.style.borderColor='#d0d7de';"></textarea>
+                `;
+                formRow.appendChild(remarksGroup);
+                
+                copyDiv.appendChild(formRow);
+                container.appendChild(copyDiv);
+            }
+            
+            holdingsSection.appendChild(container);
+        }
+
         // Ensure any stray modals are hidden on load (prevents broken state where modals remain visible)
         document.addEventListener('DOMContentLoaded', function(){
             document.querySelectorAll('.modal').forEach(m => {
                 try { m.style.display = 'none'; } catch(e){}
             });
+            
+            // Render holdings section on page load with default value
+            renderHoldingsSection();
         });
 
         function openBulkImportModal() {
@@ -1835,16 +2344,25 @@ if (!function_exists('generateQR')) {
             const numCopies = parseInt(form.querySelector('[name="numCopies"]')?.value || '1', 10) || 1;
             fd.append('num_copies', numCopies);
 
-            // Map holdings - send the first holding fields (backend expects simple fields per copy)
-            const firstHoldingIndex = 1;
-            fd.append('book_no', document.getElementById('holdingBookNo_' + firstHoldingIndex)?.value || '');
-            fd.append('acc_date', document.getElementById('holdingAccDate_' + firstHoldingIndex)?.value || '');
-            fd.append('class_no', document.getElementById('holdingClassNo_' + firstHoldingIndex)?.value || '');
-            fd.append('location', document.getElementById('holdingLocation_' + firstHoldingIndex)?.value || '');
-            fd.append('section', document.getElementById('holdingSection_' + firstHoldingIndex)?.value || '');
-            fd.append('collection', document.getElementById('holdingCollection_' + firstHoldingIndex)?.value || '');
-            fd.append('binding', document.getElementById('holdingBinding_' + firstHoldingIndex)?.value || '');
-            fd.append('remarks', document.getElementById('holdingRemarks_' + firstHoldingIndex)?.value || '');
+            // Collect holdings data for ALL copies
+            const holdingsData = [];
+            for (let i = 1; i <= numCopies; i++) {
+                const holding = {
+                    accNo: document.getElementById('holdingAccNo_' + i)?.value || '',
+                    bookNo: document.getElementById('holdingBookNo_' + i)?.value || '',
+                    accDate: document.getElementById('holdingAccDate_' + i)?.value || '',
+                    classNo: document.getElementById('holdingClassNo_' + i)?.value || '',
+                    location: document.getElementById('holdingLocation_' + i)?.value || '',
+                    section: document.getElementById('holdingSection_' + i)?.value || '',
+                    collection: document.getElementById('holdingCollection_' + i)?.value || '',
+                    binding: document.getElementById('holdingBinding_' + i)?.value || '',
+                    remarks: document.getElementById('holdingRemarks_' + i)?.value || ''
+                };
+                holdingsData.push(holding);
+            }
+            
+            // Send holdings as JSON string
+            fd.append('holdings', JSON.stringify(holdingsData));
 
             // Acquisition mapping (backend expects snake_case lowercase keys)
             fd.append('supplier', document.getElementById('acqSupplier')?.value || '');

@@ -44,8 +44,60 @@ function update_assignment($pdo) {
     echo json_encode(['success' => true]);
 }
 
+function fetch_books($pdo) {
+    $search = $_GET['search'] ?? '';
+    $sql = "SELECT b.CatNo, b.Title, b.Author1, b.Subject, 
+            (SELECT COUNT(*) FROM Holding h WHERE h.CatNo = b.CatNo AND h.Status = 'Available') AS AvailableCopies
+            FROM Books b WHERE 1=1";
+    $params = [];
+    
+    if ($search) {
+        $sql .= " AND (b.Title LIKE ? OR b.Author1 LIKE ? OR b.Subject LIKE ?)";
+        $searchTerm = "%{$search}%";
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+    }
+    
+    $sql .= " ORDER BY b.Title LIMIT 50";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    echo json_encode(['success' => true, 'data' => $books]);
+}
+
+function fetch_statistics($pdo) {
+    // Get total assignments
+    $totalStmt = $pdo->query("SELECT COUNT(*) as count FROM BookAssignments");
+    $total = $totalStmt->fetch(PDO::FETCH_ASSOC)['count'];
+    
+    // Get active assignments
+    $activeStmt = $pdo->query("SELECT COUNT(*) as count FROM BookAssignments WHERE Status = 'Active'");
+    $active = $activeStmt->fetch(PDO::FETCH_ASSOC)['count'];
+    
+    // Get shortage assignments
+    $shortageStmt = $pdo->query("SELECT COUNT(*) as count FROM BookAssignments WHERE Status = 'Shortage'");
+    $shortage = $shortageStmt->fetch(PDO::FETCH_ASSOC)['count'];
+    
+    // Get total unique courses
+    $coursesStmt = $pdo->query("SELECT COUNT(DISTINCT CourseCode) as count FROM BookAssignments");
+    $courses = $coursesStmt->fetch(PDO::FETCH_ASSOC)['count'];
+    
+    echo json_encode([
+        'success' => true,
+        'stats' => [
+            'totalAssignments' => (int)$total,
+            'activeAssignments' => (int)$active,
+            'shortageItems' => (int)$shortage,
+            'totalCourses' => (int)$courses
+        ]
+    ]);
+}
+
 try {
-    $pdo = getDb();
+    // Use global $pdo from db_connect.php
+    global $pdo;
+    
     switch ($action) {
         case 'list':
             fetch_assignments($pdo);
@@ -58,6 +110,12 @@ try {
             break;
         case 'edit':
             update_assignment($pdo);
+            break;
+        case 'books':
+            fetch_books($pdo);
+            break;
+        case 'stats':
+            fetch_statistics($pdo);
             break;
         default:
             echo json_encode(['success' => false, 'message' => 'Invalid action']);
