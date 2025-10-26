@@ -732,7 +732,7 @@ try {
             sendJson(['success' => true, 'data' => $books]);
             break;
         
-        case 'lookup':
+        case 'lookup-verify':
             // Lookup book by Accession Number (for stock verification)
             $accNo = $_GET['accNo'] ?? '';
             

@@ -29,8 +29,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
         
+        // Get the actual AdminID from the database
+        require_once '../includes/db_connect.php';
+        try {
+            $stmt = $pdo->prepare("SELECT AdminID FROM Admin WHERE Email = ? LIMIT 1");
+            $stmt->execute([$email]);
+            $dbAdmin = $stmt->fetch(PDO::FETCH_ASSOC);
+            $actualAdminId = $dbAdmin ? $dbAdmin['AdminID'] : null;
+        } catch (Exception $e) {
+            $actualAdminId = null;
+        }
+        
         // Set session variables
-        $_SESSION['admin_id'] = $admin['is_superadmin'] ? 'SUPERADM2024001' : 'ADM2024001';
+        $_SESSION['admin_id'] = $actualAdminId; // Use actual database AdminID
+        $_SESSION['AdminID'] = $actualAdminId; // Alternative session key
         $_SESSION['admin_name'] = $admin['name'];
         $_SESSION['admin_email'] = $admin['email'];
         $_SESSION['admin_role'] = $admin['role'];

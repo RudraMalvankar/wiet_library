@@ -426,7 +426,6 @@ try {
                 $pdo->rollBack();
                 throw $e;
             }
-            break;
             
         case 'get_student':
             // Get single student details
@@ -504,7 +503,6 @@ try {
                 $pdo->rollBack();
                 throw $e;
             }
-            break;
             
         default:
             sendJson(['success' => false, 'message' => 'Invalid action'], 400);
