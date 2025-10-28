@@ -1,0 +1,16 @@
+# Disable directory listing
+Options -Indexes
+
+# Redirect to login if accessing directory
+DirectoryIndex login.php index.php
+
+# PHP settings
+php_flag display_errors Off
+php_flag log_errors On
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>

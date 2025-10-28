@@ -2,22 +2,26 @@
 // Admin Dashboard Content - Library Administration Staff
 // This file will be included in the main-content area of admin/layout.php
 
-session_start();
+// Include AJAX handler FIRST
+require_once 'ajax-handler.php';
+
+// Include session check and authentication
+require_once 'session_check.php';
+
+// Check dashboard permission
+checkPagePermission('view_dashboard');
 
 // Include database connection and functions
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 
-// Admin information
-$admin_name = isset($_SESSION['admin_name']) ? $_SESSION['admin_name'] : "Library Admin";
-$admin_id = isset($_SESSION['admin_id']) ? $_SESSION['admin_id'] : 1;
-$is_superadmin = $_SESSION['is_superadmin'] ?? false;
+// Admin information from session
+$admin_name = $current_admin['name'];
+$admin_id = $current_admin['id'];
+$is_superadmin = $current_admin['is_superadmin'];
 
 // Set display name for dashboard header
-$display_name = $is_superadmin ? "Super Admin" : $admin_name;
-
-// Add last login information
-$last_login = isset($_SESSION['last_login']) ? $_SESSION['last_login'] : date("Y-m-d H:i:s");
+$display_name = $admin_name;
 
 // Dashboard Statistics - Fetch from database
 try {

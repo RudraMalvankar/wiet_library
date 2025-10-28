@@ -1,21 +1,16 @@
 <?php
-// Student Dashboard PHP File
-// This file contains the complete student library dashboard
-// Session management and authentication would be added here
+// Admin Layout - Main Dashboard Layout File
+// Includes session check and authentication
 
-// Start session for user authentication
-session_start();
+// Include session check and authentication
+require_once 'session_check.php';
 
-// Placeholder for authentication check
-// if (!isset($_SESSION['student_id'])) {
-//     header('Location: login.php');
-//     exit();
-// }
-
-// Get admin information from session
-$admin_name = $_SESSION['admin_name'] ?? 'Admin User';
-$admin_id = $_SESSION['admin_id'] ?? 'ADM2024001';
-$is_superadmin = $_SESSION['is_superadmin'] ?? false;
+// Get admin information from session (already set by session_check.php)
+$admin_name = $current_admin['name'];
+$admin_id = $current_admin['id'];
+$admin_email = $current_admin['email'];
+$admin_role = $current_admin['role'];
+$is_superadmin = $current_admin['is_superadmin'];
 ?>
 
 <!DOCTYPE html>
@@ -129,12 +124,49 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
     cursor: pointer;
     padding: 8px;
     border-radius: 4px;
-    display: none;
-    /* Hidden by default, shown only on mobile */
+    display: block;
+    /* Always visible for sidebar collapse/expand */
+    transition: all 0.3s ease;
+    position: relative;
   }
 
   .sidebar-toggle:hover {
     background-color: rgba(38, 60, 121, 0.1);
+    transform: scale(1.1);
+  }
+
+  .sidebar-toggle:active {
+    transform: scale(0.95);
+  }
+
+  /* Tooltip for sidebar toggle */
+  .sidebar-toggle::after {
+    content: 'Toggle Sidebar';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(5px);
+    background: rgba(38, 60, 121, 0.95);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 1001;
+  }
+
+  .sidebar-toggle:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(8px);
+  }
+
+  @media (max-width: 768px) {
+    .sidebar-toggle::after {
+      content: 'Menu';
+    }
   }
 
   .navbar-right {
@@ -188,8 +220,27 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
     overflow-x: hidden;
     /* Hide horizontal scroll */
     z-index: 998;
-    transition: transform 0.3s ease;
+    transition: all 0.3s ease;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Sidebar collapsed state */
+  .sidebar.collapsed {
+    width: 60px;
+  }
+
+  .sidebar.collapsed .sidebar-link span {
+    display: none;
+  }
+
+  .sidebar.collapsed .sidebar-icon {
+    margin-right: 0;
+    font-size: 20px;
+  }
+
+  .sidebar.collapsed .sidebar-link {
+    justify-content: center;
+    padding: 12px 10px;
   }
 
   .sidebar-menu {
@@ -274,6 +325,12 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
     position: relative;
     z-index: 1;
     /* Ensure content is above watermark */
+    transition: margin-left 0.3s ease;
+  }
+
+  /* Main content when sidebar is collapsed */
+  .main-content.expanded {
+    margin-left: 60px;
   }
 
   /* Watermark - Fixed positioning to stay behind content */
@@ -295,6 +352,13 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
     pointer-events: none;
     /* Allow clicking through */
     background: transparent;
+    transition: left 0.3s ease, width 0.3s ease;
+  }
+
+  /* Watermark when sidebar is collapsed */
+  .watermark.expanded {
+    left: 60px;
+    width: calc(100vw - 60px);
   }
 
   .watermark img {
@@ -348,20 +412,6 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
       /* Smaller watermark on mobile */
       max-height: 200px;
       opacity: 0.25;
-    }
-
-    .sidebar-toggle {
-      display: block;
-      /* Show toggle button on mobile */
-    }
-
-    .navbar-title {
-      font-size: 18px;
-    }
-
-    .sidebar-toggle {
-      display: block;
-      /* Show toggle button on mobile */
     }
 
     .navbar-title {
@@ -446,13 +496,12 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
       </div>
       <div class="navbar-right">
         <p class="welcome-text">Welcome, <?php 
-            if ($is_superadmin && strpos($admin_name, 'Super Admin') === false) {
-                echo htmlspecialchars($admin_name) . ' (Super Admin)';
-            } else {
-                echo htmlspecialchars($admin_name);
+            echo htmlspecialchars($admin_name); 
+            if (!empty($admin_role)) {
+                echo ' <span style="font-size: 0.85em; opacity: 0.8;">(' . htmlspecialchars($admin_role) . ')</span>';
             }
         ?></p>
-        <a href="../index.php" class="logout-btn">
+        <a href="logout.php" class="logout-btn">
           <i class="fas fa-sign-out-alt"></i>
           Logout
         </a>
@@ -465,75 +514,117 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="dashboard">
             <i class="sidebar-icon fas fa-tachometer-alt"></i>
-            Dashboard
+            <span>Dashboard</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="analytics">
             <i class="sidebar-icon fas fa-chart-bar"></i>
-            Analytics
+            <span>Analytics</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="books-management">
             <i class="sidebar-icon fas fa-book-open"></i>
-            Books Management
+            <span>Books Management</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="student-management">
             <i class="sidebar-icon fas fa-user-graduate"></i>
-            Student Management
+            <span>Student Management</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="circulation">
             <i class="sidebar-icon fas fa-exchange-alt"></i>
-            Circulation
+            <span>Circulation</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="members">
             <i class="sidebar-icon fas fa-users"></i>
-            Members
+            <span>Members</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="book-assignments">
             <i class="sidebar-icon fas fa-clipboard-list"></i>
-            Book Assignments
+            <span>Book Assignments</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a href="#" class="sidebar-link" data-page="fine-management">
+            <i class="sidebar-icon fas fa-money-bill-wave"></i>
+            <span>Fine Management</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a href="#" class="sidebar-link" data-page="reports">
+            <i class="sidebar-icon fas fa-file-alt"></i>
+            <span>Reports</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a href="#" class="sidebar-link" data-page="inventory">
+            <i class="sidebar-icon fas fa-warehouse"></i>
+            <span>Inventory</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a href="#" class="sidebar-link" data-page="stock-verification">
+            <i class="sidebar-icon fas fa-check-circle"></i>
+            <span>Stock Verification</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="library-events">
             <i class="sidebar-icon fas fa-calendar-alt"></i>
-            Library Events
+            <span>Library Events</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="bulk-import">
             <i class="sidebar-icon fas fa-upload"></i>
-            Bulk Import
+            <span>Bulk Import</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a href="#" class="sidebar-link" data-page="qr-generator">
+            <i class="sidebar-icon fas fa-qrcode"></i>
+            <span>QR Generator</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a href="#" class="sidebar-link" data-page="backup-restore">
+            <i class="sidebar-icon fas fa-database"></i>
+            <span>Backup & Restore</span>
           </a>
         </li>
         <?php if ($is_superadmin): ?>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="manage-admins">
             <i class="sidebar-icon fas fa-user-shield"></i>
-            Admin Management
+            <span>Admin Management</span>
           </a>
         </li>
         <?php endif; ?>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="notifications">
             <i class="sidebar-icon fas fa-bell"></i>
-            Notifications
+            <span>Notifications</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
+          <a href="#" class="sidebar-link" data-page="change-password">
+            <i class="sidebar-icon fas fa-key"></i>
+            <span>Change Password</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="settings">
             <i class="sidebar-icon fas fa-cog"></i>
-            Settings
+            <span>Settings</span>
           </a>
         </li>
       </ul>
@@ -561,14 +652,39 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
       const sidebar = document.getElementById('sidebar');
       const sidebarLinks = document.querySelectorAll('.sidebar-link');
       const mainContent = document.getElementById('main-content');
+      const watermark = document.getElementById('watermark');
 
-      // Mobile sidebar toggle
+      // Desktop sidebar collapse/expand toggle
       if (sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
-          if (sidebar) {
+          if (window.innerWidth > 768) {
+            // Desktop: collapse/expand sidebar
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+            if (watermark) {
+              watermark.classList.toggle('expanded');
+            }
+            
+            // Save state to localStorage
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+          } else {
+            // Mobile: toggle sidebar open/close
             sidebar.classList.toggle('sidebar-open');
           }
         });
+      }
+
+      // Restore sidebar state from localStorage on page load (desktop only)
+      if (window.innerWidth > 768) {
+        const savedState = localStorage.getItem('sidebarCollapsed');
+        if (savedState === 'true') {
+          sidebar.classList.add('collapsed');
+          mainContent.classList.add('expanded');
+          if (watermark) {
+            watermark.classList.add('expanded');
+          }
+        }
       }
 
       // Close sidebar when clicking outside on mobile
@@ -594,6 +710,10 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
           // Get the page data attribute
           const page = this.getAttribute('data-page');
 
+          // Check if this is the same page - if yes, force reload
+          const currentHash = window.location.hash.substring(1);
+          const forceReload = (currentHash === page);
+
           // Update URL hash to maintain state
           window.location.hash = page;
 
@@ -602,15 +722,38 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
             sidebar.classList.remove('sidebar-open');
           }
 
-          // Load the page content
+          // Load the page content (force reload if same page)
+          if (forceReload) {
+            console.log(`Force reloading page: ${page}`);
+          }
           loadPage(page);
         });
       });
 
       // Function to load page content (you can modify this for PHP includes)
       function loadPage(page) {
-        // Use fetch to load PHP content dynamically
-        fetch(`${page}.php`)
+        // Show loading indicator
+        mainContent.innerHTML = `
+          <div style="text-align: center; padding: 60px;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 48px; color: #263c79; margin-bottom: 15px;"></i>
+            <p style="color: #666; font-size: 16px;">Loading ${page.replace(/-/g, ' ')}...</p>
+          </div>
+        `;
+
+        // Add cache busting parameter to force fresh data
+        const timestamp = new Date().getTime();
+        const url = `${page}.php?ajax=1&_t=${timestamp}`;
+
+        // Use fetch to load PHP content dynamically with no-cache headers
+        fetch(url, {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          },
+          cache: 'no-store'
+        })
           .then(response => {
             if (!response.ok) {
               throw new Error(`Page not found: ${page}`);
@@ -618,44 +761,31 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
             return response.text();
           })
           .then(html => {
+            // Clear any existing content and scripts
+            mainContent.innerHTML = '';
+            
+            // Remove any previously loaded scripts from this page
+            document.querySelectorAll(`script[data-page="${page}"]`).forEach(s => s.remove());
+            
+            // Insert the new content
             mainContent.innerHTML = html;
+            
             // Execute any scripts in the loaded content
             const scripts = mainContent.querySelectorAll('script');
-            scripts.forEach(script => {
+            scripts.forEach((script, index) => {
               const newScript = document.createElement('script');
+              newScript.setAttribute('data-page', page);
+              newScript.setAttribute('data-script-index', index);
+              
               if (script.src) {
-                newScript.src = script.src;
+                newScript.src = script.src + '?_t=' + timestamp;
+                newScript.async = false;
               } else {
                 newScript.textContent = script.textContent;
               }
-              document.head.appendChild(newScript);
-              setTimeout(() => {
-                try {
-                  document.head.removeChild(newScript);
-                } catch (e) {}
-              }, 0);
+              
+              document.body.appendChild(newScript);
             });
-              // Try calling common initialization functions from the loaded page
-              try {
-                const candidateFns = [
-                  `${page}Init`,
-                  `init_${page.replace(/-/g, '_')}`,
-                  `${page.replace(/-/g, '_')}Init`,
-                  'initPage',
-                  'loadBooksTable'
-                ];
-                candidateFns.forEach(fnName => {
-                  if (typeof window[fnName] === 'function') {
-                    try {
-                      window[fnName]();
-                    } catch (e) {
-                      console.warn('Error calling init function', fnName, e);
-                    }
-                  }
-                });
-              } catch (e) {
-                console.warn('Error while attempting to call page init functions', e);
-              }
           })
           .catch(error => {
             console.error('Error loading page:', error);
@@ -665,11 +795,14 @@ $is_superadmin = $_SESSION['is_superadmin'] ?? false;
                 <h3 style="color: #263c79; margin-bottom: 10px;">Page Not Found</h3>
                 <p>The requested page "${page}" could not be loaded.</p>
                 <p style="font-size: 14px; color: #666;">Please try again or contact support if the problem persists.</p>
+                <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #263c79; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                  <i class="fas fa-redo"></i> Reload Page
+                </button>
               </div>
             `;
           });
         // Update page title
-        document.title = `${page.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} - WIET College Library`;
+        document.title = `${page.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} - WIET College Library`;
       }
 
       // Initialize - check URL or set default active state

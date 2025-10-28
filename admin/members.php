@@ -1,4 +1,7 @@
 <?php
+// Include AJAX handler FIRST (before session_start)
+require_once 'ajax-handler.php';
+
 session_start();
 
 // Include database connection and functions

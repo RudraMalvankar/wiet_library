@@ -1,4 +1,7 @@
 <?php
+// Include AJAX handler FIRST
+require_once 'ajax-handler.php';
+
 session_start();
 
 // No database connection needed for frontend development

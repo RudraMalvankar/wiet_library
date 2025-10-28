@@ -2,6 +2,9 @@
 // Admin Analytics Page - Library Administration Staff
 // This file will be included in the main-content area of admin/layout.php
 
+// Include AJAX handler FIRST
+require_once 'ajax-handler.php';
+
 session_start();
 require_once '../includes/db_connect.php';
 
