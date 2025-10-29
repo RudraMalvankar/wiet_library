@@ -1,24 +1,14 @@
 <?php
 // Student Dashboard PHP File
 // This file contains the complete student library dashboard
-// Session management and authentication would be added here
+// Session management and authentication
 
-// Start session for user authentication
-session_start();
+// Include session check - validates login and prevents unauthorized access
+require_once 'student_session_check.php';
 
-// Placeholder for authentication check
-// if (!isset($_SESSION['student_id'])) {
-//     header('Location: login.php');
-//     exit();
-// }
-
-// Get student information (placeholder)
-$student_name = "John Doe";
-$student_id = "STU2024001";
-
-// Store in session for child components
-$_SESSION['student_name'] = $student_name;
-$_SESSION['student_id'] = $student_id;
+// Student information is now available from session check
+// Variables available: $student_id, $member_no, $student_name, $student_email, 
+// $student_branch, $student_course, $student_prn, $books_issued
 ?>
 
 <!DOCTYPE html>

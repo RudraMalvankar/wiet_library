@@ -2,13 +2,22 @@
 // Search Books Content - Advanced book search functionality
 // This file will be included in the main content area
 
+// Start session and check authentication
+session_start();
+
+// Redirect to login if not authenticated
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header('Location: student_login.php');
+    exit();
+}
+
 // Include database connection and functions
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 
 // Session variables for student info
-$student_name = isset($_SESSION['student_name']) ? $_SESSION['student_name'] : 'John Doe';
-$student_id = isset($_SESSION['student_id']) ? $_SESSION['student_id'] : 'STU2024001';
+$student_name = $_SESSION['student_name'] ?? 'Student';
+$student_id = $_SESSION['student_id'] ?? null;
 
 // ============================================================
 // DATA SOURCE: DATABASE (Fully Integrated)
@@ -22,21 +31,20 @@ $student_id = isset($_SESSION['student_id']) ? $_SESSION['student_id'] : 'STU202
 try {
     $featured_books = [];
     
-    // Get available books sorted by CallNo descending (newest first)
+    // Get available books sorted by CatNo descending (newest first)
     $query = "SELECT 
-        b.CallNo,
+        b.CatNo,
         b.Title,
         b.Author1,
         b.ISBN,
         b.Subject as category,
-        b.Location,
         COUNT(h.AccNo) as total_copies,
         SUM(CASE WHEN h.Status = 'Available' THEN 1 ELSE 0 END) as copies_available
-    FROM books b
-    LEFT JOIN holding h ON b.CallNo = h.CallNo
-    GROUP BY b.CallNo
+    FROM Books b
+    LEFT JOIN Holding h ON b.CatNo = h.CatNo
+    GROUP BY b.CatNo
     HAVING copies_available > 0
-    ORDER BY b.CallNo DESC
+    ORDER BY b.CatNo DESC
     LIMIT 6";
     
     $stmt = $pdo->query($query);
@@ -54,7 +62,7 @@ try {
         }
         
         $featured_books[] = [
-            'call_no' => $row['CallNo'],
+            'cat_no' => $row['CatNo'],
             'title' => $row['Title'],
             'author' => $row['Author1'],
             'isbn' => $row['ISBN'] ?: 'N/A',
@@ -62,61 +70,27 @@ try {
             'status' => $status,
             'copies_available' => $copies_available,
             'total_copies' => $total_copies,
-            'location' => $row['Location'] ?: 'Library'
+            'location' => 'Library'
         ];
     }
     
     // Get unique categories/subjects
-    $categoriesQuery = "SELECT DISTINCT Subject FROM books WHERE Subject IS NOT NULL AND Subject != '' ORDER BY Subject";
+    $categoriesQuery = "SELECT DISTINCT Subject FROM Books WHERE Subject IS NOT NULL AND Subject != '' ORDER BY Subject";
     $categoriesStmt = $pdo->query($categoriesQuery);
     $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
     
     if (empty($categories)) {
-        $categories = ['Computer Science', 'Mathematics', 'Engineering', 'General'];
+        $categories = [];
     }
     
 } catch (Exception $e) {
-    // Fallback to dummy data
-    $featured_books = [
-        [
-            'call_no' => 'CS001',
-            'title' => 'Clean Code: A Handbook of Agile Software Craftsmanship',
-            'author' => 'Robert C. Martin',
-            'isbn' => '978-0132350884',
-            'category' => 'Programming',
-            'status' => 'Available',
-            'copies_available' => 3,
-            'total_copies' => 5,
-            'location' => 'CS-Section-A, Shelf 12'
-        ],
-        [
-            'call_no' => 'CS002',
-            'title' => 'Introduction to Algorithms',
-            'author' => 'Thomas H. Cormen',
-            'isbn' => '978-0262033848',
-            'category' => 'Computer Science',
-            'status' => 'Available',
-            'copies_available' => 2,
-            'total_copies' => 3,
-            'location' => 'CS-Section-B, Shelf 8'
-        ]
-    ];
-    
-    $categories = [
-        'Computer Science',
-        'Programming',
-        'Software Engineering',
-        'Mathematics'
-    ];
+    error_log("Search Books - Error fetching data: " . $e->getMessage());
+    $featured_books = [];
+    $categories = [];
 }
 
-// Recent searches would come from a search history table (placeholder for now)
-$recent_searches = [
-    'Data Structures',
-    'Machine Learning',
-    'Java Programming',
-    'Web Development'
-];
+// Recent searches - would come from SearchHistory table (placeholder for now)
+$recent_searches = [];
 ?>
 
 <style>
@@ -570,6 +544,7 @@ $recent_searches = [
 </div>
 
 <!-- Quick Searches -->
+<?php if (count($recent_searches) > 0): ?>
 <div class="quick-searches">
     <h3 class="quick-search-title">Recent Searches</h3>
     <div class="search-tags">
@@ -580,6 +555,7 @@ $recent_searches = [
         <?php endforeach; ?>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- Search Results -->
 <div class="results-section" id="searchResults" style="display: none;">
@@ -660,113 +636,122 @@ $recent_searches = [
     }
 
     async function searchBooks() {
+        // Get form values
+        const title = document.getElementById('title').value.trim();
+        const author = document.getElementById('author').value.trim();
+        const isbn = document.getElementById('isbn').value.trim();
+        const category = document.getElementById('category').value;
+        const keywords = document.getElementById('keywords').value.trim();
+
+        // Check if at least one field is filled
+        if (!title && !author && !isbn && !category && !keywords) {
+            alert('Please enter at least one search criteria.');
+            return;
+        }
+
         // Show loading state
         const resultsSection = document.getElementById('searchResults');
         const resultsContainer = document.getElementById('resultsContainer');
         const resultsCount = document.getElementById('resultsCount');
 
         resultsSection.style.display = 'block';
-        resultsContainer.innerHTML = '<div style="padding: 40px; text-align: center; color: #666;"><i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i><br>Searching books...</div>';
+        resultsContainer.innerHTML = `
+            <div style="padding: 40px; text-align: center; color: #666;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px; color: #263c79;"></i>
+                <br><strong>Searching books...</strong>
+            </div>
+        `;
 
-        // Get search parameters
-        const searchQuery = document.getElementById('searchQuery').value;
-        const searchType = document.getElementById('searchType').value;
-        const category = document.getElementById('category').value;
-        const availability = document.getElementById('availability').value;
+        // Build query parameters
+        const params = new URLSearchParams();
+        if (title) params.append('title', title);
+        if (author) params.append('author', author);
+        if (isbn) params.append('isbn', isbn);
+        if (category) params.append('subject', category);
+        if (keywords) params.append('keywords', keywords);
 
         try {
-            // Build query string
-            let apiUrl = '../admin/api/books.php?action=search';
-            if (searchQuery) {
-                apiUrl += `&query=${encodeURIComponent(searchQuery)}`;
+            // Make API call to search books
+            const response = await fetch(`../admin/api/books.php?action=list&${params.toString()}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-            if (category) {
-                apiUrl += `&subject=${encodeURIComponent(category)}`;
-            }
+            
+            const data = await response.json();
 
-            const response = await fetch(apiUrl);
-            const result = await response.json();
+            if (data.success && data.data) {
+                const books = data.data;
+                resultsCount.textContent = `${books.length} book${books.length !== 1 ? 's' : ''} found`;
 
-            let books = [];
-            if (result.success && result.data) {
-                // Filter by availability if needed
-                books = result.data.filter(book => {
-                    if (availability === 'available') {
-                        return (book.AvailableCopies || 0) > 0;
-                    } else if (availability === 'unavailable') {
-                        return (book.AvailableCopies || 0) === 0;
-                    }
-                    return true; // 'all'
-                });
-            }
-
-            resultsCount.textContent = `${books.length} books found`;
-
-            if (books.length > 0) {
-                resultsContainer.innerHTML = `
-                <div class="book-grid">
-                    ${books.map(book => {
-                        const available = book.AvailableCopies || 0;
-                        const total = book.TotalCopies || 0;
-                        let status = 'available';
-                        let statusText = 'Available';
-                        
-                        if (available === 0) {
-                            status = 'unavailable';
-                            statusText = 'Not Available';
-                        } else if (available === 1) {
-                            status = 'limited';
-                            statusText = 'Limited';
-                        }
-                        
-                        return `
-                        <div class="book-card">
-                            <div class="book-card-header">
-                                <h4 class="book-card-title">${book.Title}</h4>
-                                <div class="book-card-author">by ${book.Author1}</div>
-                                <div class="book-card-isbn">ISBN: ${book.ISBN || 'N/A'}</div>
-                            </div>
-                            <div class="book-card-details">
-                                <div class="detail-item">
-                                    <div class="detail-label">Category</div>
-                                    <div class="detail-value">${book.Subject || 'General'}</div>
+                if (books.length > 0) {
+                    resultsContainer.innerHTML = `
+                    <div class="book-grid">
+                        ${books.map(book => {
+                            const available = book.AvailableCopies || 0;
+                            const total = book.TotalCopies || 0;
+                            let status = 'available';
+                            let statusText = 'Available';
+                            
+                            if (available === 0) {
+                                status = 'unavailable';
+                                statusText = 'Not Available';
+                            } else if (available <= 2) {
+                                status = 'limited';
+                                statusText = 'Limited';
+                            }
+                            
+                            return `
+                            <div class="book-card">
+                                <div class="book-card-header">
+                                    <h4 class="book-card-title">${book.Title}</h4>
+                                    <div class="book-card-author">by ${book.Author1 || 'Unknown Author'}</div>
+                                    <div class="book-card-isbn">ISBN: ${book.ISBN || 'N/A'}</div>
                                 </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">Available</div>
-                                    <div class="detail-value">${available}/${total}</div>
+                                <div class="book-card-details">
+                                    <div class="detail-item">
+                                        <div class="detail-label">Category</div>
+                                        <div class="detail-value">${book.Subject || 'General'}</div>
+                                    </div>
+                                    <div class="detail-item">
+                                        <div class="detail-label">Available</div>
+                                        <div class="detail-value">${available}/${total}</div>
+                                    </div>
+                                </div>
+                                <div class="availability-status">
+                                    <span class="status-badge status-${status}">${statusText}</span>
+                                    <span class="copies-info">${available} copies available</span>
+                                </div>
+                                <div class="location-info">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    Library
+                                </div>
+                                <div class="book-actions">
+                                    <button class="reserve-btn" ${available === 0 ? 'disabled' : ''}>
+                                        <i class="fas fa-bookmark"></i>
+                                        ${available > 0 ? 'Reserve' : 'Unavailable'}
+                                    </button>
+                                    <button class="details-btn" onclick="viewBookDetails('${book.CatNo}')">
+                                        <i class="fas fa-info-circle"></i>
+                                        Details
+                                    </button>
                                 </div>
                             </div>
-                            <div class="availability-status">
-                                <span class="status-badge status-${status}">${statusText}</span>
-                                <span class="copies-info">${available} copies available</span>
-                            </div>
-                            <div class="location-info">
-                                <i class="fas fa-map-marker-alt"></i>
-                                ${book.Location || 'Library'}
-                            </div>
-                            <div class="book-actions">
-                                <button class="reserve-btn" ${available === 0 ? 'disabled' : ''}>
-                                    <i class="fas fa-bookmark"></i>
-                                    Reserve
-                                </button>
-                                <button class="details-btn" onclick="viewBookDetails('${book.CallNo}')">
-                                    <i class="fas fa-info-circle"></i>
-                                    Details
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    }).join('')}
-                </div>
-            `;
+                        `;
+                        }).join('')}
+                    </div>
+                `;
+                } else {
+                    resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        <i class="fas fa-search"></i>
+                        <h3>No Books Found</h3>
+                        <p>Try adjusting your search criteria or browse our featured books below.</p>
+                    </div>
+                `;
+                }
             } else {
-                resultsContainer.innerHTML = `
-                <div class="no-results">
-                    <i class="fas fa-search"></i>
-                    <h3>No Books Found</h3>
-                    <p>Try adjusting your search criteria or browse our featured books below.</p>
-                </div>
-            `;
+                throw new Error('Invalid response format');
             }
         } catch (error) {
             console.error('Error searching books:', error);

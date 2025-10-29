@@ -542,6 +542,12 @@ $is_superadmin = $current_admin['is_superadmin'];
           </a>
         </li>
         <li class="sidebar-item">
+          <a href="#" class="sidebar-link" data-page="footfall-analytics">
+            <i class="sidebar-icon fas fa-chart-line"></i>
+            <span>Footfall Analytics</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="members">
             <i class="sidebar-icon fas fa-users"></i>
             <span>Members</span>

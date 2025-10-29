@@ -5,23 +5,87 @@
 // Session management
 session_start();
 
-// Mock data for demonstration - replace with actual database queries
-$student_name = isset($_SESSION['student_name']) ? $_SESSION['student_name'] : "John Doe";
-$student_id = isset($_SESSION['student_id']) ? $_SESSION['student_id'] : "STU2024001";
+// Redirect to login if not authenticated
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header('Location: student_login.php');
+    exit();
+}
 
-$digital_card = [
-    'member_no' => 'M2024001',
-    'student_id' => $student_id,
-    'name' => $student_name,
-    'course' => 'B.Tech Computer Science',
-    'year' => '3rd Year',
-    'department' => 'Computer Science & Engineering',
-    'issue_date' => '2024-08-15',
-    'expiry_date' => '2025-08-14',
-    'status' => 'Active',
-    'barcode' => '123456789012',
-    'qr_code' => $student_id . '_' . date('Y')
-];
+// Include database connection
+require_once '../includes/db_connect.php';
+
+// Get student information from session
+$student_id = $_SESSION['student_id'] ?? null;
+$member_no = $_SESSION['member_no'] ?? null;
+
+// Fetch real student data from database
+$digital_card = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT 
+            s.StudentID,
+            s.MemberNo,
+            s.FirstName,
+            s.MiddleName,
+            s.Surname,
+            s.Email,
+            s.Mobile,
+            s.Branch,
+            s.CourseName,
+            s.PRN,
+            s.ValidTill,
+            s.QRCode,
+            s.CardColour,
+            s.Photo,
+            m.MemberName,
+            m.AdmissionDate,
+            m.Status,
+            m.BooksIssued,
+            m.Entitlement
+        FROM Student s
+        INNER JOIN Member m ON s.MemberNo = m.MemberNo
+        WHERE s.StudentID = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$student_id]);
+    $student_data = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($student_data) {
+        $digital_card = [
+            'member_no' => 'M' . str_pad($student_data['MemberNo'], 7, '0', STR_PAD_LEFT),
+            'student_id' => $student_data['PRN'] ?? $student_data['StudentID'],
+            'name' => $student_data['MemberName'],
+            'course' => $student_data['CourseName'] ?? 'N/A',
+            'year' => '', // Can be calculated from AdmissionDate
+            'department' => $student_data['Branch'] ?? 'N/A',
+            'issue_date' => $student_data['AdmissionDate'] ?? date('Y-m-d'),
+            'expiry_date' => $student_data['ValidTill'] ?? 'N/A',
+            'status' => $student_data['Status'],
+            'barcode' => str_pad($student_data['MemberNo'], 12, '0', STR_PAD_LEFT),
+            'qr_code' => $student_data['QRCode'] ?? ($student_data['PRN'] . '_' . date('Y')),
+            'email' => $student_data['Email'],
+            'mobile' => $student_data['Mobile'],
+            'books_issued' => $student_data['BooksIssued'],
+            'entitlement' => $student_data['Entitlement'] ?? 'Standard',
+            'photo' => $student_data['Photo']
+        ];
+    }
+} catch (PDOException $e) {
+    error_log("Digital ID fetch error: " . $e->getMessage());
+    $digital_card = [
+        'member_no' => 'M' . str_pad($member_no, 7, '0', STR_PAD_LEFT),
+        'student_id' => $_SESSION['student_prn'] ?? $student_id,
+        'name' => $_SESSION['student_name'] ?? 'Student',
+        'course' => $_SESSION['student_course'] ?? 'N/A',
+        'year' => '',
+        'department' => $_SESSION['student_branch'] ?? 'N/A',
+        'issue_date' => date('Y-m-d'),
+        'expiry_date' => 'N/A',
+        'status' => 'Active',
+        'barcode' => str_pad($member_no, 12, '0', STR_PAD_LEFT),
+        'qr_code' => $student_id . '_' . date('Y')
+    ];
+}
 
 $card_features = [
     'Library Access' => 'Physical and digital library access',

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Footfall System Diagnostic</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #263c79 0%, #1a2a52 100%);
+            padding: 30px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #263c79;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #cfac69;
+            padding-bottom: 15px;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #263c79;
+        }
+        .test-section h2 {
+            color: #263c79;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        .test-item {
+            padding: 12px;
+            margin: 8px 0;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .status {
+            width: 80px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status.success { background: #d1fae5; color: #065f46; }
+        .status.error { background: #fee2e2; color: #991b1b; }
+        .status.pending { background: #fef3c7; color: #92400e; }
+        .test-name { flex: 1; color: #374151; }
+        .test-result { color: #6b7280; font-size: 14px; }
+        button {
+            background: #263c79;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { background: #1e2d5f; transform: translateY(-2px); }
+        .button-group { margin: 20px 0; }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+            margin: 10px 0;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .alert.info { background: #dbeafe; color: #1e40af; border-left: 4px solid #3b82f6; }
+        .alert.warning { background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Footfall System Diagnostic Tool</h1>
+        <p style="color: #6b7280; margin-top: 10px;">Check if all footfall system components are working correctly</p>
+
+        <div class="button-group">
+            <button onclick="runAllTests()">▶️ Run All Tests</button>
+            <button onclick="testDatabase()">🗄️ Test Database</button>
+            <button onclick="testAPIs()">🔌 Test APIs</button>
+            <button onclick="testFiles()">📁 Test Files</button>
+        </div>
+
+        <!-- Database Tests -->
+        <div class="test-section">
+            <h2>📊 Database Tests</h2>
+            <div id="dbTests">
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">Footfall table exists</span>
+                    <span class="test-result" id="db-table"></span>
+                </div>
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">Required columns exist (EntryTime, ExitTime, Purpose, Status, EntryMethod, WorkstationUsed)</span>
+                    <span class="test-result" id="db-columns"></span>
+                </div>
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">SQL Views created (FootfallDailyStats, FootfallHourlyStats, MemberFootfallSummary)</span>
+                    <span class="test-result" id="db-views"></span>
+                </div>
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">Sample data exists</span>
+                    <span class="test-result" id="db-data"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Tests -->
+        <div class="test-section">
+            <h2>🔌 API Endpoint Tests</h2>
+            <div id="apiTests">
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">checkin.php</span>
+                    <span class="test-result" id="api-checkin"></span>
+                </div>
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">checkout.php</span>
+                    <span class="test-result" id="api-checkout"></span>
+                </div>
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">footfall-stats.php</span>
+                    <span class="test-result" id="api-stats"></span>
+                </div>
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">footfall-records.php</span>
+                    <span class="test-result" id="api-records"></span>
+                </div>
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">analytics-data.php</span>
+                    <span class="test-result" id="api-analytics"></span>
+                </div>
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">recent-visitors.php</span>
+                    <span class="test-result" id="api-recent"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- File Tests -->
+        <div class="test-section">
+            <h2>📁 File Existence Tests</h2>
+            <div id="fileTests">
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">admin/footfall-analytics.php</span>
+                    <span class="test-result" id="file-analytics"></span>
+                </div>
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">footfall/scanner.php</span>
+                    <span class="test-result" id="file-scanner"></span>
+                </div>
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">student/library-checkin.php</span>
+                    <span class="test-result" id="file-checkin"></span>
+                </div>
+                <div class="test-item">
+                    <span class="status pending">PENDING</span>
+                    <span class="test-name">student/my-footfall.php</span>
+                    <span class="test-result" id="file-history"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="alert info">
+            <strong>ℹ️ How to Use:</strong>
+            <ul style="margin-top: 10px; margin-left: 20px;">
+                <li>Click "Run All Tests" to check entire system</li>
+                <li>Green = Working correctly</li>
+                <li>Red = Error detected</li>
+                <li>Yellow = Pending test</li>
+            </ul>
+        </div>
+
+        <div class="alert warning">
+            <strong>⚠️ Common Issues:</strong>
+            <ul style="margin-top: 10px; margin-left: 20px;">
+                <li><strong>Camera not starting:</strong> Allow browser camera permissions (must use HTTPS or localhost)</li>
+                <li><strong>Navigation link not working:</strong> Clear browser cache (Ctrl+F5)</li>
+                <li><strong>APIs failing:</strong> Check database connection in includes/db_connect.php</li>
+                <li><strong>No data showing:</strong> Run database migration: database/migrations/006_enhance_footfall_tracking.sql</li>
+            </ul>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Check if page is opened via web server or file://
+        if (window.location.protocol === 'file:') {
+            document.body.innerHTML = `
+                <div style="max-width: 800px; margin: 50px auto; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                    <h1 style="color: #dc2626; margin-bottom: 20px;">⚠️ Wrong Access Method</h1>
+                    <p style="font-size: 18px; margin-bottom: 20px; color: #333;">
+                        This page must be opened through a web server, not as a file.
+                    </p>
+                    <div style="background: #fee2e2; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626; margin: 20px 0;">
+                        <strong style="color: #991b1b;">Current URL:</strong><br>
+                        <code style="color: #991b1b; font-size: 14px;">${window.location.href}</code>
+                    </div>
+                    <div style="background: #d1fae5; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
+                        <strong style="color: #065f46;">✓ Correct URLs:</strong><br>
+                        <code style="color: #065f46; display: block; margin: 5px 0;">http://localhost/wiet_lib/admin/footfall-diagnostic-simple.php</code>
+                        <code style="color: #065f46; display: block; margin: 5px 0;">http://localhost/wiet_lib/admin/footfall-diagnostic.html</code>
+                    </div>
+                    <p style="margin-top: 30px; font-size: 16px; color: #666;">
+                        <strong>Recommended:</strong> Use the PHP version for better reliability:<br>
+                        <a href="http://localhost/wiet_lib/admin/footfall-diagnostic-simple.php" 
+                           style="display: inline-block; margin-top: 15px; padding: 12px 24px; background: linear-gradient(135deg, #263c79 0%, #1e2d5f 100%); color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
+                            🚀 Open Diagnostic Tool
+                        </a>
+                    </p>
+                </div>
+            `;
+            throw new Error('Page must be accessed via web server');
+        }
+
+        // Get base path for API calls
+        const basePath = window.location.pathname.includes('admin/') 
+            ? './' 
+            : './admin/';
+
+        async function runAllTests() {
+            await testDatabase();
+            await testAPIs();
+            await testFiles();
+        }
+
+        async function testDatabase() {
+            const tests = [
+                { id: 'db-table', name: 'Footfall table', query: 'table' },
+                { id: 'db-columns', name: 'Required columns', query: 'columns' },
+                { id: 'db-views', name: 'SQL Views', query: 'views' },
+                { id: 'db-data', name: 'Sample data', query: 'data' }
+            ];
+
+            for (const test of tests) {
+                try {
+                    const url = `${basePath}diagnostic-api.php?test=${test.query}`;
+                    const response = await fetch(url);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        const text = await response.text();
+                        throw new Error(`Not JSON response. Got: ${text.substring(0, 100)}`);
+                    }
+                    
+                    const data = await response.json();
+                    updateTestStatus(test.id, data.success, data.message);
+                } catch (error) {
+                    updateTestStatus(test.id, false, `${error.message} (Check if diagnostic-api.php exists)`);
+                }
+            }
+        }
+
+        async function testAPIs() {
+            const apis = [
+                { id: 'api-checkin', path: 'footfall/api/checkin.php' },
+                { id: 'api-checkout', path: 'footfall/api/checkout.php' },
+                { id: 'api-stats', path: 'footfall/api/footfall-stats.php' },
+                { id: 'api-records', path: 'footfall/api/footfall-records.php' },
+                { id: 'api-analytics', path: 'footfall/api/analytics-data.php' },
+                { id: 'api-recent', path: 'footfall/api/recent-visitors.php' }
+            ];
+
+            for (const api of apis) {
+                try {
+                    const url = `../${api.path}`;
+                    const response = await fetch(url);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        updateTestStatus(api.id, true, `✓ Returns JSON (${response.status})`);
+                    } else {
+                        updateTestStatus(api.id, false, `✗ Not JSON response (${contentType})`);
+                    }
+                } catch (error) {
+                    updateTestStatus(api.id, false, `${error.message}`);
+                }
+            }
+        }
+
+        async function testFiles() {
+            const files = [
+                { id: 'file-analytics', path: 'admin/footfall-analytics.php' },
+                { id: 'file-scanner', path: 'footfall/scanner.php' },
+                { id: 'file-checkin', path: 'student/library-checkin.php' },
+                { id: 'file-history', path: 'student/my-footfall.php' }
+            ];
+
+            for (const file of files) {
+                try {
+                    const response = await fetch(`../${file.path}`, { method: 'HEAD' });
+                    updateTestStatus(file.id, response.ok, response.ok ? `✓ File exists (${response.status})` : `✗ File not found (${response.status})`);
+                } catch (error) {
+                    updateTestStatus(file.id, false, error.message);
+                }
+            }
+        }
+
+        function updateTestStatus(id, success, message) {
+            const element = document.getElementById(id);
+            const item = element.closest('.test-item');
+            const statusBadge = item.querySelector('.status');
+            
+            statusBadge.classList.remove('pending', 'success', 'error');
+            statusBadge.classList.add(success ? 'success' : 'error');
+            statusBadge.textContent = success ? 'PASS' : 'FAIL';
+            
+            element.textContent = message;
+        }
+    </script>
+</body>
+</html>

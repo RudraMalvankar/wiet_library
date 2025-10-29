@@ -2,52 +2,180 @@
 // My Profile Content - Student profile management and settings
 // This file will be included in the main content area
 
-// Session variables for student info
-$student_name = isset($_SESSION['student_name']) ? $_SESSION['student_name'] : 'John Doe';
-$student_id = isset($_SESSION['student_id']) ? $_SESSION['student_id'] : 'STU2024001';
+// Start session and check authentication
+session_start();
 
-// Mock data for demonstration - replace with actual database queries
+// Redirect to login if not authenticated
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header('Location: student_login.php');
+    exit();
+}
+
+// Include database connection
+require_once '../includes/db_connect.php';
+
+// Session variables for student info
+$student_id = $_SESSION['student_id'] ?? null;
+$member_no = $_SESSION['member_no'] ?? null;
+
+// Fetch real student profile data from database
 $student_profile = [
-    'personal_info' => [
-        'full_name' => 'John Doe',
-        'student_id' => 'STU2024001',
-        'email' => 'john.doe@wiet.edu.in',
-        'phone' => '+91 9876543210',
-        'date_of_birth' => '2003-05-15',
-        'gender' => 'Male',
-        'address' => '123 Student Colony, Mumbai, Maharashtra - 400001'
-    ],
-    'academic_info' => [
-        'course' => 'Bachelor of Technology',
-        'branch' => 'Computer Science & Engineering',
-        'year' => '3rd Year',
-        'semester' => '6th Semester',
-        'roll_number' => 'CSE2022001',
-        'admission_year' => '2022',
-        'expected_graduation' => '2026'
-    ],
-    'library_stats' => [
-        'membership_since' => '2022-08-15',
-        'total_books_borrowed' => 47,
-        'current_borrowed' => 3,
-        'total_visits' => 156,
-        'total_fines_paid' => 150,
-        'favorite_sections' => ['Computer Science', 'Mathematics', 'Fiction']
-    ],
-    'preferences' => [
-        'notification_email' => true,
-        'notification_sms' => false,
-        'reminder_before_due' => 2,
-        'preferred_language' => 'English',
-        'privacy_profile' => 'Private'
-    ]
+    'personal_info' => [],
+    'academic_info' => [],
+    'library_stats' => [],
+    'preferences' => []
 ];
 
-$recent_activity = [
-    ['action' => 'Borrowed "Clean Code" by Robert Martin', 'date' => '2025-09-20', 'type' => 'borrow'],
-    ['action' => 'Renewed "Introduction to Algorithms"', 'date' => '2025-09-18', 'type' => 'renew'],
-    ['action' => 'Returned "Database Systems" by Korth', 'date' => '2025-09-15', 'type' => 'return'],
-    ['action' => 'Updated email preferences', 'date' => '2025-09-10', 'type' => 'settings'],
+$recent_activity = [];
+
+try {
+    // Fetch personal and academic info
+    $stmt = $pdo->prepare("
+        SELECT 
+            s.*,
+            m.MemberName,
+            m.Phone,
+            m.Email as MemberEmail,
+            m.AdmissionDate,
+            m.Status,
+            m.BooksIssued
+        FROM Student s
+        INNER JOIN Member m ON s.MemberNo = m.MemberNo
+        WHERE s.StudentID = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$student_id]);
+    $data = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($data) {
+        $student_profile['personal_info'] = [
+            'full_name' => $data['MemberName'],
+            'student_id' => $data['PRN'] ?? $data['StudentID'],
+            'email' => $data['Email'] ?? $data['MemberEmail'],
+            'phone' => $data['Mobile'] ?? $data['Phone'],
+            'date_of_birth' => $data['DOB'] ?? 'N/A',
+            'gender' => $data['Gender'] ?? 'N/A',
+            'blood_group' => $data['BloodGroup'] ?? 'N/A',
+            'address' => $data['Address'] ?? 'N/A'
+        ];
+        
+        $student_profile['academic_info'] = [
+            'course' => $data['CourseName'] ?? 'N/A',
+            'branch' => $data['Branch'] ?? 'N/A',
+            'year' => '', // Calculate from admission date
+            'semester' => '', // Calculate from admission date
+            'roll_number' => $data['PRN'] ?? 'N/A',
+            'admission_year' => date('Y', strtotime($data['AdmissionDate'])),
+            'expected_graduation' => '' // Calculate
+        ];
+        
+        // Fetch library statistics
+        $stats_stmt = $pdo->prepare("
+            SELECT 
+                COUNT(DISTINCT c.CirculationID) as total_borrowed,
+                COUNT(DISTINCT CASE WHEN c.Status = 'Active' THEN c.CirculationID END) as current_borrowed,
+                COALESCE(SUM(f.Amount), 0) as total_fines
+            FROM Student s
+            LEFT JOIN Member m ON s.MemberNo = m.MemberNo
+            LEFT JOIN Circulation c ON m.MemberNo = c.MemberNo
+            LEFT JOIN FinePayments f ON m.MemberNo = f.MemberNo
+            WHERE s.StudentID = ?
+            GROUP BY s.StudentID
+        ");
+        $stats_stmt->execute([$student_id]);
+        $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Fetch footfall count
+        $footfall_stmt = $pdo->prepare("
+            SELECT COUNT(*) as total_visits 
+            FROM footfall 
+            WHERE MemberNo = ?
+        ");
+        $footfall_stmt->execute([$member_no]);
+        $footfall = $footfall_stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $student_profile['library_stats'] = [
+            'membership_since' => $data['AdmissionDate'] ?? 'N/A',
+            'total_books_borrowed' => $stats['total_borrowed'] ?? 0,
+            'current_borrowed' => $stats['current_borrowed'] ?? 0,
+            'total_visits' => $footfall['total_visits'] ?? 0,
+            'total_fines_paid' => $stats['total_fines'] ?? 0,
+            'favorite_sections' => [$data['Branch']] // Based on branch
+        ];
+    }
+    
+    // Fetch recent activity
+    $activity_stmt = $pdo->prepare("
+        SELECT 
+            'Borrowed' as action,
+            b.Title as details,
+            c.IssueDate as date,
+            'borrow' as type
+        FROM Circulation c
+        INNER JOIN Holding h ON c.AccNo = h.AccNo
+        INNER JOIN Books b ON h.CallNo = b.CallNo
+        WHERE c.MemberNo = ?
+        
+        UNION ALL
+        
+        SELECT 
+            'Returned' as action,
+            b.Title as details,
+            r.ReturnDate as date,
+            'return' as type
+        FROM `Return` r
+        INNER JOIN Circulation c ON r.CirculationID = c.CirculationID
+        INNER JOIN Holding h ON c.AccNo = h.AccNo
+        INNER JOIN Books b ON h.CallNo = b.CallNo
+        WHERE c.MemberNo = ?
+        
+        ORDER BY date DESC
+        LIMIT 10
+    ");
+    $activity_stmt->execute([$member_no, $member_no]);
+    $recent_activity = $activity_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+} catch (PDOException $e) {
+    error_log("Profile fetch error: " . $e->getMessage());
+    // Use session data as fallback
+    $student_profile['personal_info'] = [
+        'full_name' => $_SESSION['student_name'] ?? 'Student',
+        'student_id' => $_SESSION['student_prn'] ?? $student_id,
+        'email' => $_SESSION['student_email'] ?? 'N/A',
+        'phone' => $_SESSION['student_mobile'] ?? 'N/A',
+        'date_of_birth' => 'N/A',
+        'gender' => 'N/A',
+        'address' => 'N/A'
+    ];
+    
+    $student_profile['academic_info'] = [
+        'course' => $_SESSION['student_course'] ?? 'N/A',
+        'branch' => $_SESSION['student_branch'] ?? 'N/A',
+        'year' => 'N/A',
+        'semester' => 'N/A',
+        'roll_number' => $_SESSION['student_prn'] ?? 'N/A',
+        'admission_year' => date('Y'),
+        'expected_graduation' => 'N/A'
+    ];
+    
+    $student_profile['library_stats'] = [
+        'membership_since' => date('Y-m-d'),
+        'total_books_borrowed' => 0,
+        'current_borrowed' => $_SESSION['books_issued'] ?? 0,
+        'total_visits' => 0,
+        'total_fines_paid' => 0,
+        'favorite_sections' => []
+    ];
+}
+
+$student_profile['preferences'] = [
+    'notification_email' => true,
+    'notification_sms' => false,
+    'reminder_before_due' => 2,
+    'preferred_language' => 'English',
+    'privacy_profile' => 'Private'
+];
+?>
     ['action' => 'Downloaded "Digital Signal Processing" eBook', 'date' => '2025-09-08', 'type' => 'download']
 ];
 ?>

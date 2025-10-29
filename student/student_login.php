@@ -1,29 +1,95 @@
 <?php
 // Student Login Page
 session_start();
-
-// Temporary credentials for demo
-$temp_email = "student@lib.com";
-$temp_password = "pass123";
+require_once '../includes/db_connect.php';
 
 $error_message = "";
 
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $email = $_POST['email'] ?? '';
+    $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    // Validate credentials
-    if ($email === $temp_email && $password === $temp_password) {
-        // Set session variables
-        $_SESSION['student_id'] = 'STU2024001';
-        $_SESSION['student_name'] = 'John Doe';
-        $_SESSION['student_email'] = $email;
-        $_SESSION['logged_in'] = true;
-        // Redirect to student layout
-        header('Location: ./layout.php');
-        exit();
+    
+    // Validate input
+    if (empty($email) || empty($password)) {
+        $error_message = "Please enter both email and password.";
     } else {
-        $error_message = "Invalid email or password. Try: student@lib.com / pass123";
+        try {
+            // Query student with member details
+            $stmt = $pdo->prepare("
+                SELECT 
+                    s.StudentID,
+                    s.MemberNo,
+                    s.FirstName,
+                    s.MiddleName,
+                    s.Surname,
+                    s.Email,
+                    s.Branch,
+                    s.CourseName,
+                    s.PRN,
+                    s.Mobile,
+                    s.ValidTill,
+                    m.MemberName,
+                    m.Status,
+                    m.BooksIssued,
+                    m.Group
+                FROM Student s
+                INNER JOIN Member m ON s.MemberNo = m.MemberNo
+                WHERE s.Email = ? 
+                AND m.Status = 'Active'
+                LIMIT 1
+            ");
+            
+            $stmt->execute([$email]);
+            $student = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Validate credentials (password is 123456 for all students)
+            if ($student && $password === '123456') {
+                // Check if membership is still valid
+                if ($student['ValidTill'] && strtotime($student['ValidTill']) < time()) {
+                    $error_message = "Your library membership has expired. Please contact the library office.";
+                } else {
+                    // Set session variables
+                    $_SESSION['student_id'] = $student['StudentID'];
+                    $_SESSION['member_no'] = $student['MemberNo'];
+                    $_SESSION['student_name'] = $student['MemberName'];
+                    $_SESSION['student_email'] = $student['Email'];
+                    $_SESSION['student_branch'] = $student['Branch'];
+                    $_SESSION['student_course'] = $student['CourseName'];
+                    $_SESSION['student_prn'] = $student['PRN'];
+                    $_SESSION['student_mobile'] = $student['Mobile'];
+                    $_SESSION['books_issued'] = $student['BooksIssued'];
+                    $_SESSION['logged_in'] = true;
+                    $_SESSION['login_time'] = time();
+                    $_SESSION['last_activity'] = time();
+                    
+                    // Log student login activity (optional)
+                    try {
+                        $log_stmt = $pdo->prepare("
+                            INSERT INTO ActivityLog (UserID, UserType, Action, Details, IPAddress)
+                            VALUES (?, 'Student', 'Login', 'Student logged into portal', ?)
+                        ");
+                        $log_stmt->execute([
+                            $student['StudentID'],
+                            $_SERVER['REMOTE_ADDR'] ?? 'Unknown'
+                        ]);
+                    } catch (PDOException $e) {
+                        // Log error but continue with login
+                        error_log("Activity log error: " . $e->getMessage());
+                    }
+                    
+                    // Redirect to student dashboard
+                    header('Location: ./layout.php');
+                    exit();
+                }
+            } else {
+                $error_message = "Invalid email or password. Please contact the library office for assistance.";
+            }
+            
+        } catch (PDOException $e) {
+            error_log("Student login error: " . $e->getMessage());
+            $error_message = "System error. Please contact library administration.";
+        }
     }
 }
 ?>
@@ -315,9 +381,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <h1 class="login-title">Student Login</h1>
             <p class="login-subtitle">WIET Central Library</p>
         </div>
+        <?php 
+        // Show success/info messages
+        if (isset($_GET['logout']) && $_GET['logout'] == '1'): ?>
+            <div class="success-message" style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; text-align: center;">
+                <i class="fas fa-check-circle"></i> You have been successfully logged out.
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_GET['timeout']) && $_GET['timeout'] == '1'): ?>
+            <div class="warning-message" style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; text-align: center;">
+                <i class="fas fa-clock"></i> Your session has expired. Please login again.
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_GET['inactive']) && $_GET['inactive'] == '1'): ?>
+            <div class="error-message" style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; text-align: center;">
+                <i class="fas fa-ban"></i> Your account is inactive. Please contact the library office.
+            </div>
+        <?php endif; ?>
+        
         <?php if ($error_message): ?>
             <div class="error-message error-message-styled">
-                <i class="fas fa-exclamation-triangle"></i> Invalid credentials. Please check your email and password.
+                <i class="fas fa-exclamation-triangle"></i> <?php echo htmlspecialchars($error_message); ?>
             </div>
         <?php endif; ?>
         <form method="POST" action="" class="login-form-styled">
@@ -337,6 +423,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <input type="password" id="password" name="password" class="form-input" 
                            placeholder="Enter your password" required>
                 </div>
+                <small style="color: #666; font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                    <i class="fas fa-info-circle"></i> Default password is <strong>123456</strong>
+                </small>
             </div>
             <div class="forgot-password">
                 <a href="#">Forgot Password?</a>
@@ -349,3 +438,4 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </body>
 
 </html>
+

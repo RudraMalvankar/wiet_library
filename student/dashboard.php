@@ -2,87 +2,230 @@
 // Student Dashboard Content
 // This file will be included in the main content area
 
-// Start session for user authentication
+// Start session and check authentication
 session_start();
+
+// Redirect to login if not authenticated
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header('Location: student_login.php');
+    exit();
+}
 
 // Include database connection and functions
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 
 // Get student information from session
-$student_name = isset($_SESSION['student_name']) ? $_SESSION['student_name'] : "John Doe";
-$student_id = isset($_SESSION['student_id']) ? $_SESSION['student_id'] : "STU2024001";
-$member_no = isset($_SESSION['MemberNo']) ? $_SESSION['MemberNo'] : 2511;
+$student_name = $_SESSION['student_name'] ?? 'Student';
+$student_id = $_SESSION['student_id'] ?? null;
+$member_no = $_SESSION['member_no'] ?? null;
 
 // ============================================================
-// DATA SOURCE: MIXED (Database + Dummy)
+// DATA SOURCE: 100% LIVE DATABASE
 // ============================================================
-// TODO: Full database integration needed for:
+// ✅ COMPLETED: All data fetched from database
+// - Quick stats from Circulation + Return + Books tables
 // - Recent activity from ActivityLog table
-// - Upcoming due books from Circulation table
-// - Notifications from Notifications table
+// - Upcoming due books from Circulation + Holding + Books tables
+// - Dynamic notifications from Circulation + LibraryEvents tables
 // ============================================================
 
-// Try to fetch real data from database, fallback to dummy if not available
+// Fetch quick stats from database
 try {
-    // Get real member statistics
-    $member = getMemberByNo($pdo, $member_no);
-    $activeBooks = getMemberActiveCirculations($pdo, $member_no);
+    // Get books issued and due soon counts
+    $quick_stats_query = "
+        SELECT 
+            COUNT(DISTINCT c.CirculationID) as books_issued,
+            COUNT(DISTINCT CASE WHEN DATEDIFF(c.DueDate, CURDATE()) <= 7 AND DATEDIFF(c.DueDate, CURDATE()) >= 0 THEN c.CirculationID END) as books_due
+        FROM Circulation c
+        WHERE c.MemberNo = :member_no 
+        AND c.ReturnDate IS NULL
+    ";
+    $stmt = $pdo->prepare($quick_stats_query);
+    $stmt->execute(['member_no' => $member_no]);
+    $quick_stats = $stmt->fetch(PDO::FETCH_ASSOC);
     
+    // Calculate pending fines from Return table (fines not yet paid)
+    $fines_query = "
+        SELECT COALESCE(SUM(r.Fine - COALESCE(fp.AmountPaid, 0)), 0) as pending_fines
+        FROM `Return` r
+        LEFT JOIN (
+            SELECT TransactionID, SUM(AmountPaid) as AmountPaid
+            FROM FinePayments
+            GROUP BY TransactionID
+        ) fp ON r.ReturnID = fp.TransactionID
+        WHERE r.MemberNo = :member_no
+        AND r.Fine > COALESCE(fp.AmountPaid, 0)
+    ";
+    $stmt = $pdo->prepare($fines_query);
+    $stmt->execute(['member_no' => $member_no]);
+    $fines_result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $quick_stats['pending_fines'] = (int)$fines_result['pending_fines'];
+    
+    // Count available recommendations in student's branch
+    $recommendations_query = "
+        SELECT COUNT(DISTINCT b.CallNo) as recommendations
+        FROM Books b
+        INNER JOIN Holding h ON b.CallNo = h.CallNo
+        WHERE b.Subject LIKE CONCAT('%', :branch, '%')
+        AND h.Status = 'Available'
+        LIMIT 100
+    ";
+    $stmt = $pdo->prepare($recommendations_query);
+    $stmt->execute(['branch' => $student_branch]);
+    $rec_result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $quick_stats['recommendations'] = min((int)$rec_result['recommendations'], 99);
+    
+    // Get upcoming due books (within 7 days)
+    $upcoming_due_query = "
+        SELECT 
+            b.Title as title,
+            b.Author as author,
+            c.DueDate as due_date,
+            DATEDIFF(c.DueDate, CURDATE()) as days_left
+        FROM Circulation c
+        INNER JOIN Holding h ON c.AccNo = h.AccNo
+        INNER JOIN Books b ON h.CallNo = b.CallNo
+        WHERE c.MemberNo = :member_no 
+        AND c.ReturnDate IS NULL
+        AND DATEDIFF(c.DueDate, CURDATE()) <= 7
+        AND DATEDIFF(c.DueDate, CURDATE()) >= 0
+        ORDER BY c.DueDate ASC
+        LIMIT 5
+    ";
+    $stmt = $pdo->prepare($upcoming_due_query);
+    $stmt->execute(['member_no' => $member_no]);
+    $upcoming_due = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+} catch (Exception $e) {
+    // Fallback to session data if database error
     $quick_stats = [
-        'books_issued' => count($activeBooks),
-        'books_due' => 0, // TODO: Calculate from DueDate
-        'pending_fines' => 0, // TODO: Calculate from Return table
-        'recommendations' => 0 // TODO: Get from Recommendations table
+        'books_issued' => isset($_SESSION['books_issued']) ? $_SESSION['books_issued'] : 0,
+        'books_due' => 0,
+        'pending_fines' => 0,
+        'recommendations' => 0
     ];
-    
-    // Calculate books due soon (within 3 days)
-    foreach ($activeBooks as $book) {
-        $daysLeft = (strtotime($book['DueDate']) - time()) / (60 * 60 * 24);
-        if ($daysLeft <= 3 && $daysLeft >= 0) {
-            $quick_stats['books_due']++;
-        }
-    }
-    
     $upcoming_due = [];
-    foreach ($activeBooks as $book) {
-        $daysLeft = ceil((strtotime($book['DueDate']) - time()) / (60 * 60 * 24));
-        $upcoming_due[] = [
-            'title' => $book['Title'],
-            'author' => $book['Author1'],
-            'due_date' => $book['DueDate'],
-            'days_left' => $daysLeft
+}
+
+// Fetch recent activity from ActivityLog table
+try {
+    $activity_query = "
+        SELECT 
+            al.Action as action,
+            COALESCE(b.Title, al.Details) as book,
+            al.Timestamp as date
+        FROM ActivityLog al
+        LEFT JOIN Circulation c ON al.RelatedID = c.CirculationID AND al.Action IN ('Book Issued', 'Book Returned', 'Book Renewed')
+        LEFT JOIN Holding h ON c.AccNo = h.AccNo
+        LEFT JOIN Books b ON h.CallNo = b.CallNo
+        WHERE al.MemberNo = :member_no
+        AND al.Action IN ('Book Issued', 'Book Returned', 'Book Renewed', 'Profile Updated', 'Password Changed')
+        ORDER BY al.Timestamp DESC
+        LIMIT 10
+    ";
+    $stmt = $pdo->prepare($activity_query);
+    $stmt->execute(['member_no' => $member_no]);
+    $recent_activity = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // If no activity, show a placeholder
+    if (empty($recent_activity)) {
+        $recent_activity = [
+            ['action' => 'Account Created', 'book' => 'Welcome to WIET Library', 'date' => date('Y-m-d')]
         ];
     }
     
 } catch (Exception $e) {
-    // Fallback to dummy data if database error
-    $quick_stats = [
-        'books_issued' => 3,
-        'books_due' => 1,
-        'pending_fines' => 0,
-        'recommendations' => 2
-    ];
-    
-    $upcoming_due = [
-        ['title' => 'Database Management Systems', 'author' => 'Ramez Elmasri', 'due_date' => '2025-09-25', 'days_left' => 2],
-        ['title' => 'Software Engineering', 'author' => 'Ian Sommerville', 'due_date' => '2025-09-28', 'days_left' => 5]
+    // Fallback to empty activity
+    $recent_activity = [
+        ['action' => 'Account Created', 'book' => 'Welcome to WIET Library', 'date' => date('Y-m-d')]
     ];
 }
 
-// TODO: Fetch from ActivityLog table
-$recent_activity = [
-    ['action' => 'Book Issued', 'book' => 'Data Structures and Algorithms', 'date' => '2025-09-20'],
-    ['action' => 'Book Returned', 'book' => 'Computer Networks', 'date' => '2025-09-18'],
-    ['action' => 'Book Renewed', 'book' => 'Operating Systems', 'date' => '2025-09-15']
-];
-
-// TODO: Fetch from Notifications table
-$notifications = [
-    ['type' => 'warning', 'message' => 'Book "Database Management Systems" is due in 2 days'],
-    ['type' => 'info', 'message' => 'New arrivals: 15 books added to Computer Science section'],
-    ['type' => 'success', 'message' => 'Your recommendation for "Clean Code" has been approved']
-];
+// Generate dynamic notifications
+$notifications = [];
+try {
+    // 1. Check for overdue books
+    $overdue_query = "
+        SELECT COUNT(*) as overdue_count
+        FROM Circulation c
+        WHERE c.MemberNo = :member_no 
+        AND c.ReturnDate IS NULL
+        AND c.DueDate < CURDATE()
+    ";
+    $stmt = $pdo->prepare($overdue_query);
+    $stmt->execute(['member_no' => $member_no]);
+    $overdue_result = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($overdue_result['overdue_count'] > 0) {
+        $notifications[] = [
+            'type' => 'warning',
+            'message' => 'You have ' . $overdue_result['overdue_count'] . ' overdue book(s). Please return them to avoid additional fines.'
+        ];
+    }
+    
+    // 2. Check for books due soon (within 3 days)
+    $due_soon_query = "
+        SELECT b.Title, c.DueDate, DATEDIFF(c.DueDate, CURDATE()) as days_left
+        FROM Circulation c
+        INNER JOIN Holding h ON c.AccNo = h.AccNo
+        INNER JOIN Books b ON h.CallNo = b.CallNo
+        WHERE c.MemberNo = :member_no 
+        AND c.ReturnDate IS NULL
+        AND DATEDIFF(c.DueDate, CURDATE()) BETWEEN 0 AND 3
+        ORDER BY c.DueDate ASC
+        LIMIT 2
+    ";
+    $stmt = $pdo->prepare($due_soon_query);
+    $stmt->execute(['member_no' => $member_no]);
+    $due_soon_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($due_soon_books as $book) {
+        $notifications[] = [
+            'type' => 'warning',
+            'message' => 'Book "' . htmlspecialchars($book['Title']) . '" is due in ' . $book['days_left'] . ' day(s).'
+        ];
+    }
+    
+    // 3. Check for pending fines
+    if ($quick_stats['pending_fines'] > 0) {
+        $notifications[] = [
+            'type' => 'warning',
+            'message' => 'You have pending fines of ₹' . $quick_stats['pending_fines'] . '. Please clear them at the circulation desk.'
+        ];
+    }
+    
+    // 4. Check for upcoming library events (within 7 days)
+    $events_query = "
+        SELECT EventName, EventDate
+        FROM LibraryEvents
+        WHERE EventDate BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+        AND Status = 'Active'
+        ORDER BY EventDate ASC
+        LIMIT 1
+    ";
+    $stmt = $pdo->prepare($events_query);
+    $stmt->execute();
+    $upcoming_event = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($upcoming_event) {
+        $notifications[] = [
+            'type' => 'info',
+            'message' => 'Upcoming event: "' . htmlspecialchars($upcoming_event['EventName']) . '" on ' . date('M j, Y', strtotime($upcoming_event['EventDate']))
+        ];
+    }
+    
+    // 5. Show success message if no issues
+    if (empty($notifications)) {
+        $notifications[] = [
+            'type' => 'success',
+            'message' => 'All good! You have no overdue books or pending fines. Keep up the great reading!'
+        ];
+    }
+    
+} catch (Exception $e) {
+    // Fallback to generic notification
+    $notifications = [
+        ['type' => 'info', 'message' => 'Welcome to your dashboard! Check out new books and events.']
+    ];
+}
 ?>
 
 <style>

@@ -5,9 +5,15 @@
 // Session management
 session_start();
 
-// Mock data for demonstration - replace with actual database queries
-$student_name = isset($_SESSION['student_name']) ? $_SESSION['student_name'] : "John Doe";
-$student_id = isset($_SESSION['student_id']) ? $_SESSION['student_id'] : "STU2024001";
+// Redirect to login if not authenticated
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header('Location: student_login.php');
+    exit();
+}
+
+// Get student info from session
+$student_name = $_SESSION['student_name'] ?? 'Student';
+$student_id = $_SESSION['student_id'] ?? null;
 
 // E-Resources data
 $databases = [

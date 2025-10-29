@@ -2,88 +2,180 @@
 // Notifications Content - Student notification center
 // This file will be included in the main content area
 
-// Session variables for student info
-$student_name = isset($_SESSION['student_name']) ? $_SESSION['student_name'] : 'John Doe';
-$student_id = isset($_SESSION['student_id']) ? $_SESSION['student_id'] : 'STU2024001';
+// ============================================================
+// DATA SOURCE: DATABASE (100% LIVE)
+// ============================================================
+// ✅ Overdue books - FROM Circulation + Books + Holding
+// ✅ Due soon books - FROM Circulation + Books + Holding
+// ✅ Library events - FROM LibraryEvents
+// ✅ Activity log - FROM ActivityLog
+// ============================================================
 
-// Mock data for demonstration - replace with actual database queries
-$notifications = [
-    [
-        'id' => 1,
-        'title' => 'Book Due Tomorrow',
-        'message' => 'The book "Database Management Systems" is due tomorrow (Sep 24, 2025). Please renew or return on time to avoid fines.',
-        'type' => 'warning',
-        'category' => 'due_reminder',
-        'date' => '2025-09-23 10:30:00',
-        'read' => false,
-        'action_required' => true,
-        'book_id' => 'BK001',
-        'book_title' => 'Database Management Systems'
-    ],
-    [
-        'id' => 2,
-        'title' => 'New Books Added - Computer Science',
-        'message' => '15 new books have been added to the Computer Science section. Check out the latest titles in AI, Machine Learning, and Data Science.',
-        'type' => 'info',
-        'category' => 'new_arrivals',
-        'date' => '2025-09-22 14:15:00',
-        'read' => false,
-        'action_required' => false
-    ],
-    [
-        'id' => 3,
-        'title' => 'Library Maintenance Notice',
-        'message' => 'The library will be closed for system maintenance on September 25, 2025 from 2:00 PM to 6:00 PM. Digital resources will remain accessible.',
-        'type' => 'announcement',
-        'category' => 'maintenance',
-        'date' => '2025-09-21 09:00:00',
-        'read' => true,
-        'action_required' => false
-    ],
-    [
-        'id' => 4,
-        'title' => 'Fine Payment Reminder',
-        'message' => 'You have an outstanding fine of ₹50 for late return of "Introduction to Algorithms". Please clear your dues at the earliest.',
-        'type' => 'error',
-        'category' => 'fine',
-        'date' => '2025-09-20 11:45:00',
-        'read' => false,
-        'action_required' => true,
-        'fine_amount' => 50
-    ],
-    [
-        'id' => 5,
-        'title' => 'Book Reservation Ready',
-        'message' => 'Your reserved book "Clean Code" by Robert Martin is now available for pickup. Please collect it within 24 hours.',
-        'type' => 'success',
-        'category' => 'reservation',
-        'date' => '2025-09-19 16:20:00',
-        'read' => true,
-        'action_required' => true,
-        'book_title' => 'Clean Code'
-    ],
-    [
-        'id' => 6,
-        'title' => 'E-Resource Access Update',
-        'message' => 'New databases IEEE Xplore and ACM Digital Library are now available. Access them from the E-Resources section.',
-        'type' => 'info',
-        'category' => 'eresources',
-        'date' => '2025-09-18 13:30:00',
-        'read' => true,
-        'action_required' => false
-    ],
-    [
-        'id' => 7,
-        'title' => 'Library Workshop Registration',
-        'message' => 'Register for the "Research Methodology" workshop on October 5, 2025. Limited seats available. Registration deadline: September 30.',
-        'type' => 'event',
-        'category' => 'workshop',
-        'date' => '2025-09-17 10:00:00',
-        'read' => true,
-        'action_required' => true,
-        'deadline' => '2025-09-30'
-    ]
-];
+// Start session and check authentication
+session_start();
+
+// Redirect to login if not authenticated
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header('Location: student_login.php');
+    exit();
+}
+
+// Include database connection
+require_once '../includes/db_connect.php';
+
+// Session variables for student info
+$student_id = $_SESSION['student_id'] ?? null;
+$member_no = $_SESSION['member_no'] ?? null;
+
+// Fetch real notifications from database
+$notifications = [];
+
+try {
+    // Get overdue books (warning notifications)
+    $overdue_stmt = $pdo->prepare("
+        SELECT 
+            c.CirculationID,
+            b.Title,
+            c.DueDate,
+            DATEDIFF(CURRENT_DATE, c.DueDate) as days_overdue
+        FROM Circulation c
+        INNER JOIN Holding h ON c.AccNo = h.AccNo
+        INNER JOIN Books b ON h.CatNo = b.CatNo
+        WHERE c.MemberNo = ?
+        AND c.Status = 'Active'
+        AND c.DueDate < CURRENT_DATE
+        ORDER BY c.DueDate ASC
+    ");
+    $overdue_stmt->execute([$member_no]);
+    $overdue_books = $overdue_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($overdue_books as $book) {
+        $notifications[] = [
+            'id' => 'overdue_' . $book['CirculationID'],
+            'title' => 'Book Overdue',
+            'message' => sprintf('The book "%s" is overdue by %d days. Please return it as soon as possible to avoid additional fines.', 
+                $book['Title'], $book['days_overdue']),
+            'type' => 'error',
+            'category' => 'overdue',
+            'date' => date('Y-m-d H:i:s'),
+            'read' => false,
+            'action_required' => true,
+            'book_title' => $book['Title']
+        ];
+    }
+    
+    // Get books due soon (next 3 days)
+    $due_soon_stmt = $pdo->prepare("
+        SELECT 
+            c.CirculationID,
+            b.Title,
+            c.DueDate,
+            DATEDIFF(c.DueDate, CURRENT_DATE) as days_remaining
+        FROM Circulation c
+        INNER JOIN Holding h ON c.AccNo = h.AccNo
+        INNER JOIN Books b ON h.CatNo = b.CatNo
+        WHERE c.MemberNo = ?
+        AND c.Status = 'Active'
+        AND c.DueDate BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL 3 DAY)
+        ORDER BY c.DueDate ASC
+    ");
+    $due_soon_stmt->execute([$member_no]);
+    $due_soon_books = $due_soon_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($due_soon_books as $book) {
+        $notifications[] = [
+            'id' => 'due_' . $book['CirculationID'],
+            'title' => 'Book Due Soon',
+            'message' => sprintf('The book "%s" is due in %d days (%s). Please renew or return on time.', 
+                $book['Title'], $book['days_remaining'], date('M d, Y', strtotime($book['DueDate']))),
+            'type' => 'warning',
+            'category' => 'due_reminder',
+            'date' => date('Y-m-d H:i:s'),
+            'read' => false,
+            'action_required' => true,
+            'book_title' => $book['Title']
+        ];
+    }
+    
+    // Get recent library events
+    $events_stmt = $pdo->query("
+        SELECT 
+            EventID,
+            EventTitle,
+            StartDate,
+            Venue
+        FROM LibraryEvents
+        WHERE Status IN ('Active', 'Upcoming')
+        AND StartDate >= CURRENT_DATE
+        ORDER BY StartDate ASC
+        LIMIT 3
+    ");
+    $events = $events_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($events as $event) {
+        $notifications[] = [
+            'id' => 'event_' . $event['EventID'],
+            'title' => 'Upcoming Library Event: ' . $event['EventTitle'],
+            'message' => sprintf('Event scheduled on %s at %s. Register now!', 
+                date('M d, Y', strtotime($event['StartDate'])), $event['Venue']),
+            'type' => 'info',
+            'category' => 'event',
+            'date' => date('Y-m-d H:i:s'),
+            'read' => false,
+            'action_required' => false
+        ];
+    }
+    
+    // Get activity log notifications
+    $activity_stmt = $pdo->prepare("
+        SELECT 
+            Action,
+            Details,
+            Timestamp
+        FROM ActivityLog
+        WHERE UserID = ?
+        AND UserType = 'Student'
+        AND Action IN ('Book Issued', 'Book Returned', 'Fine Paid')
+        ORDER BY Timestamp DESC
+        LIMIT 5
+    ");
+    $activity_stmt->execute([$student_id]);
+    $activities = $activity_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($activities as $activity) {
+        $type = 'info';
+        if (strpos($activity['Action'], 'Fine') !== false) {
+            $type = 'warning';
+        }
+        
+        $notifications[] = [
+            'id' => 'activity_' . strtotime($activity['Timestamp']),
+            'title' => $activity['Action'],
+            'message' => $activity['Details'],
+            'type' => $type,
+            'category' => 'activity',
+            'date' => $activity['Timestamp'],
+            'read' => true,
+            'action_required' => false
+        ];
+    }
+    
+} catch (PDOException $e) {
+    error_log("Notifications fetch error: " . $e->getMessage());
+    $notifications = []; // Ensure array exists even on error
+}
+
+// Ensure notifications is an array
+if (!is_array($notifications)) {
+    $notifications = [];
+}
+
+// Sort notifications by date (newest first)
+if (count($notifications) > 0) {
+    usort($notifications, function($a, $b) {
+        return strtotime($b['date']) - strtotime($a['date']);
+    });
+}
 
 // Filter notifications by category
 $categories = [

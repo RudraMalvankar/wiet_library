@@ -2,52 +2,62 @@
 // Borrowing History Content - Complete transaction history
 // This file will be included in the main content area
 
+// Start session and check authentication
+session_start();
+
+// Redirect to login if not authenticated
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header('Location: student_login.php');
+    exit();
+}
+
 // Include database connection and functions
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 
 // Session variables for student info
-$student_name = isset($_SESSION['student_name']) ? $_SESSION['student_name'] : 'John Doe';
-$student_id = isset($_SESSION['student_id']) ? $_SESSION['student_id'] : 'STU2024001';
-$member_no = isset($_SESSION['MemberNo']) ? $_SESSION['MemberNo'] : 2511;
+$student_name = $_SESSION['student_name'] ?? 'Student';
+$student_id = $_SESSION['student_id'] ?? null;
+$member_no = $_SESSION['member_no'] ?? null;
 
 // ============================================================
-// DATA SOURCE: DATABASE (Partial Integration)
+// DATA SOURCE: 100% LIVE DATABASE
 // ============================================================
-// ✅ Borrowing history - FROM DATABASE
+// ✅ Complete borrowing history - FROM DATABASE
 // ✅ Statistics - CALCULATED FROM DATABASE
-// ⚠️ Real-time fine calculation needs enhancement
-// TODO: Add fine calculation from FinePayments table
+// ✅ Fine calculation from Return table
+// ✅ All details with proper schema
 // ============================================================
 
-// Fetch real borrowing history from database
+// Fetch complete borrowing history from database
 try {
     $borrowing_history = [];
     
     // Get all circulations (active and returned) for this member
-    $query = "SELECT 
-        c.CirculationID,
-        c.AccNo,
-        c.IssueDate,
-        c.DueDate,
-        c.RenewalCount,
-        r.ReturnID,
-        r.ReturnDate,
-        r.LateFine,
-        r.Status as ReturnStatus,
-        b.Title,
-        b.Author1,
-        CASE 
-            WHEN r.ReturnID IS NULL THEN 'Issued'
-            WHEN r.Status = 'Returned Late' THEN 'Returned Late'
-            ELSE 'Returned'
-        END as Status
-    FROM circulation c
-    INNER JOIN holding h ON c.AccNo = h.AccNo
-    INNER JOIN books b ON h.CallNo = b.CallNo
-    LEFT JOIN `return` r ON c.CirculationID = r.CirculationID
-    WHERE c.MemberNo = :member_no
-    ORDER BY c.IssueDate DESC";
+    $query = "
+        SELECT 
+            c.CirculationID,
+            c.AccNo,
+            c.IssueDate,
+            c.DueDate,
+            c.RenewalCount,
+            r.ReturnID,
+            r.ReturnDate,
+            r.FineAmount,
+            b.Title,
+            b.Author1,
+            CASE 
+                WHEN r.ReturnID IS NULL THEN 'Issued'
+                WHEN r.ReturnDate > c.DueDate THEN 'Returned Late'
+                ELSE 'Returned'
+            END as Status
+        FROM Circulation c
+        INNER JOIN Holding h ON c.AccNo = h.AccNo
+        INNER JOIN Books b ON h.CatNo = b.CatNo
+        LEFT JOIN `Return` r ON c.CirculationID = r.CirculationID
+        WHERE c.MemberNo = :member_no
+        ORDER BY c.IssueDate DESC
+    ";
     
     $stmt = $pdo->prepare($query);
     $stmt->execute([':member_no' => $member_no]);
@@ -56,6 +66,7 @@ try {
     foreach ($results as $row) {
         $borrowing_history[] = [
             'id' => 'BOR' . str_pad($row['CirculationID'], 3, '0', STR_PAD_LEFT),
+            'circulation_id' => $row['CirculationID'],
             'title' => $row['Title'],
             'author' => $row['Author1'],
             'acc_no' => $row['AccNo'],
@@ -63,12 +74,12 @@ try {
             'due_date' => $row['DueDate'],
             'return_date' => $row['ReturnDate'],
             'status' => $row['Status'],
-            'fine' => $row['LateFine'] ?? 0,
+            'fine' => $row['FineAmount'] ?? 0,
             'renewed_count' => $row['RenewalCount'] ?? 0
         ];
     }
     
-    // Calculate statistics
+    // Calculate statistics from real data
     $statistics = [
         'total_borrowed' => count($borrowing_history),
         'currently_issued' => count(array_filter($borrowing_history, function ($item) {
@@ -79,77 +90,13 @@ try {
     ];
     
 } catch (Exception $e) {
-    // Fallback to dummy data if database error
-    $borrowing_history = [
-        [
-            'id' => 'BOR001',
-            'title' => 'Clean Code: A Handbook of Agile Software Craftsmanship',
-            'author' => 'Robert C. Martin',
-            'acc_no' => 'CS001234',
-            'issue_date' => '2025-09-10',
-            'due_date' => '2025-09-25',
-            'return_date' => null,
-            'status' => 'Issued',
-            'fine' => 0,
-            'renewed_count' => 0
-        ],
-        [
-            'id' => 'BOR002',
-            'title' => 'Introduction to Algorithms',
-            'author' => 'Thomas H. Cormen',
-            'acc_no' => 'CS002145',
-            'issue_date' => '2025-08-15',
-            'due_date' => '2025-09-05',
-            'return_date' => '2025-09-03',
-            'status' => 'Returned',
-            'fine' => 0,
-            'renewed_count' => 1
-        ],
-        [
-            'id' => 'BOR003',
-            'title' => 'Design Patterns',
-            'author' => 'Gang of Four',
-            'acc_no' => 'CS003256',
-            'issue_date' => '2025-07-20',
-            'due_date' => '2025-08-10',
-            'return_date' => '2025-08-12',
-            'status' => 'Returned Late',
-            'fine' => 10,
-            'renewed_count' => 0
-        ],
-        [
-            'id' => 'BOR004',
-            'title' => 'JavaScript: The Good Parts',
-            'author' => 'Douglas Crockford',
-            'acc_no' => 'WEB001123',
-            'issue_date' => '2025-06-28',
-            'due_date' => '2025-07-19',
-            'return_date' => '2025-07-18',
-            'status' => 'Returned',
-            'fine' => 0,
-            'renewed_count' => 2
-        ],
-        [
-            'id' => 'BOR005',
-            'title' => 'Database System Concepts',
-            'author' => 'Abraham Silberschatz',
-            'acc_no' => 'DB001445',
-            'issue_date' => '2025-06-10',
-            'due_date' => '2025-07-01',
-            'return_date' => '2025-07-01',
-            'status' => 'Returned',
-            'fine' => 0,
-            'renewed_count' => 1
-        ]
-    ];
-
+    // Fallback to empty array if database error
+    $borrowing_history = [];
     $statistics = [
-        'total_borrowed' => count($borrowing_history),
-        'currently_issued' => count(array_filter($borrowing_history, function ($item) {
-            return $item['status'] === 'Issued';
-        })),
-        'total_fines_paid' => array_sum(array_column($borrowing_history, 'fine')),
-        'books_renewed' => array_sum(array_column($borrowing_history, 'renewed_count'))
+        'total_borrowed' => 0,
+        'currently_issued' => 0,
+        'total_fines_paid' => 0,
+        'books_renewed' => 0
     ];
 }
 ?>
@@ -639,7 +586,7 @@ try {
                             <?php endif; ?>
                         </td>
                         <td class="actions-cell">
-                            <a href="#" class="action-btn" onclick="viewDetails('<?php echo $record['id']; ?>')">
+                            <a href="#" class="action-btn" onclick="viewBookDetails('<?php echo $record['acc_no']; ?>', '<?php echo $record['circulation_id']; ?>')">
                                 <i class="fas fa-eye"></i>
                                 Details
                             </a>
@@ -650,6 +597,24 @@ try {
         </table>
     </div>
 <?php endif; ?>
+
+<!-- Book Details Modal -->
+<div id="bookDetailsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; overflow-y: auto;">
+    <div style="max-width: 800px; margin: 50px auto; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+        <div style="padding: 25px; border-bottom: 2px solid #cfac69;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #263c79; margin: 0;">Book Details</h2>
+                <button onclick="closeBookDetails()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+            </div>
+        </div>
+        <div id="bookDetailsContent" style="padding: 25px;">
+            <div style="text-align: center; padding: 40px;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 40px; color: #263c79;"></i>
+                <p style="margin-top: 15px; color: #666;">Loading book details...</p>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
     // Filter functionality
@@ -697,6 +662,168 @@ try {
                 row.style.display = 'none';
             }
         });
+    });
+
+    // View Book Details Function
+    function viewBookDetails(accNo, circulationId) {
+        event.preventDefault();
+        
+        // Show modal
+        document.getElementById('bookDetailsModal').style.display = 'block';
+        
+        // Fetch book details via AJAX
+        fetch('get_book_details.php?acc_no=' + accNo + '&circulation_id=' + circulationId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayBookDetails(data.book);
+                } else {
+                    document.getElementById('bookDetailsContent').innerHTML = 
+                        '<div style="text-align: center; padding: 40px; color: #d63384;">' +
+                        '<i class="fas fa-exclamation-triangle" style="font-size: 40px;"></i>' +
+                        '<p style="margin-top: 15px;">Error loading book details: ' + data.message + '</p>' +
+                        '</div>';
+                }
+            })
+            .catch(error => {
+                document.getElementById('bookDetailsContent').innerHTML = 
+                    '<div style="text-align: center; padding: 40px; color: #d63384;">' +
+                    '<i class="fas fa-exclamation-triangle" style="font-size: 40px;"></i>' +
+                    '<p style="margin-top: 15px;">Error loading book details. Please try again.</p>' +
+                    '</div>';
+            });
+    }
+    
+    function displayBookDetails(book) {
+        const statusClass = book.days_left <= 1 ? '#d63384' : (book.days_left <= 3 ? '#ffc107' : '#28a745');
+        const statusText = book.days_left <= 0 ? 'OVERDUE' : (book.days_left <= 1 ? 'DUE TODAY' : (book.days_left <= 3 ? 'DUE SOON' : 'ACTIVE'));
+        
+        let html = `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div style="grid-column: 1 / -1; padding: 20px; background: linear-gradient(135deg, #263c79, #1e2f5a); border-radius: 8px; color: white;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 24px;">${book.Title}</h3>
+                    <p style="margin: 0; font-size: 16px; opacity: 0.9;">by ${book.Author}</p>
+                    <div style="margin-top: 15px; display: inline-block; padding: 6px 12px; background: ${statusClass}; border-radius: 20px; font-size: 13px; font-weight: bold;">
+                        ${statusText}
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <div style="color: #666; font-size: 12px; text-transform: uppercase; margin-bottom: 5px;">Accession Number</div>
+                    <div style="font-weight: 600; color: #263c79; font-family: monospace;">${book.AccNo}</div>
+                </div>
+                
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <div style="color: #666; font-size: 12px; text-transform: uppercase; margin-bottom: 5px;">ISBN</div>
+                    <div style="font-weight: 600; color: #263c79; font-family: monospace;">${book.ISBN || 'N/A'}</div>
+                </div>
+                
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <div style="color: #666; font-size: 12px; text-transform: uppercase; margin-bottom: 5px;">Catalog Number</div>
+                    <div style="font-weight: 600; color: #263c79;">${book.CatNo || 'N/A'}</div>
+                </div>
+                
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <div style="color: #666; font-size: 12px; text-transform: uppercase; margin-bottom: 5px;">Publisher</div>
+                    <div style="font-weight: 600; color: #263c79;">${book.Publisher || 'N/A'}</div>
+                </div>
+                
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <div style="color: #666; font-size: 12px; text-transform: uppercase; margin-bottom: 5px;">Edition</div>
+                    <div style="font-weight: 600; color: #263c79;">${book.Edition || 'N/A'}</div>
+                </div>
+                
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <div style="color: #666; font-size: 12px; text-transform: uppercase; margin-bottom: 5px;">Location</div>
+                    <div style="font-weight: 600; color: #263c79;">${book.Location}</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 25px; padding: 20px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 8px;">
+                <h4 style="margin: 0 0 15px 0; color: #263c79;">
+                    <i class="fas fa-calendar-alt"></i> Circulation Details
+                </h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                    <div>
+                        <div style="color: #666; font-size: 12px; margin-bottom: 3px;">Issue Date</div>
+                        <div style="font-weight: 600; color: #263c79;">${book.issue_date_formatted}</div>
+                    </div>
+                    <div>
+                        <div style="color: #666; font-size: 12px; margin-bottom: 3px;">Due Date</div>
+                        <div style="font-weight: 600; color: #263c79;">${book.due_date_formatted}</div>
+                    </div>
+                    <div>
+                        <div style="color: #666; font-size: 12px; margin-bottom: 3px;">Days Left</div>
+                        <div style="font-weight: 600; color: ${statusClass};">${book.days_left <= 0 ? Math.abs(book.days_left) + ' days overdue' : book.days_left + ' days left'}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div style="padding: 15px; background: ${book.fine > 0 ? '#fff3cd' : '#d4edda'}; border-radius: 8px; border-left: 4px solid ${book.fine > 0 ? '#ffc107' : '#28a745'};">
+                    <div style="color: #666; font-size: 12px; margin-bottom: 3px;">Fine Amount</div>
+                    <div style="font-weight: 600; color: #263c79; font-size: 20px;">₹${book.fine}</div>
+                </div>
+                
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <div style="color: #666; font-size: 12px; margin-bottom: 3px;">Renewal Count</div>
+                    <div style="font-weight: 600; color: #263c79; font-size: 20px;">${book.RenewalCount} / 2</div>
+                </div>
+            </div>
+        `;
+        
+        // Add return history if exists
+        if (book.return_history && book.return_history.length > 0) {
+            html += `
+                <div style="margin-top: 25px; padding: 20px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 8px;">
+                    <h4 style="margin: 0 0 15px 0; color: #263c79;">
+                        <i class="fas fa-history"></i> Previous Borrowing History
+                    </h4>
+            `;
+            
+            book.return_history.forEach(history => {
+                html += `
+                    <div style="padding: 12px; background: white; border-radius: 6px; margin-bottom: 10px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; font-size: 13px;">
+                            <div>
+                                <div style="color: #666; font-size: 11px;">Issued</div>
+                                <div style="font-weight: 600;">${history.issue_date}</div>
+                            </div>
+                            <div>
+                                <div style="color: #666; font-size: 11px;">Returned</div>
+                                <div style="font-weight: 600;">${history.return_date}</div>
+                            </div>
+                            <div>
+                                <div style="color: #666; font-size: 11px;">Status</div>
+                                <div style="font-weight: 600; color: ${history.fine > 0 ? '#d63384' : '#28a745'};">${history.fine > 0 ? 'Late' : 'On Time'}</div>
+                            </div>
+                            <div>
+                                <div style="color: #666; font-size: 11px;">Fine</div>
+                                <div style="font-weight: 600;">₹${history.fine}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `</div>`;
+        }
+        
+        document.getElementById('bookDetailsContent').innerHTML = html;
+    }
+    
+    function closeBookDetails() {
+        document.getElementById('bookDetailsModal').style.display = 'none';
+    }
+    
+    // Close modal on outside click
+    document.addEventListener('click', function(event) {
+        const modal = document.getElementById('bookDetailsModal');
+        if (event.target === modal) {
+            closeBookDetails();
+        }
     });
 
     function viewDetails(transactionId) {

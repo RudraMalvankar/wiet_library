@@ -2,52 +2,107 @@
 // My Footfall Content - Library visit tracking and analytics
 // This file will be included in the main content area
 
-// Session variables for student info
-$student_name = isset($_SESSION['student_name']) ? $_SESSION['student_name'] : 'John Doe';
-$student_id = isset($_SESSION['student_id']) ? $_SESSION['student_id'] : 'STU2024001';
+// Start session and check authentication
+session_start();
 
-// Mock data for demonstration - replace with actual database queries
+// Redirect to login if not authenticated
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header('Location: student_login.php');
+    exit();
+}
+
+// Include database connection
+require_once '../includes/db_connect.php';
+
+// Session variables for student info
+$student_id = $_SESSION['student_id'] ?? null;
+$member_no = $_SESSION['member_no'] ?? null;
+
+// Fetch real footfall data from database
 $monthly_stats = [
     'current_month' => [
-        'visits' => 18,
-        'hours' => 47.5,
-        'avg_duration' => '2h 38m',
-        'books_accessed' => 23
+        'visits' => 0,
+        'hours' => 0,
+        'avg_duration' => '0h 0m',
+        'books_accessed' => 0
     ],
     'last_month' => [
-        'visits' => 22,
-        'hours' => 56.2,
-        'avg_duration' => '2h 33m',
-        'books_accessed' => 31
+        'visits' => 0,
+        'hours' => 0,
+        'avg_duration' => '0h 0m',
+        'books_accessed' => 0
     ]
 ];
 
-$recent_visits = [
-    [
-        'date' => '2025-09-23',
-        'entry_time' => '09:15 AM',
-        'exit_time' => '11:45 AM',
-        'duration' => '2h 30m',
-        'purpose' => 'Study Session',
-        'section' => 'Computer Science'
-    ],
-    [
-        'date' => '2025-09-21',
-        'entry_time' => '02:30 PM',
-        'exit_time' => '04:15 PM',
-        'duration' => '1h 45m',
-        'purpose' => 'Book Research',
-        'section' => 'Reference Section'
-    ],
-    [
-        'date' => '2025-09-19',
-        'entry_time' => '10:00 AM',
-        'exit_time' => '01:30 PM',
-        'duration' => '3h 30m',
-        'purpose' => 'Project Work',
-        'section' => 'Reading Hall'
-    ],
-    [
+$recent_visits = [];
+
+try {
+    // Current month stats
+    $stmt = $pdo->prepare("
+        SELECT 
+            COUNT(*) as visits,
+            COUNT(DISTINCT DATE(EntryTime)) as unique_days
+        FROM footfall
+        WHERE MemberNo = ?
+        AND MONTH(EntryTime) = MONTH(CURRENT_DATE)
+        AND YEAR(EntryTime) = YEAR(CURRENT_DATE)
+    ");
+    $stmt->execute([$member_no]);
+    $current_stats = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    $monthly_stats['current_month']['visits'] = $current_stats['visits'] ?? 0;
+    
+    // Last month stats
+    $stmt = $pdo->prepare("
+        SELECT 
+            COUNT(*) as visits,
+            COUNT(DISTINCT DATE(EntryTime)) as unique_days
+        FROM footfall
+        WHERE MemberNo = ?
+        AND MONTH(EntryTime) = MONTH(DATE_SUB(CURRENT_DATE, INTERVAL 1 MONTH))
+        AND YEAR(EntryTime) = YEAR(DATE_SUB(CURRENT_DATE, INTERVAL 1 MONTH))
+    ");
+    $stmt->execute([$member_no]);
+    $last_stats = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    $monthly_stats['last_month']['visits'] = $last_stats['visits'] ?? 0;
+    
+    // Recent visits
+    $stmt = $pdo->prepare("
+        SELECT 
+            DATE(EntryTime) as date,
+            TIME(EntryTime) as entry_time,
+            TIME(ExitTime) as exit_time,
+            Purpose,
+            TIMESTAMPDIFF(MINUTE, EntryTime, ExitTime) as duration_minutes
+        FROM footfall
+        WHERE MemberNo = ?
+        AND EntryTime IS NOT NULL
+        ORDER BY EntryTime DESC
+        LIMIT 20
+    ");
+    $stmt->execute([$member_no]);
+    $footfall_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($footfall_data as $visit) {
+        $duration_minutes = $visit['duration_minutes'] ?? 0;
+        $hours = floor($duration_minutes / 60);
+        $mins = $duration_minutes % 60;
+        
+        $recent_visits[] = [
+            'date' => $visit['date'],
+            'entry_time' => date('h:i A', strtotime($visit['entry_time'])),
+            'exit_time' => $visit['exit_time'] ? date('h:i A', strtotime($visit['exit_time'])) : 'In Progress',
+            'duration' => $hours . 'h ' . $mins . 'm',
+            'purpose' => $visit['Purpose'] ?? 'Library Visit',
+            'section' => 'N/A'
+        ];
+    }
+    
+} catch (PDOException $e) {
+    error_log("Footfall fetch error: " . $e->getMessage());
+}
+?>
         'date' => '2025-09-17',
         'entry_time' => '03:15 PM',
         'exit_time' => '05:00 PM',
