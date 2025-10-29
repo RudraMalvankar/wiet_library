@@ -628,6 +628,12 @@ $is_superadmin = $current_admin['is_superadmin'];
           </a>
         </li>
         <li class="sidebar-item">
+          <a href="#" class="sidebar-link" data-page="activity-log">
+            <i class="sidebar-icon fas fa-history"></i>
+            <span>Activity Log</span>
+          </a>
+        </li>
+        <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="settings">
             <i class="sidebar-icon fas fa-cog"></i>
             <span>Settings</span>

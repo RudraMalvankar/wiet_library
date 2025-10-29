@@ -36,6 +36,20 @@ $monthly_stats = [
 
 $recent_visits = [];
 
+// Weekly chart data initialization
+$weekly_chart_data = [
+    'Mon' => 0,
+    'Tue' => 0,
+    'Wed' => 0,
+    'Thu' => 0,
+    'Fri' => 0,
+    'Sat' => 0,
+    'Sun' => 0
+];
+
+// Purpose breakdown initialization
+$purpose_breakdown = [];
+
 try {
     // Current month stats
     $stmt = $pdo->prepare("
@@ -67,14 +81,47 @@ try {
     
     $monthly_stats['last_month']['visits'] = $last_stats['visits'] ?? 0;
     
+    // Weekly visit pattern (last 7 days)
+    $stmt = $pdo->prepare("
+        SELECT 
+            DAYNAME(EntryTime) as day_name,
+            COUNT(*) as visits
+        FROM footfall
+        WHERE MemberNo = ?
+        AND DATE(EntryTime) >= DATE_SUB(CURRENT_DATE, INTERVAL 7 DAY)
+        GROUP BY DAYNAME(EntryTime), DAYOFWEEK(EntryTime)
+        ORDER BY DAYOFWEEK(EntryTime)
+    ");
+    $stmt->execute([$member_no]);
+    $weekly_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($weekly_data as $day) {
+        $day_abbr = substr($day['day_name'], 0, 3);
+        $weekly_chart_data[$day_abbr] = (int)$day['visits'];
+    }
+    
+    // Purpose breakdown
+    $stmt = $pdo->prepare("
+        SELECT 
+            Purpose,
+            COUNT(*) as count
+        FROM footfall
+        WHERE MemberNo = ?
+        AND MONTH(EntryTime) = MONTH(CURRENT_DATE)
+        AND YEAR(EntryTime) = YEAR(CURRENT_DATE)
+        GROUP BY Purpose
+        ORDER BY count DESC
+        LIMIT 5
+    ");
+    $stmt->execute([$member_no]);
+    $purpose_breakdown = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
     // Recent visits
     $stmt = $pdo->prepare("
         SELECT 
             DATE(EntryTime) as date,
             TIME(EntryTime) as entry_time,
-            TIME(ExitTime) as exit_time,
-            Purpose,
-            TIMESTAMPDIFF(MINUTE, EntryTime, ExitTime) as duration_minutes
+            Purpose
         FROM footfall
         WHERE MemberNo = ?
         AND EntryTime IS NOT NULL
@@ -85,50 +132,16 @@ try {
     $footfall_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     foreach ($footfall_data as $visit) {
-        $duration_minutes = $visit['duration_minutes'] ?? 0;
-        $hours = floor($duration_minutes / 60);
-        $mins = $duration_minutes % 60;
-        
         $recent_visits[] = [
             'date' => $visit['date'],
             'entry_time' => date('h:i A', strtotime($visit['entry_time'])),
-            'exit_time' => $visit['exit_time'] ? date('h:i A', strtotime($visit['exit_time'])) : 'In Progress',
-            'duration' => $hours . 'h ' . $mins . 'm',
-            'purpose' => $visit['Purpose'] ?? 'Library Visit',
-            'section' => 'N/A'
+            'purpose' => $visit['Purpose'] ?? 'Library Visit'
         ];
     }
     
 } catch (PDOException $e) {
     error_log("Footfall fetch error: " . $e->getMessage());
 }
-?>
-        'date' => '2025-09-17',
-        'entry_time' => '03:15 PM',
-        'exit_time' => '05:00 PM',
-        'duration' => '1h 45m',
-        'purpose' => 'E-Resource Access',
-        'section' => 'Digital Section'
-    ],
-    [
-        'date' => '2025-09-15',
-        'entry_time' => '11:30 AM',
-        'exit_time' => '02:15 PM',
-        'duration' => '2h 45m',
-        'purpose' => 'Study Session',
-        'section' => 'Silent Zone'
-    ]
-];
-
-$weekly_chart_data = [
-    'Mon' => 3,
-    'Tue' => 2,
-    'Wed' => 4,
-    'Thu' => 1,
-    'Fri' => 3,
-    'Sat' => 2,
-    'Sun' => 3
-];
 ?>
 
 <style>
@@ -559,22 +572,19 @@ $weekly_chart_data = [
             Visit Purposes
         </h3>
         <div class="purpose-breakdown">
-            <div class="purpose-item">
-                <span class="purpose-name">Study Session</span>
-                <span class="purpose-count">8 visits</span>
-            </div>
-            <div class="purpose-item">
-                <span class="purpose-name">Project Work</span>
-                <span class="purpose-count">5 visits</span>
-            </div>
-            <div class="purpose-item">
-                <span class="purpose-name">Book Research</span>
-                <span class="purpose-count">3 visits</span>
-            </div>
-            <div class="purpose-item">
-                <span class="purpose-name">E-Resource Access</span>
-                <span class="purpose-count">2 visits</span>
-            </div>
+            <?php if (!empty($purpose_breakdown)): ?>
+                <?php foreach ($purpose_breakdown as $purpose): ?>
+                    <div class="purpose-item">
+                        <span class="purpose-name"><?php echo htmlspecialchars($purpose['Purpose']); ?></span>
+                        <span class="purpose-count"><?php echo $purpose['count']; ?> visits</span>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="purpose-item">
+                    <span class="purpose-name">No data available</span>
+                    <span class="purpose-count">0 visits</span>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -597,33 +607,36 @@ $weekly_chart_data = [
         <thead>
             <tr>
                 <th>Date</th>
-                <th>Entry/Exit Time</th>
-                <th>Duration</th>
-                <th>Purpose & Section</th>
+                <th>Entry Time</th>
+                <th>Purpose</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($recent_visits as $visit): ?>
+            <?php if (!empty($recent_visits)): ?>
+                <?php foreach ($recent_visits as $visit): ?>
+                    <tr>
+                        <td>
+                            <div class="visit-date"><?php echo date('M j, Y', strtotime($visit['date'])); ?></div>
+                            <div class="visit-day"><?php echo date('l', strtotime($visit['date'])); ?></div>
+                        </td>
+                        <td>
+                            <div class="time-info">
+                                <div class="entry-time">⬇ <?php echo $visit['entry_time']; ?></div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="purpose-badge"><?php echo htmlspecialchars($visit['purpose']); ?></div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php else: ?>
                 <tr>
-                    <td>
-                        <div class="visit-date"><?php echo date('M j, Y', strtotime($visit['date'])); ?></div>
-                        <div class="visit-day"><?php echo date('l', strtotime($visit['date'])); ?></div>
-                    </td>
-                    <td>
-                        <div class="time-info">
-                            <div class="entry-time">⬇ <?php echo $visit['entry_time']; ?></div>
-                            <div class="exit-time">⬆ <?php echo $visit['exit_time']; ?></div>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="duration"><?php echo $visit['duration']; ?></div>
-                    </td>
-                    <td>
-                        <div class="purpose-badge"><?php echo htmlspecialchars($visit['purpose']); ?></div>
-                        <div class="section-info"><?php echo htmlspecialchars($visit['section']); ?></div>
+                    <td colspan="3" style="text-align: center; padding: 30px; color: #666;">
+                        <i class="fas fa-info-circle" style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
+                        No footfall records found. Visit the library to see your statistics here!
                     </td>
                 </tr>
-            <?php endforeach; ?>
+            <?php endif; ?>
         </tbody>
     </table>
 </div>

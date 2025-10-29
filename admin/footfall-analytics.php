@@ -389,10 +389,6 @@ body {
             <div class="stat-number" id="activeNow">-</div>
             <div class="stat-label">Active Now</div>
         </div>
-        <div class="stat-card week">
-            <div class="stat-number" id="avgDuration">-</div>
-            <div class="stat-label">Avg Duration</div>
-        </div>
     </div>
 
     <!-- Tabs -->
@@ -520,16 +516,13 @@ body {
                             <th>Name</th>
                             <th>Branch</th>
                             <th>Entry Time</th>
-                            <th>Exit Time</th>
-                            <th>Duration</th>
                             <th>Purpose</th>
                             <th>Method</th>
-                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody id="allRecordsTable">
                         <tr>
-                            <td colspan="9" style="text-align: center; padding: 20px;">
+                            <td colspan="6" style="text-align: center; padding: 20px;">
                                 <i class="fas fa-spinner fa-spin"></i> Loading records...
                             </td>
                         </tr>
@@ -548,15 +541,13 @@ body {
                             <th>Name</th>
                             <th>Branch</th>
                             <th>Entry Time</th>
-                            <th>Duration</th>
                             <th>Purpose</th>
                             <th>Method</th>
-                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="activeVisitorsTable">
                         <tr>
-                            <td colspan="8" style="text-align: center; padding: 20px;">
+                            <td colspan="6" style="text-align: center; padding: 20px;">
                                 <i class="fas fa-spinner fa-spin"></i> Loading active visitors...
                             </td>
                         </tr>
@@ -672,11 +663,6 @@ async function loadStatistics() {
             document.getElementById('totalVisits').textContent = data.data.today_visits || 0;
             document.getElementById('uniqueVisitors').textContent = data.data.week_visits || 0;
             document.getElementById('activeNow').textContent = data.data.active_visitors || 0;
-            
-            const avgMins = data.data.avg_duration_minutes || 0;
-            const hours = Math.floor(avgMins / 60);
-            const mins = Math.round(avgMins % 60);
-            document.getElementById('avgDuration').textContent = `${hours}h ${mins}m`;
         }
     } catch (error) {
         console.error('Error loading statistics:', error);
@@ -840,7 +826,7 @@ async function loadAllRecords() {
             let html = '';
             
             if (data.data.records.length === 0) {
-                html = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No records found</td></tr>';
+                html = '<tr><td colspan="6" style="text-align: center; padding: 20px;">No records found</td></tr>';
             } else {
                 data.data.records.forEach(record => {
                     html += `
@@ -849,11 +835,8 @@ async function loadAllRecords() {
                             <td>${escapeHtml(record.name)}</td>
                             <td>${escapeHtml(record.branch)}</td>
                             <td>${escapeHtml(record.entry_time)}</td>
-                            <td>${escapeHtml(record.exit_time || '-')}</td>
-                            <td>${escapeHtml(record.duration || '-')}</td>
                             <td>${escapeHtml(record.purpose)}</td>
-                            <td><span class="badge badge-primary">${escapeHtml(record.entry_method)}</span></td>
-                            <td><span class="badge badge-${record.status === 'Active' ? 'success' : 'warning'}">${escapeHtml(record.status)}</span></td>
+                            <td><span class="badge badge-primary">${escapeHtml(record.method)}</span></td>
                         </tr>
                     `;
                 });
@@ -864,7 +847,7 @@ async function loadAllRecords() {
     } catch (error) {
         console.error('Error loading records:', error);
         document.getElementById('allRecordsTable').innerHTML = 
-            '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Error loading records</td></tr>';
+            '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Error loading records</td></tr>';
     }
 }
 
@@ -878,29 +861,17 @@ async function loadActiveVisitors() {
             let html = '';
             
             if (data.data.records.length === 0) {
-                html = '<tr><td colspan="8" style="text-align: center; padding: 20px;">No active visitors</td></tr>';
+                html = '<tr><td colspan="6" style="text-align: center; padding: 20px;">No active visitors</td></tr>';
             } else {
                 data.data.records.forEach(record => {
-                    const entryTime = new Date(record.entry_time);
-                    const now = new Date();
-                    const durationMins = Math.floor((now - entryTime) / 60000);
-                    const hours = Math.floor(durationMins / 60);
-                    const mins = durationMins % 60;
-                    
                     html += `
                         <tr>
                             <td>${escapeHtml(record.member_no)}</td>
                             <td>${escapeHtml(record.name)}</td>
                             <td>${escapeHtml(record.branch)}</td>
                             <td>${escapeHtml(record.entry_time)}</td>
-                            <td>${hours}h ${mins}m</td>
                             <td>${escapeHtml(record.purpose)}</td>
-                            <td><span class="badge badge-primary">${escapeHtml(record.entry_method)}</span></td>
-                            <td>
-                                <button class="btn btn-success" onclick="checkoutVisitor('${record.member_no}')" style="padding: 5px 10px; font-size: 12px;">
-                                    <i class="fas fa-sign-out-alt"></i> Check Out
-                                </button>
-                            </td>
+                            <td><span class="badge badge-primary">${escapeHtml(record.method)}</span></td>
                         </tr>
                     `;
                 });
@@ -939,12 +910,26 @@ async function checkoutVisitor(memberNo) {
 }
 
 // Load report stats
-function loadReportStats() {
-    // Placeholder stats
-    document.getElementById('reportTotalVisits').textContent = '0';
-    document.getElementById('reportPeakHour').textContent = '-';
-    document.getElementById('reportBusiestDay').textContent = '-';
-    document.getElementById('reportAvgDaily').textContent = '0';
+async function loadReportStats() {
+    try {
+        const response = await fetch('../footfall/api/footfall-stats.php');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('reportTotalVisits').textContent = data.data.month_visits || 0;
+            document.getElementById('reportPeakHour').textContent = data.data.peak_hour || '-';
+            document.getElementById('reportBusiestDay').textContent = 'Today';
+            
+            // Calculate average daily visits (month visits / days in month)
+            const monthVisits = data.data.month_visits || 0;
+            const today = new Date();
+            const daysInMonth = today.getDate(); // Current day of month
+            const avgDaily = daysInMonth > 0 ? Math.round(monthVisits / daysInMonth) : 0;
+            document.getElementById('reportAvgDaily').textContent = avgDaily;
+        }
+    } catch (error) {
+        console.error('Error loading report stats:', error);
+    }
 }
 
 // Generate report
@@ -994,9 +979,9 @@ function escapeHtml(text) {
     return String(text).replace(/[&<>"']/g, c => map[c]);
 }
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Footfall Analytics loaded');
+// Initialize function
+function initFootfallAnalytics() {
+    console.log('Footfall Analytics initialized');
     loadStatistics();
     loadAnalytics();
     
@@ -1008,7 +993,15 @@ document.addEventListener('DOMContentLoaded', function() {
             loadActiveVisitors();
         }
     }, 60000);
-});
+}
+
+// Initialize on page load (works for both direct access and AJAX loading)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFootfallAnalytics);
+} else {
+    // DOM already loaded (AJAX case)
+    initFootfallAnalytics();
+}
 </script>
 
 </body>

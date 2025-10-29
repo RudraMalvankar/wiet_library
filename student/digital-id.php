@@ -552,7 +552,7 @@ $card_features = [
         <div class="qr-code">
             <div>
                 <div class="code-label">QR Code</div>
-                <div style="font-size: 48px; margin: 10px 0;">⬜</div>
+                <div id="qrcode" style="margin: 10px 0;"></div>
                 <div class="code-value"><?php echo htmlspecialchars($digital_card['qr_code']); ?></div>
             </div>
         </div>
@@ -560,20 +560,20 @@ $card_features = [
         <div class="barcode">
             <div>
                 <div class="code-label">Barcode</div>
-                <div style="font-family: monospace; font-size: 20px; margin: 10px 0; letter-spacing: 2px;">||||| |||| |||||</div>
+                <svg id="barcode" style="margin: 10px 0;"></svg>
                 <div class="code-value"><?php echo htmlspecialchars($digital_card['barcode']); ?></div>
             </div>
         </div>
 
         <div class="download-actions">
-            <a href="#" class="download-btn" onclick="downloadCard()">
+            <button class="download-btn" onclick="downloadCard()">
                 <i class="fas fa-download"></i>
-                Download Card
-            </a>
-            <a href="#" class="download-btn secondary" onclick="printCard()">
+                Download Card (PNG)
+            </button>
+            <button class="download-btn secondary" onclick="printCard()">
                 <i class="fas fa-print"></i>
                 Print Card
-            </a>
+            </button>
         </div>
     </div>
 </div>
@@ -628,14 +628,175 @@ $card_features = [
 </div>
 
 <script>
-    function downloadCard() {
-        // Simulate download functionality
-        alert('Digital ID card download will be available soon!');
-        // In real implementation, this would generate and download a PDF/image
+    // QR Code generation using QRCode.js
+    function generateQRCode() {
+        const qrContainer = document.getElementById('qrcode');
+        if (!qrContainer) return;
+        
+        // Clear existing QR code
+        qrContainer.innerHTML = '';
+        
+        // Generate QR code
+        new QRCode(qrContainer, {
+            text: '<?php echo htmlspecialchars($digital_card['qr_code']); ?>',
+            width: 150,
+            height: 150,
+            colorDark: '#263c79',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H
+        });
     }
 
-    function printCard() {
-        // Open print dialog for the card section
-        window.print();
+    // Barcode generation using JsBarcode
+    function generateBarcode() {
+        const barcodeElement = document.getElementById('barcode');
+        if (!barcodeElement) return;
+        
+        try {
+            JsBarcode(barcodeElement, '<?php echo htmlspecialchars($digital_card['barcode']); ?>', {
+                format: 'CODE128',
+                width: 2,
+                height: 60,
+                displayValue: false,
+                background: '#ffffff',
+                lineColor: '#263c79'
+            });
+        } catch (error) {
+            console.error('Barcode generation error:', error);
+            barcodeElement.innerHTML = '<text y="30" x="50%" text-anchor="middle">Barcode Error</text>';
+        }
     }
+
+    // Download card as PNG
+    async function downloadCard() {
+        try {
+            // Hide download buttons temporarily
+            const downloadActions = document.querySelector('.download-actions');
+            const originalDisplay = downloadActions.style.display;
+            downloadActions.style.display = 'none';
+            
+            // Get the card container
+            const cardContainer = document.querySelector('.digital-card-container');
+            
+            // Use html2canvas to capture the card
+            const canvas = await html2canvas(cardContainer, {
+                backgroundColor: '#f5f6fa',
+                scale: 2, // Higher quality
+                logging: false,
+                useCORS: true
+            });
+            
+            // Restore download buttons
+            downloadActions.style.display = originalDisplay;
+            
+            // Convert canvas to blob and download
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'WIET_Library_Digital_ID_<?php echo $digital_card['member_no']; ?>.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+            
+        } catch (error) {
+            console.error('Download error:', error);
+            alert('Failed to download card. Please try printing instead.');
+        }
+    }
+
+    // Print card
+    function printCard() {
+        // Create a new window for printing
+        const printWindow = window.open('', '_blank');
+        const cardHTML = document.querySelector('.digital-card-container').outerHTML;
+        const featuresHTML = document.querySelector('.features-section').outerHTML;
+        
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>WIET Library Digital ID - <?php echo $digital_card['member_no']; ?></title>
+                <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+                <style>
+                    <?php
+                    // Include the same styles
+                    $style_start = strpos(file_get_contents(__FILE__), '<style>');
+                    $style_end = strpos(file_get_contents(__FILE__), '</style>');
+                    if ($style_start !== false && $style_end !== false) {
+                        echo substr(file_get_contents(__FILE__), $style_start + 7, $style_end - $style_start - 7);
+                    }
+                    ?>
+                    body {
+                        padding: 20px;
+                    }
+                    .download-actions {
+                        display: none !important;
+                    }
+                    @media print {
+                        body {
+                            padding: 0;
+                        }
+                        .digital-card-container {
+                            page-break-inside: avoid;
+                        }
+                        .features-section {
+                            page-break-before: always;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                ${cardHTML}
+                ${featuresHTML}
+                <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
+                <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
+                <script>
+                    // Generate QR code
+                    new QRCode(document.getElementById('qrcode'), {
+                        text: '<?php echo htmlspecialchars($digital_card['qr_code']); ?>',
+                        width: 150,
+                        height: 150,
+                        colorDark: '#263c79',
+                        colorLight: '#ffffff'
+                    });
+                    
+                    // Generate barcode
+                    JsBarcode('#barcode', '<?php echo htmlspecialchars($digital_card['barcode']); ?>', {
+                        format: 'CODE128',
+                        width: 2,
+                        height: 60,
+                        displayValue: false,
+                        background: '#ffffff',
+                        lineColor: '#263c79'
+                    });
+                    
+                    // Auto print after codes are generated
+                    setTimeout(function() {
+                        window.print();
+                        // Close window after printing (optional)
+                        // window.onafterprint = function() { window.close(); };
+                    }, 500);
+                <\/script>
+            </body>
+            </html>
+        `);
+        
+        printWindow.document.close();
+    }
+
+    // Initialize codes when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        generateQRCode();
+        generateBarcode();
+    });
 </script>
+
+<!-- External Libraries for QR Code and Barcode -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+

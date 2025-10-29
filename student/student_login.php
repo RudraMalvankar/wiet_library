@@ -4,6 +4,12 @@ session_start();
 require_once '../includes/db_connect.php';
 
 $error_message = "";
+$success_message = "";
+
+// Check for password reset success
+if (isset($_GET['reset']) && $_GET['reset'] == 'success') {
+    $success_message = "Password reset successful! Please login with your new password.";
+}
 
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -29,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     s.PRN,
                     s.Mobile,
                     s.ValidTill,
+                    s.Password,
                     m.MemberName,
                     m.Status,
                     m.BooksIssued,
@@ -43,8 +50,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->execute([$email]);
             $student = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            // Validate credentials (password is 123456 for all students)
-            if ($student && $password === '123456') {
+            // Validate credentials
+            $password_valid = false;
+            if ($student) {
+                // Check if student has a hashed password
+                if (!empty($student['Password']) && password_verify($password, $student['Password'])) {
+                    $password_valid = true;
+                } 
+                // Fallback to default password (123456) for students without hashed password
+                elseif ($password === '123456') {
+                    $password_valid = true;
+                }
+            }
+            
+            if ($student && $password_valid) {
                 // Check if membership is still valid
                 if ($student['ValidTill'] && strtotime($student['ValidTill']) < time()) {
                     $error_message = "Your library membership has expired. Please contact the library office.";
@@ -383,7 +402,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
         <?php 
         // Show success/info messages
-        if (isset($_GET['logout']) && $_GET['logout'] == '1'): ?>
+        if ($success_message): ?>
+            <div class="success-message" style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; text-align: center;">
+                <i class="fas fa-check-circle"></i> <?php echo $success_message; ?>
+            </div>
+        <?php endif; ?>
+        <?php if (isset($_GET['logout']) && $_GET['logout'] == '1'): ?>
             <div class="success-message" style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; text-align: center;">
                 <i class="fas fa-check-circle"></i> You have been successfully logged out.
             </div>
@@ -423,12 +447,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <input type="password" id="password" name="password" class="form-input" 
                            placeholder="Enter your password" required>
                 </div>
-                <small style="color: #666; font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                <div style="text-align: right; margin-top: 0.5rem;">
+                    <a href="forgot-password.php" style="color: #cfac69; font-size: 0.8rem; text-decoration: none; font-weight: 500;">
+                        <i class="fas fa-key"></i> Forgot Password?
+                    </a>
+                </div>
+                <small style="color: #666; font-size: 0.75rem; margin-top: 0.5rem; display: block;">
                     <i class="fas fa-info-circle"></i> Default password is <strong>123456</strong>
                 </small>
-            </div>
-            <div class="forgot-password">
-                <a href="#">Forgot Password?</a>
             </div>
             <button type="submit" class="login-btn">
                 <i class="fas fa-sign-in-alt"></i> Login
