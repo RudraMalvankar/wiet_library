@@ -21,14 +21,28 @@ try {
             $group = $_GET['group'] ?? 'all';
             $search = $_GET['search'] ?? '';
             
-            $sql = "SELECT m.*, 
+          // Select explicit columns so we can prefer Student.Mobile when Member.Phone is empty
+          $sql = "SELECT 
+                    m.MemberNo,
+                    m.MemberName,
+                    m.`Group`,
+                    m.Designation,
+                    COALESCE(m.Phone, s.Mobile) AS Phone,
+                    COALESCE(m.Email, s.Email) AS Email,
+                    m.FinePerDay,
+                    m.BooksIssued,
+                    m.AdmissionDate,
+                    m.ClosingDate,
+                    m.Status,
+                    s.PRN,
+                    s.Branch,
                     CASE WHEN s.StudentID IS NOT NULL THEN 'Student' 
-                         WHEN f.FacultyID IS NOT NULL THEN 'Faculty' 
-                         ELSE 'Other' END as MemberType
-                    FROM Member m
-                    LEFT JOIN Student s ON m.MemberNo = s.MemberNo
-                    LEFT JOIN Faculty f ON m.MemberNo = f.MemberNo
-                    WHERE 1=1";
+                        WHEN f.FacultyID IS NOT NULL THEN 'Faculty' 
+                        ELSE 'Other' END as MemberType
+                FROM Member m
+                LEFT JOIN Student s ON m.MemberNo = s.MemberNo
+                LEFT JOIN Faculty f ON m.MemberNo = f.MemberNo
+                WHERE 1=1";
             
             $params = [];
             
@@ -79,6 +93,12 @@ try {
                 sendJson(['success' => false, 'message' => 'Member not found'], 404);
             }
             
+            // Normalize phone/email fields: prefer Member.Phone then Student.Mobile
+            $memberPhone = isset($member['Phone']) && $member['Phone'] ? $member['Phone'] : (isset($member['Mobile']) ? $member['Mobile'] : null);
+            $memberEmail = isset($member['Email']) && $member['Email'] ? $member['Email'] : (isset($member['Email']) ? $member['Email'] : null);
+            $member['Phone'] = $memberPhone;
+            $member['Email'] = $memberEmail;
+
             // Get active circulations
             $circulations = getMemberActiveCirculations($pdo, $memberNo);
             $member['activeCirculations'] = $circulations;

@@ -502,6 +502,12 @@ require_once 'student_session_check.php';
           </a>
         </li>
         <li class="sidebar-item">
+          <a href="#" class="sidebar-link" data-page="chatbot">
+            <i class="sidebar-icon fas fa-robot"></i>
+            Library Assistant
+          </a>
+        </li>
+        <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="library-events">
             <i class="sidebar-icon fas fa-calendar"></i>
             Library Events
