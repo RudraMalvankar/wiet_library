@@ -12,7 +12,7 @@ header('Content-Type: application/json');
 session_start();
 
 // Basic debug logging (append-only)
-@file_put_contents(__DIR__ . '/api_debug.log', "\n[dashboard] " . date('c') . " REQUEST: " . ($_SERVER['REQUEST_URI'] ?? '') . "\n", FILE_APPEND);
+// @file_put_contents(__DIR__ . '/api_debug.log', "\n[dashboard] " . date('c') . " REQUEST: " . ($_SERVER['REQUEST_URI'] ?? '') . "\n", FILE_APPEND);
 
 try {
     // Ensure the user is authenticated as admin (best-effort; adjust to your auth system)
