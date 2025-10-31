@@ -1198,8 +1198,9 @@
             </div>
 
             <div class="footer-bottom">
-                <p>&copy; 2025 WIET College Library.</p>
+                <p>&copy; 2025 WIET College Library | Developed and Managed by <a href="developer.php" style="color: var(--yellow); text-decoration: none; font-weight: 600; transition: all 0.3s ease;">WIET Library Team</a></p>
             </div>
+            
         </div>
     </footer>
 
