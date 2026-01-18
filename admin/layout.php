@@ -512,7 +512,7 @@ $is_superadmin = $current_admin['is_superadmin'];
     <aside class="sidebar" id="sidebar">
       <ul class="sidebar-menu">
         <li class="sidebar-item">
-          <a href="#" class="sidebar-link" data-page="dashboard">
+          <a href="#dashboard.php" class="sidebar-link" data-page="dashboard">
             <i class="sidebar-icon fas fa-tachometer-alt"></i>
             <span>Dashboard</span>
           </a>

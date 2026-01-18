@@ -37,6 +37,115 @@ function verifyPassword($password, $hash) {
     return password_verify($password, $hash);
 }
 
+/**
+ * Generate CSRF token for form protection
+ */
+function generateCSRFToken() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Validate CSRF token
+ */
+function validateCSRFToken($token) {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    if (empty($_SESSION['csrf_token']) || $token !== $_SESSION['csrf_token']) {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Rate limiting function to prevent API abuse
+ * @param string $identifier Unique identifier (user ID, IP, etc.)
+ * @param int $maxRequests Maximum requests allowed
+ * @param int $timeWindow Time window in seconds
+ * @return bool True if within rate limit, false if exceeded
+ */
+function checkRateLimit($identifier, $maxRequests = 100, $timeWindow = 60) {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    $key = "rate_limit_" . md5($identifier);
+    
+    if (!isset($_SESSION[$key])) {
+        $_SESSION[$key] = ['count' => 1, 'start' => time()];
+        return true;
+    }
+    
+    $data = $_SESSION[$key];
+    $elapsed = time() - $data['start'];
+    
+    // Reset if time window passed
+    if ($elapsed > $timeWindow) {
+        $_SESSION[$key] = ['count' => 1, 'start' => time()];
+        return true;
+    }
+    
+    // Check limit
+    if ($data['count'] >= $maxRequests) {
+        return false;
+    }
+    
+    // Increment counter
+    $_SESSION[$key]['count']++;
+    return true;
+}
+
+/**
+ * Validate and sanitize integer input
+ */
+function validateInt($value, $min = null, $max = null) {
+    $filtered = filter_var($value, FILTER_VALIDATE_INT);
+    if ($filtered === false) {
+        return false;
+    }
+    if ($min !== null && $filtered < $min) {
+        return false;
+    }
+    if ($max !== null && $filtered > $max) {
+        return false;
+    }
+    return $filtered;
+}
+
+/**
+ * Validate and sanitize string input
+ */
+function validateString($value, $maxLength = 255, $pattern = null) {
+    if (!is_string($value) && !is_numeric($value)) {
+        return false;
+    }
+    $value = trim((string)$value);
+    if (strlen($value) > $maxLength) {
+        return false;
+    }
+    if ($pattern !== null && !preg_match($pattern, $value)) {
+        return false;
+    }
+    return $value;
+}
+
+/**
+ * Validate date format (YYYY-MM-DD)
+ */
+function validateDate($date) {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        return false;
+    }
+    $parts = explode('-', $date);
+    return checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0]) ? $date : false;
+}
+
 // Member Functions
 // ================
 
@@ -215,7 +324,7 @@ function returnBook($pdo, $circulationId, $condition = 'Good', $remarks = '') {
         
         // Insert return record
         $stmt = $pdo->prepare("
-            INSERT INTO `Return` (CirculationID, MemberNo, AccNo, ReturnDate, ReturnTime, FineAmount, Condition, Remarks)
+            INSERT INTO `Return` (CirculationID, MemberNo, AccNo, ReturnDate, ReturnTime, FineAmount, `Condition`, Remarks)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([

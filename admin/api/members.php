@@ -9,12 +9,37 @@ require_once '../../includes/functions.php';
 
 header('Content-Type: application/json');
 
+// Start session for authentication and CSRF
+session_start();
+
+// Rate limiting check
+$identifier = $_SESSION['AdminID'] ?? $_SESSION['admin_id'] ?? $_SERVER['REMOTE_ADDR'];
+if (!checkRateLimit($identifier, 100, 60)) {
+    sendJson(['success' => false, 'message' => 'Rate limit exceeded. Please try again later.'], 429);
+}
+
 // Get request method and action
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
+// CSRF validation for POST/PUT/DELETE requests
+if (in_array($method, ['POST', 'PUT', 'DELETE'])) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $csrfToken = $data['csrf_token'] ?? $_POST['csrf_token'] ?? '';
+    
+    if (!validateCSRFToken($csrfToken)) {
+        sendJson(['success' => false, 'message' => 'Invalid CSRF token. Please refresh the page.'], 403);
+    }
+}
+
 try {
     switch ($action) {
+        case 'get-csrf-token':
+            // Get CSRF token for form submissions
+            $token = generateCSRFToken();
+            sendJson(['success' => true, 'token' => $token]);
+            break;
+            
         case 'list':
             // Get all members or filtered list
             $status = $_GET['status'] ?? 'all';

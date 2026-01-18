@@ -1197,6 +1197,38 @@ try {
             }
         }
 
+        let csrfToken = null;
+
+        // Fetch CSRF token on page load
+        async function fetchCSRFToken() {
+            try {
+                const response = await fetch('api/members.php?action=get-csrf-token');
+                const result = await response.json();
+                if (result.success) {
+                    csrfToken = result.token;
+                    console.log('✅ CSRF token loaded');
+                }
+            } catch (error) {
+                console.error('Failed to load CSRF token:', error);
+            }
+        }
+
+        let csrfToken = null;
+
+        // Fetch CSRF token on page load
+        async function fetchCSRFToken() {
+            try {
+                const response = await fetch('api/members.php?action=get-csrf-token');
+                const result = await response.json();
+                if (result.success) {
+                    csrfToken = result.token;
+                    console.log('✅ CSRF token loaded');
+                }
+            } catch (error) {
+                console.error('Failed to load CSRF token:', error);
+            }
+        }
+
         async function fetchStudentsData(forceRefresh = false) {
             // Check if cache is valid
             const now = Date.now();
@@ -1676,6 +1708,7 @@ try {
             
             // Add action parameter
             formData.append('action', 'add_student');
+            formData.append('csrf_token', csrfToken);
 
             try {
                 const response = await fetch('api/members.php', {
@@ -1706,6 +1739,7 @@ try {
             
             // Add action parameter
             formData.append('action', 'add_student');
+            formData.append('csrf_token', csrfToken);
 
             try {
                 const response = await fetch('api/members.php', {
@@ -1810,7 +1844,8 @@ try {
                     },
                     body: JSON.stringify({
                         action: 'delete_student',
-                        studentId: studentId
+                        studentId: studentId,
+                        csrf_token: csrfToken
                     })
                 });
 
@@ -2245,6 +2280,7 @@ try {
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
+            fetchCSRFToken();
             loadStatistics();
             loadStudentsTable();
         });

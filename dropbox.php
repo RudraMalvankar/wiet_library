@@ -270,6 +270,11 @@
                 }
             });
         }
+        
+        // Expose functions to window scope for onclick handlers
+        window.startBookScan = startBookScan;
+        window.startStudentScan = startStudentScan;
+        
         // Start camera feeds on page load
         window.addEventListener('DOMContentLoaded', function() {
             startBookCamera();

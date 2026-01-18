@@ -1,10 +1,27 @@
 <?php
 // Check-out API - Process library exit
+session_start();
 header('Content-Type: application/json');
 require_once '../../includes/db_connect.php';
+require_once '../../includes/functions.php';
+
+// Rate limiting
+if (!checkRateLimit('footfall_checkout_api', 100, 60)) {
+    http_response_code(429);
+    echo json_encode(['success' => false, 'message' => 'Too many requests. Please try again later.']);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request method']);
+    exit;
+}
+
+// CSRF protection
+$token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if (!validateCSRFToken($token)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
     exit;
 }
 

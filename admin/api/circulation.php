@@ -12,8 +12,24 @@ header('Content-Type: application/json');
 // Start session for admin info
 session_start();
 
+// Rate limiting check
+$identifier = $_SESSION['AdminID'] ?? $_SERVER['REMOTE_ADDR'];
+if (!checkRateLimit($identifier, 100, 60)) {
+    sendJson(['success' => false, 'message' => 'Rate limit exceeded. Please try again later.'], 429);
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
+
+// CSRF validation for POST requests
+if ($method === 'POST') {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $csrfToken = $data['csrf_token'] ?? '';
+    
+    if (!validateCSRFToken($csrfToken)) {
+        sendJson(['success' => false, 'message' => 'Invalid CSRF token. Please refresh the page.'], 403);
+    }
+}
 
 try {
     switch ($action) {
@@ -138,6 +154,12 @@ try {
             sendJson(['success' => true, 'data' => $circulations]);
             break;
             
+        case 'get-csrf-token':
+            // Get CSRF token for form submissions
+            $token = generateCSRFToken();
+            sendJson(['success' => true, 'token' => $token]);
+            break;
+            
         case 'overdue':
             // Get overdue books
             $overdueBooks = getOverdueBooks($pdo);
@@ -153,7 +175,7 @@ try {
                 SELECT c.*, 
                        m.MemberName,
                        b.Title, b.Author1,
-                       r.ReturnDate, r.FineAmount, r.Condition
+                       r.ReturnDate, r.FineAmount, r.`Condition`
                 FROM Circulation c
                 JOIN Member m ON c.MemberNo = m.MemberNo
                 JOIN Holding h ON c.AccNo = h.AccNo

@@ -11,6 +11,14 @@ header('Content-Type: application/json');
 // Start session & ensure student is logged in
 require_once __DIR__ . '/../../student/student_session_check.php'; // defines $member_no and $student_id
 require_once __DIR__ . '/../../includes/db_connect.php';
+require_once __DIR__ . '/../../includes/functions.php';
+
+// Rate limiting
+if (!checkRateLimit('chatbot_api', 100, 60)) {
+    http_response_code(429);
+    echo json_encode(['success' => false, 'message' => 'Too many requests. Please try again later.']);
+    exit;
+}
 
 $action = $_GET['action'] ?? ($_POST['action'] ?? '');
 

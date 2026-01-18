@@ -9,6 +9,15 @@ require_once '../../includes/functions.php';
 
 header('Content-Type: application/json');
 
+// Start session for authentication and CSRF
+session_start();
+
+// Rate limiting check
+$identifier = $_SESSION['AdminID'] ?? $_SESSION['admin_id'] ?? $_SERVER['REMOTE_ADDR'];
+if (!checkRateLimit($identifier, 100, 60)) {
+    sendJson(['success' => false, 'message' => 'Rate limit exceeded. Please try again later.'], 429);
+}
+
 // Helper: generate QR file and return filename; uses phpqrcode if available
 function generate_qr_file($text) {
     $baseDir = realpath(__DIR__ . '/../../storage');
@@ -131,32 +140,19 @@ function generate_qr_png($text) {
     return null;
 }
 
-// Quick debug entry log
-file_put_contents(__DIR__ . '/api_debug.log', "\n[ENTRY] " . date('c') . " REQUEST: " . ($_SERVER['REQUEST_URI'] ?? '') . "\n", FILE_APPEND);
-
 session_start();
-
-// Debugging helper: capture any unexpected output or fatal errors to a log
-ob_start();
-register_shutdown_function(function() {
-    $logFile = __DIR__ . '/api_debug.log';
-    $output = ob_get_contents();
-    $err = error_get_last();
-    $data = "\n=== API DEBUG " . date('c') . " ===\n";
-    $data .= "REQUEST_URI: " . ($_SERVER['REQUEST_URI'] ?? '') . "\n";
-    $data .= "REQUEST_METHOD: " . ($_SERVER['REQUEST_METHOD'] ?? '') . "\n";
-    $data .= "OUTPUT:\n" . $output . "\n";
-    if ($err) {
-        $data .= "ERROR:\n" . print_r($err, true) . "\n";
-    }
-    file_put_contents($logFile, $data, FILE_APPEND);
-});
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
 try {
     switch ($action) {
+        case 'get-csrf-token':
+            // Get CSRF token for form submissions
+            $token = generateCSRFToken();
+            sendJson(['success' => true, 'token' => $token]);
+            break;
+            
         case 'list':
             // Get all books with holding information, with pagination
             $search = $_GET['search'] ?? '';

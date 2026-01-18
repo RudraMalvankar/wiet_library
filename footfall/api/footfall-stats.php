@@ -1,7 +1,16 @@
 <?php
 // Footfall Statistics API
+session_start();
 header('Content-Type: application/json');
 require_once '../../includes/db_connect.php';
+require_once '../../includes/functions.php';
+
+// Rate limiting
+if (!checkRateLimit('footfall_stats_api', 100, 60)) {
+    http_response_code(429);
+    echo json_encode(['success' => false, 'message' => 'Too many requests. Please try again later.']);
+    exit;
+}
 
 try {
     // Today's visits

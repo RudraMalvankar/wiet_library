@@ -2,9 +2,9 @@
 // Include AJAX handler FIRST
 require_once 'ajax-handler.php';
 
-// Enable error display for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+// Production mode - errors logged to PHP error log
+// error_reporting(E_ALL);
+// ini_set('display_errors', 1);
 
 session_start();
 
@@ -16,71 +16,14 @@ $admin_id = $_SESSION['admin_id'] ?? 1;
 $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
 // ============================================================
-// DATA SOURCE: DATABASE (Fully Integrated)
+// DATA SOURCE: DATABASE (Fully Integrated via APIs)
 // ============================================================
-// ✅ Issue books - POSTS to api/circulation.php?action=issue
-// ✅ Return books - POSTS to api/circulation.php?action=return
-// ✅ Active circulations - FETCHES from api/circulation.php?action=active
-// ✅ Return history - FETCHES from api/circulation.php?action=history
-// ✅ Member search - FETCHES from api/members.php?action=get
-// ✅ Book search - FETCHES from api/books.php?action=get
+// ✅ All data is fetched dynamically from these API endpoints:
+//    - api/circulation.php (issue, return, active, history, stats)
+//    - api/members.php (member search)
+//    - api/books.php (book search)
+// ✅ No dummy data needed - JavaScript handles all data loading
 // ============================================================
-
-// For now, using dummy data for UI display
-// Once JavaScript is updated to call APIs, this can be removed
-
-$sampleMembers = [
-    ['MemberNo' => 2024001, 'MemberName' => 'Rahul Sharma', 'Group' => 'Student', 'BooksIssued' => 2, 'Status' => 'Active'],
-    ['MemberNo' => 2024002, 'MemberName' => 'Priya Patel', 'Group' => 'Student', 'BooksIssued' => 1, 'Status' => 'Active'],
-    ['MemberNo' => 2024003, 'MemberName' => 'Dr. Amit Kumar', 'Group' => 'Faculty', 'BooksIssued' => 3, 'Status' => 'Active'],
-];
-
-$sampleBooks = [
-    ['AccNo' => 'ACC001001', 'CatNo' => 1001, 'Title' => 'Introduction to Computer Science', 'Author1' => 'John Smith', 'Status' => 'Available'],
-    ['AccNo' => 'ACC001002', 'CatNo' => 1001, 'Title' => 'Introduction to Computer Science', 'Author1' => 'John Smith', 'Status' => 'Issued'],
-    ['AccNo' => 'ACC002001', 'CatNo' => 1002, 'Title' => 'Advanced Mathematics', 'Author1' => 'Jane Doe', 'Status' => 'Available'],
-];
-
-$sampleCirculations = [
-    [
-        'CirculationID' => 1,
-        'MemberNo' => 2024001,
-        'MemberName' => 'Rahul Sharma',
-        'AccNo' => 'ACC001002',
-        'Title' => 'Introduction to Computer Science',
-        'IssueDate' => '2024-09-20',
-        'DueDate' => '2024-10-05',
-        'Status' => 'Active',
-        'DaysLeft' => 3
-    ],
-    [
-        'CirculationID' => 2,
-        'MemberNo' => 2024002,
-        'MemberName' => 'Priya Patel',
-        'AccNo' => 'ACC003001',
-        'Title' => 'Database Management Systems',
-        'IssueDate' => '2024-09-18',
-        'DueDate' => '2024-10-03',
-        'Status' => 'Overdue',
-        'DaysLeft' => -2
-    ],
-];
-
-$sampleReturns = [
-    [
-        'ReturnID' => 1,
-        'CirculationID' => 3,
-        'MemberNo' => 2024003,
-        'MemberName' => 'Dr. Amit Kumar',
-        'AccNo' => 'ACC004001',
-        'Title' => 'Software Engineering',
-        'IssueDate' => '2024-09-10',
-        'ReturnDate' => '2024-09-25',
-        'DueDate' => '2024-09-25',
-        'FineAmount' => 0.00,
-        'Status' => 'Returned'
-    ],
-];
 ?>
 
 <!DOCTYPE html>
@@ -255,6 +198,35 @@ $sampleReturns = [
         .btn-secondary {
             background-color: #6c757d;
             color: white;
+        }
+
+        .btn-renew {
+            background-color: #17a2b8;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            margin-right: 5px;
+        }
+
+        .btn-renew:hover {
+            background-color: #138496;
+        }
+
+        .btn-return {
+            background-color: #ffc107;
+            color: #212529;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn-return:hover {
+            background-color: #e0a800;
         }
 
         .issue-form,
@@ -670,7 +642,6 @@ $sampleReturns = [
 </head>
 
 <body>
-<!-- DEBUG: Page loaded at <?php echo date('Y-m-d H:i:s'); ?> -->
 <div class="page-container">
     <div class="circulation-header">
         <h1 class="circulation-title">
@@ -1193,25 +1164,7 @@ $sampleReturns = [
         // TODO: Send to server via fetch if needed
         console.log('Audit:', entry);
     }
-    // Utility: Populate camera select dropdowns
-    async function populateCameraSelect(selectId) {
-        const select = document.getElementById(selectId);
-        if (!select) return;
-        try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoInputs = devices.filter(d => d.kind === 'videoinput');
-            select.innerHTML = '';
-            videoInputs.forEach((device, idx) => {
-                const option = document.createElement('option');
-                option.value = device.deviceId;
-                option.text = device.label || `Camera ${idx+1}`;
-                select.appendChild(option);
-            });
-            select.style.display = videoInputs.length > 1 ? 'inline-block' : 'none';
-        } catch (err) {
-            select.style.display = 'none';
-        }
-    }
+    
     // Tab switching function - MUST BE AT TOP FOR ONCLICK HANDLERS
     window.showTab = function(tabName) {
         console.log('showTab called with:', tabName);
@@ -1248,7 +1201,63 @@ $sampleReturns = [
     let selectedMember = null;
     let selectedBook = null;
     let returnBookData = null;
+    let csrfToken = null;
 
+        // Fetch CSRF token on page load
+        async function fetchCSRFToken() {
+            try {
+                const response = await fetch('api/circulation.php?action=get-csrf-token');
+                const result = await response.json();
+                if (result.success) {
+                    csrfToken = result.token;
+                    console.log('✅ CSRF token loaded');
+                }
+            } catch (error) {
+                console.error('Failed to load CSRF token:', error);
+            }
+        }
+
+        // Show notification to user
+        function showNotification(message, type = 'info') {
+            // Create notification element if it doesn't exist
+            let notification = document.getElementById('notification-toast');
+            if (!notification) {
+                notification = document.createElement('div');
+                notification.id = 'notification-toast';
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    z-index: 10000;
+                    max-width: 400px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    display: none;
+                    animation: slideIn 0.3s ease-out;
+                `;
+                document.body.appendChild(notification);
+            }
+
+            // Set color based on type
+            const colors = {
+                'success': '#28a745',
+                'error': '#dc3545',
+                'warning': '#ffc107',
+                'info': '#17a2b8'
+            };
+            notification.style.backgroundColor = colors[type] || colors['info'];
+            notification.style.color = type === 'warning' ? '#212529' : 'white';
+            notification.textContent = message;
+            notification.style.display = 'block';
+
+            // Auto hide after 5 seconds
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 5000);
+        }
 
         function loadTabContent(tabName) {
             switch (tabName) {
@@ -1332,7 +1341,6 @@ $sampleReturns = [
                 document.getElementById('memberInfo').classList.remove('show');
             }
         }
-        window.searchMember = searchMember;
 
         function simulateBookScan() {
             const accNo = prompt('Simulate Barcode Scan - Enter Accession Number:', 'ACC001001');
@@ -1419,7 +1427,6 @@ $sampleReturns = [
                 document.getElementById('bookInfo').classList.remove('show');
             }
         }
-        window.searchBook = searchBook;
 
         function checkIssueFormComplete() {
             const issueBtn = document.getElementById('issueBtn');
@@ -1474,6 +1481,7 @@ $sampleReturns = [
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
+                        csrf_token: csrfToken,
                         memberNo: selectedMember.MemberNo,
                         accNo: selectedBook.AccNo,
                         issueDate: issueDate,
@@ -1513,7 +1521,6 @@ $sampleReturns = [
                 issueBtn.innerHTML = originalText;
             }
         }
-        window.issueBook = issueBook;
 
         function resetIssueForm() {
             // Stop camera if running
@@ -1634,7 +1641,6 @@ $sampleReturns = [
                 document.getElementById('returnBtn').disabled = true;
             }
         }
-        window.searchReturnBook = searchReturnBook;
 
         async function returnBook() {
             if (!returnBookData) {
@@ -1670,6 +1676,7 @@ $sampleReturns = [
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
+                        csrf_token: csrfToken,
                         circulationId: returnBookData.CirculationID,
                         returnDate: returnDate,
                         condition: condition,
@@ -1716,7 +1723,6 @@ $sampleReturns = [
                 returnBtn.innerHTML = originalText;
             }
         }
-        window.returnBook = returnBook;
 
         function resetReturnForm() {
             // Stop camera if running
@@ -1742,6 +1748,42 @@ $sampleReturns = [
             document.getElementById('returnBtn').disabled = true;
             
             console.log('Return form reset complete');
+        }
+
+        // Renew Book Function
+        async function renewBook(circulationId) {
+            if (!confirm('Renew this book for 15 more days?')) return;
+            
+            try {
+                const response = await fetch('api/circulation.php?action=renew', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        csrf_token: csrfToken,
+                        circulationId: circulationId 
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('✅ Book renewed successfully! New due date: ' + result.newDueDate, 'success');
+                    loadActiveCirculations(); // Refresh table
+                    loadStatistics(); // Update stats
+                } else {
+                    showNotification('❌ ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Renew error:', error);
+                showNotification('❌ Failed to renew book. Please try again.', 'error');
+            }
+        }
+
+        // Process Return from Active Circulations
+        function processReturn(accNo) {
+            showTab('return');
+            document.getElementById('returnAccNo').value = accNo;
+            searchReturnBook();
         }
 
         // Load Active Circulations from API
@@ -1948,7 +1990,6 @@ $sampleReturns = [
                 showScanError('memberScanError', 'Could not access camera. Please check permissions.');
             }
         }
-        window.startMemberScan = startMemberScan;
 
         function stopMemberScan() {
             if (memberStream) {
@@ -1971,7 +2012,6 @@ $sampleReturns = [
             stopBtn.disabled = true;
             document.getElementById('memberScanningOverlay').style.display = 'none';
         }
-        window.stopMemberScan = stopMemberScan;
 
         function handleMemberScanResult(scannedData) {
             console.log('Member scan result:', scannedData);
@@ -2040,7 +2080,6 @@ $sampleReturns = [
                 showScanError('bookScanError', 'Could not access camera. Please check permissions.');
             }
         }
-        window.startBookScan = startBookScan;
 
         function stopBookScan() {
             if (bookStream) {
@@ -2063,7 +2102,6 @@ $sampleReturns = [
             stopBtn.disabled = true;
             document.getElementById('bookScanningOverlay').style.display = 'none';
         }
-        window.stopBookScan = stopBookScan;
 
         function handleBookScanResult(scannedData) {
             console.log('Book scan result:', scannedData);
@@ -2129,7 +2167,6 @@ $sampleReturns = [
                 showScanError('returnScanError', 'Could not access camera. Please check permissions.');
             }
         }
-        window.startReturnScan = startReturnScan;
 
         function stopReturnScan() {
             if (returnStream) {
@@ -2152,7 +2189,6 @@ $sampleReturns = [
             stopBtn.disabled = true;
             document.getElementById('returnScanningOverlay').style.display = 'none';
         }
-        window.stopReturnScan = stopReturnScan;
 
         function handleReturnScanResult(scannedData) {
             console.log('Return scan result:', scannedData);
@@ -2222,6 +2258,9 @@ $sampleReturns = [
             console.log('✅ Circulation page loaded successfully');
             console.log('📅 Current date:', new Date().toLocaleDateString());
             
+            // Fetch CSRF token first
+            fetchCSRFToken();
+            
             // Initialize code readers
             initializeCodeReaders();
 
@@ -2236,13 +2275,28 @@ $sampleReturns = [
             console.log('✅ All initialization complete');
         });
 
-        // Ensure all scan functions are globally accessible for button onclick handlers
+        // Make all functions globally accessible for onclick handlers
         window.startMemberScan = startMemberScan;
         window.stopMemberScan = stopMemberScan;
         window.startBookScan = startBookScan;
         window.stopBookScan = stopBookScan;
         window.startReturnScan = startReturnScan;
         window.stopReturnScan = stopReturnScan;
+        window.searchMember = searchMember;
+        window.searchBook = searchBook;
+        window.issueBook = issueBook;
+        window.searchReturnBook = searchReturnBook;
+        window.returnBook = returnBook;
+        window.resetIssueForm = resetIssueForm;
+        window.resetReturnForm = resetReturnForm;
+        window.searchCirculations = searchCirculations;
+        window.loadActiveCirculations = loadActiveCirculations;
+        window.loadReturnHistory = loadReturnHistory;
+        window.openQuickScan = openQuickScan;
+        window.closeQuickScan = closeQuickScan;
+        window.lookupAccNo = lookupAccNo;
+        window.renewBook = renewBook;
+        window.processReturn = processReturn;
 
         // Clean up streams when page unloads
         window.addEventListener('beforeunload', function() {
@@ -2250,8 +2304,6 @@ $sampleReturns = [
             stopBookScan();
             stopReturnScan();
         });
-
-        // ...existing code...
     </script>
 
     <!-- Quick Scan Modal -->

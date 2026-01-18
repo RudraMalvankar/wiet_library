@@ -1,8 +1,32 @@
 <?php
 require_once '../../includes/db_connect.php';
+require_once '../../includes/functions.php';
+
+session_start();
 header('Content-Type: application/json');
 
+// Rate limiting check
+$identifier = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? $_SERVER['REMOTE_ADDR'];
+if (!checkRateLimit($identifier, 100, 60)) {
+    echo json_encode(['success' => false, 'message' => 'Rate limit exceeded. Please try again later.']);
+    http_response_code(429);
+    exit();
+}
+
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
+
+// CSRF validation for POST requests
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['create', 'edit', 'delete'])) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $csrfToken = $data['csrf_token'] ?? $_POST['csrf_token'] ?? '';
+    
+    if (!validateCSRFToken($csrfToken)) {
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token. Please refresh the page.']);
+        http_response_code(403);
+        exit();
+    }
+}
+
 $response = ['success' => false, 'message' => '', 'data' => null];
 
 try {

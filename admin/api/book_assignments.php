@@ -1,9 +1,34 @@
 <?php
 // Book Assignments API
+session_start();
 require_once '../../includes/db_connect.php';
+require_once '../../includes/functions.php';
 header('Content-Type: application/json');
 
+// Rate limiting
+if (!checkRateLimit('book_assignments_api', 100, 60)) {
+    http_response_code(429);
+    echo json_encode(['success' => false, 'message' => 'Too many requests. Please try again later.']);
+    exit;
+}
+
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
+
+// CSRF protection for write operations
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'get-csrf-token') {
+    $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!validateCSRFToken($token)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+        exit;
+    }
+}
+
+// Handle CSRF token request
+if ($action === 'get-csrf-token') {
+    echo json_encode(['success' => true, 'token' => generateCSRFToken()]);
+    exit;
+}
 
 function fetch_assignments($pdo) {
     $sql = "SELECT a.AssignmentID, a.CourseCode, a.CourseName, a.Branch, a.Semester, a.Year, a.Faculty, a.CatNo, b.Title, b.Author1 AS Author, a.AssignmentType, a.Priority, a.RequiredCopies, 

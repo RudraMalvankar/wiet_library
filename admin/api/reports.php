@@ -7,9 +7,15 @@
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+session_start();
 header('Content-Type: application/json');
 
-session_start();
+// Rate limiting check
+$identifier = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? $_SERVER['REMOTE_ADDR'];
+if (!checkRateLimit($identifier, 100, 60)) {
+    sendJson(['success' => false, 'message' => 'Rate limit exceeded. Please try again later.'], 429);
+}
+
 $adminId = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? 1;
 
 $action = $_GET['action'] ?? '';

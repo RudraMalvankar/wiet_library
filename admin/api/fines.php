@@ -7,7 +7,16 @@
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+session_start();
 header('Content-Type: application/json');
+
+// Rate limiting check
+$identifier = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? $_SERVER['REMOTE_ADDR'];
+if (!checkRateLimit($identifier, 100, 60)) {
+    sendJson(['success' => false, 'message' => 'Rate limit exceeded. Please try again later.'], 429);
+}
+
+$adminId = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? 1;
 
 // Ensure FinePayments table exists
 try {
@@ -36,10 +45,22 @@ try {
 $action = $_GET['action'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'];
 
-session_start();
-$adminId = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? 1;
+// CSRF validation for POST requests
+if ($method === 'POST') {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $csrfToken = $data['csrf_token'] ?? $_POST['csrf_token'] ?? '';
+    
+    if (!validateCSRFToken($csrfToken)) {
+        sendJson(['success' => false, 'message' => 'Invalid CSRF token. Please refresh the page.'], 403);
+    }
+}
 
 switch ($action) {
+    case 'get-csrf-token':
+        $token = generateCSRFToken();
+        sendJson(['success' => true, 'token' => $token]);
+        break;
+        
     case 'pending':
         // Get pending fines
         $search = $_GET['search'] ?? '';

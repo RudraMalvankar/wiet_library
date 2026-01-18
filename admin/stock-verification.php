@@ -607,7 +607,8 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 codeReader = new ZXing.BrowserMultiFormatReader();
                 console.log('QR/Barcode reader initialized');
             } else {
-                console.error('ZXing library not loaded');
+                console.warn('ZXing library not loaded yet, retrying in 100ms...');
+                setTimeout(initializeCodeReader, 100);
             }
         }
 

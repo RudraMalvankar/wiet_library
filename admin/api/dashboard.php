@@ -7,9 +7,14 @@
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+session_start();
 header('Content-Type: application/json');
 
-session_start();
+// Rate limiting check
+$identifier = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? $_SERVER['REMOTE_ADDR'];
+if (!checkRateLimit($identifier, 100, 60)) {
+    sendJson(['success' => false, 'message' => 'Rate limit exceeded. Please try again later.'], 429);
+}
 
 // Basic debug logging (append-only)
 // @file_put_contents(__DIR__ . '/api_debug.log', "\n[dashboard] " . date('c') . " REQUEST: " . ($_SERVER['REQUEST_URI'] ?? '') . "\n", FILE_APPEND);
