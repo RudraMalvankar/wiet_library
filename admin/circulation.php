@@ -2016,20 +2016,27 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         function handleMemberScanResult(scannedData) {
             console.log('Member scan result:', scannedData);
 
-            // Extract member number from scanned data (assuming it contains member number)
+            // Extract member number from scanned data
+            // QR Code Format: PRN-MemberNo (e.g., "C25116-25116")
             let memberNo = scannedData;
+
+            // Parse QR code format: PRN-MemberNo
+            if (scannedData.includes('-')) {
+                const parts = scannedData.split('-');
+                memberNo = parts[parts.length - 1]; // Get MemberNo (last part)
+                console.log('Extracted MemberNo from QR:', memberNo);
+            }
 
             // If it's a JSON or structured data, try to extract member number
             try {
                 const data = JSON.parse(scannedData);
-                memberNo = data.memberNo || data.MemberNo || data.id || scannedData;
+                memberNo = data.memberNo || data.MemberNo || data.id || memberNo;
             } catch (e) {
-                // If not JSON, assume the scanned data is the member number
-                memberNo = scannedData;
+                // Not JSON, use the extracted memberNo
             }
 
             document.getElementById('memberNo').value = memberNo;
-            showScanResult('memberScanResult', `Member scanned: ${memberNo}`);
+            showScanResult('memberScanResult', `✅ Member QR scanned: ${memberNo}`);
             searchMember();
             stopMemberScan();
         }
@@ -2106,17 +2113,18 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         function handleBookScanResult(scannedData) {
             console.log('Book scan result:', scannedData);
 
-            let accNo = scannedData;
+            let accNo = scannedData.trim();
 
+            // If it's JSON format, extract accession number
             try {
                 const data = JSON.parse(scannedData);
-                accNo = data.accNo || data.AccNo || data.barcode || scannedData;
+                accNo = data.accNo || data.AccNo || data.AccessionNo || data.barcode || scannedData;
             } catch (e) {
-                accNo = scannedData;
+                // Not JSON, use raw scanned data as AccNo
             }
 
             document.getElementById('accNo').value = accNo;
-            showScanResult('bookScanResult', `Book scanned: ${accNo}`);
+            showScanResult('bookScanResult', `✅ Book scanned: ${accNo}`);
             searchBook();
             stopBookScan();
         }
@@ -2193,17 +2201,18 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         function handleReturnScanResult(scannedData) {
             console.log('Return scan result:', scannedData);
 
-            let accNo = scannedData;
+            let accNo = scannedData.trim();
 
+            // If it's JSON format, extract accession number
             try {
                 const data = JSON.parse(scannedData);
-                accNo = data.accNo || data.AccNo || data.barcode || scannedData;
+                accNo = data.accNo || data.AccNo || data.AccessionNo || data.barcode || scannedData;
             } catch (e) {
-                accNo = scannedData;
+                // Not JSON, use raw scanned data as AccNo
             }
 
             document.getElementById('returnAccNo').value = accNo;
-            showScanResult('returnScanResult', `Book scanned: ${accNo}`);
+            showScanResult('returnScanResult', `✅ Book scanned for return: ${accNo}`);
             searchReturnBook();
             stopReturnScan();
         }
@@ -2252,6 +2261,88 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             }
         }
 
+        // Quick Scan Modal Functions
+        function openQuickScan() {
+            document.getElementById('quickScanModal').style.display = 'flex';
+            document.getElementById('quickScanInput').value = '';
+            document.getElementById('quickScanResult').style.display = 'none';
+            document.getElementById('quickScanError').style.display = 'none';
+            document.getElementById('quickScanInput').focus();
+        }
+
+        function closeQuickScan() {
+            document.getElementById('quickScanModal').style.display = 'none';
+        }
+
+        function lookupAccNo() {
+            const accNo = document.getElementById('quickScanInput').value.trim();
+            if (!accNo) return;
+
+            document.getElementById('quickScanLoading').style.display = 'block';
+            document.getElementById('quickScanResult').style.display = 'none';
+            document.getElementById('quickScanError').style.display = 'none';
+
+            fetch(`api/books.php?action=lookup&accNo=${encodeURIComponent(accNo)}`)
+                .then(res => res.json())
+                .then(result => {
+                    document.getElementById('quickScanLoading').style.display = 'none';
+                    
+                    if (result.success && result.data) {
+                        const h = result.data;
+                        let html = `
+                            <div style="margin-bottom:10px;"><strong>AccNo:</strong> ${escapeHtml(h.AccNo || '')}</div>
+                            <div style="margin-bottom:10px;"><strong>Book:</strong> ${escapeHtml(h.Title || 'Unknown')}</div>
+                            <div style="margin-bottom:10px;"><strong>Author:</strong> ${escapeHtml(h.Author1 || 'Unknown')}</div>
+                            <div style="margin-bottom:10px;"><strong>Publisher:</strong> ${escapeHtml(h.Publisher || 'N/A')} (${h.Year || 'N/A'})</div>
+                            <div style="margin-bottom:10px;"><strong>Status:</strong> <span class="status-badge status-${(h.Status || 'available').toLowerCase()}">${escapeHtml(h.Status || 'Unknown')}</span></div>
+                            <div style="margin-bottom:10px;"><strong>Location:</strong> ${escapeHtml(h.Location || 'N/A')}</div>
+                        `;
+                        
+                        document.getElementById('quickScanDetails').innerHTML = html;
+                        document.getElementById('quickScanResult').style.display = 'block';
+                        
+                        // Show action buttons based on status
+                        document.getElementById('quickIssueBtn').style.display = (h.Status === 'Available') ? 'inline-block' : 'none';
+                        document.getElementById('quickReturnBtn').style.display = (h.Status === 'Issued') ? 'inline-block' : 'none';
+                        
+                        // Store for quick actions
+                        window.currentQuickAccNo = accNo;
+                        window.currentQuickHolding = h;
+                    } else {
+                        document.getElementById('quickScanError').style.display = 'block';
+                        document.getElementById('quickScanErrorText').textContent = result.message || 'Accession number not found';
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('quickScanLoading').style.display = 'none';
+                    document.getElementById('quickScanError').style.display = 'block';
+                    document.getElementById('quickScanErrorText').textContent = 'Error: ' + err.message;
+                });
+        }
+
+        function quickIssue() {
+            closeQuickScan();
+            // Switch to Issue tab and pre-fill AccNo
+            showTab('issue');
+            document.getElementById('accNo').value = window.currentQuickAccNo || '';
+            searchBook();
+        }
+
+        function quickReturn() {
+            closeQuickScan();
+            // Switch to Return tab and pre-fill AccNo
+            showTab('return');
+            document.getElementById('returnAccNo').value = window.currentQuickAccNo || '';
+            searchReturnBook();
+        }
+
+        function escapeHtml(text) {
+            if (typeof text !== 'string' && typeof text !== 'number') return '';
+            return String(text).replace(/[&<>"']/g, function (c) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c];
+            });
+        }
+
         // Clean up streams when tab changes
         // Initialize everything when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -2273,6 +2364,24 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             setInterval(loadStatistics, 30000);
             
             console.log('✅ All initialization complete');
+            
+            // Listen for Enter key in quick scan modal
+            const quickScanInput = document.getElementById('quickScanInput');
+            if (quickScanInput) {
+                quickScanInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        lookupAccNo();
+                    }
+                });
+            }
+            
+            // Global keyboard shortcut: Ctrl+K to open quick scan
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'k') {
+                    e.preventDefault();
+                    openQuickScan();
+                }
+            });
         });
 
         // Make all functions globally accessible for onclick handlers
@@ -2354,147 +2463,5 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         </div>
     </div>
 
-    <script>
-        // Quick Scan Modal Functions
-        function openQuickScan() {
-            document.getElementById('quickScanModal').style.display = 'flex';
-            document.getElementById('quickScanInput').value = '';
-            document.getElementById('quickScanResult').style.display = 'none';
-            document.getElementById('quickScanError').style.display = 'none';
-            document.getElementById('quickScanInput').focus();
-        }
-
-        function closeQuickScan() {
-            document.getElementById('quickScanModal').style.display = 'none';
-        }
-
-        // Listen for Enter key or barcode scanner input
-        document.addEventListener('DOMContentLoaded', function() {
-            const input = document.getElementById('quickScanInput');
-            if (input) {
-                input.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        lookupAccNo();
-                    }
-                });
-            }
-        });
-
-        function lookupAccNo() {
-            const accNo = document.getElementById('quickScanInput').value.trim();
-            if (!accNo) return;
-
-            document.getElementById('quickScanLoading').style.display = 'block';
-            document.getElementById('quickScanResult').style.display = 'none';
-            document.getElementById('quickScanError').style.display = 'none';
-
-            fetch(`api/books.php?action=lookup&accNo=${encodeURIComponent(accNo)}`)
-                .then(res => res.json())
-                .then(result => {
-                    document.getElementById('quickScanLoading').style.display = 'none';
-                    
-                    if (result.success && result.data) {
-                        const h = result.data;
-                        let html = `
-                            <div style="margin-bottom:10px;"><strong>AccNo:</strong> ${escapeHtml(h.AccNo || '')}</div>
-                            <div style="margin-bottom:10px;"><strong>Book:</strong> ${escapeHtml(h.Title || 'Unknown')}</div>
-                            <div style="margin-bottom:10px;"><strong>Author:</strong> ${escapeHtml(h.Author1 || 'Unknown')}</div>
-                            <div style="margin-bottom:10px;"><strong>Publisher:</strong> ${escapeHtml(h.Publisher || 'N/A')} (${h.Year || 'N/A'})</div>
-                            <div style="margin-bottom:10px;"><strong>Status:</strong> <span class="status-badge status-${(h.Status || 'available').toLowerCase()}">${escapeHtml(h.Status || 'Unknown')}</span></div>
-                            <div style="margin-bottom:10px;"><strong>Location:</strong> ${escapeHtml(h.Location || 'N/A')}</div>
-                        `;
-                        
-                        document.getElementById('quickScanDetails').innerHTML = html;
-                        document.getElementById('quickScanResult').style.display = 'block';
-                        
-                        // Show action buttons based on status
-                        document.getElementById('quickIssueBtn').style.display = (h.Status === 'Available') ? 'inline-block' : 'none';
-                        document.getElementById('quickReturnBtn').style.display = (h.Status === 'Issued') ? 'inline-block' : 'none';
-                        
-                        // Store for quick actions
-                        window.currentQuickAccNo = accNo;
-                        window.currentQuickHolding = h;
-                    } else {
-                        document.getElementById('quickScanError').style.display = 'block';
-                        document.getElementById('quickScanErrorText').textContent = result.message || 'Accession number not found';
-                    }
-                })
-                .catch(err => {
-                    document.getElementById('quickScanLoading').style.display = 'none';
-                    document.getElementById('quickScanError').style.display = 'block';
-                    document.getElementById('quickScanErrorText').textContent = 'Error: ' + err.message;
-                });
-        }
-
-        function quickIssue() {
-            closeQuickScan();
-            // Switch to Issue tab and pre-fill AccNo
-            showTab('issue');
-            document.getElementById('accNo').value = window.currentQuickAccNo || '';
-            searchBook();
-        }
-
-        function quickReturn() {
-            closeQuickScan();
-            // Switch to Return tab and pre-fill AccNo
-            showTab('return');
-            document.getElementById('returnAccNo').value = window.currentQuickAccNo || '';
-            searchReturnBook();
-        }
-
-        function escapeHtml(text) {
-            if (typeof text !== 'string' && typeof text !== 'number') return '';
-            return String(text).replace(/[&<>"']/g, function (c) {
-                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c];
-            });
-        }
-
-        // Global keyboard shortcut: Ctrl+K to open quick scan
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.key === 'k') {
-                e.preventDefault();
-                openQuickScan();
-            }
-        });
-    </script>
-
-<script>
-    // Tab switching function - MUST BE AT TOP FOR ONCLICK HANDLERS
-    window.showTab = function(tabName) {
-        console.log('showTab called with:', tabName);
-        // Hide all tabs
-        var tabs = document.querySelectorAll('.tab-content');
-        for (var i = 0; i < tabs.length; i++) {
-            tabs[i].style.display = 'none';
-            tabs[i].classList.remove('active');
-        }
-        // Remove active from all buttons
-        var buttons = document.querySelectorAll('.tab-btn');
-        for (var i = 0; i < buttons.length; i++) {
-            buttons[i].classList.remove('active');
-        }
-        // Show selected tab
-        var selectedTab = document.getElementById(tabName);
-        if (selectedTab) {
-            selectedTab.style.display = 'block';
-            selectedTab.classList.add('active');
-        }
-        // Activate button
-        var activeButton = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
-        if (activeButton) {
-            activeButton.classList.add('active');
-        }
-        // Load content
-        if (tabName === 'active') {
-            loadActiveCirculations();
-        } else if (tabName === 'history') {
-            loadReturnHistory();
-        }
-    };
-    // Global variables
-    let selectedMember = null;
-    let selectedBook = null;
-    let returnBookData = null;
-</script>
-</div>
-<!-- End page-container -->
+</body>
+</html>

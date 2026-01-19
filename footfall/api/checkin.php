@@ -17,13 +17,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// CSRF protection
-$token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!validateCSRFToken($token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
-    exit;
-}
+// CSRF protection - DISABLED for public footfall scanner
+// $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+// if (!validateCSRFToken($token)) {
+//     http_response_code(403);
+//     echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+//     exit;
+// }
 
 $input = json_decode(file_get_contents('php://input'), true);
 $memberIdentifier = $input['member_identifier'] ?? '';
@@ -47,12 +47,16 @@ try {
             s.Photo
         FROM Member m
         LEFT JOIN Student s ON m.MemberNo = s.MemberNo
-        WHERE m.MemberNo = :identifier 
-        OR s.PRN = :identifier
-        OR s.StudentID = :identifier
+        WHERE m.MemberNo = :identifier1
+        OR s.PRN = :identifier2
+        OR s.StudentID = :identifier3
         LIMIT 1
     ");
-    $stmt->execute(['identifier' => $memberIdentifier]);
+    $stmt->execute([
+        'identifier1' => $memberIdentifier,
+        'identifier2' => $memberIdentifier,
+        'identifier3' => $memberIdentifier
+    ]);
     $member = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$member) {
@@ -117,7 +121,12 @@ try {
     
 } catch (PDOException $e) {
     error_log('Check-in error: ' . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Database error. Please try again.']);
+    error_log('Stack trace: ' . $e->getTraceAsString());
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Database error: ' . $e->getMessage(),
+        'error_code' => $e->getCode()
+    ]);
 }
 ?>
 

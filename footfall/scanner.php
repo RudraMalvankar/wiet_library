@@ -498,6 +498,16 @@ body {
         max-width: 100%;
     }
 }
+
+@keyframes scaleIn {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
 </style>
 
 <body>
@@ -527,6 +537,16 @@ body {
         <!-- Success/Error Messages -->
         <div class="success-msg" id="successMsg"></div>
         <div class="error-msg" id="errorMsg"></div>
+
+        <!-- Big Welcome Message -->
+        <div id="welcomeMessage" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(38,60,121,0.95); z-index:9999; display:none; align-items:center; justify-content:center;">
+            <div style="text-align:center; color:white; padding:40px; max-width:600px;">
+                <i class="fas fa-check-circle" style="font-size:120px; color:#10b981; margin-bottom:30px; animation: scaleIn 0.5s;"></i>
+                <h1 id="welcomeName" style="font-size:48px; font-weight:700; margin-bottom:20px; animation: slideUp 0.5s;"></h1>
+                <p id="welcomeDetails" style="font-size:24px; opacity:0.9; margin-bottom:10px;"></p>
+                <p id="welcomeTime" style="font-size:18px; color:#cfac69;"></p>
+            </div>
+        </div>
 
         <!-- Main Scanner Interface (Matching Circulation) -->
         <div class="section-title">
@@ -609,6 +629,8 @@ let scannerActive = false;
 
 // Start scanner function
 function startScanner() {
+    console.log('🎥 ===== STARTING QR SCANNER =====');
+    
     const placeholder = document.getElementById('cameraPlaceholder');
     const reader = document.getElementById('reader');
     const startBtn = document.getElementById('startBtn');
@@ -622,9 +644,24 @@ function startScanner() {
     startBtn.disabled = true;
     stopBtn.disabled = false;
     
+    console.log('📱 Initializing Html5Qrcode...');
+    
     // Initialize scanner
     html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    const config = { 
+        fps: 30,  // Maximum frame rate
+        qrbox: { width: 350, height: 350 },  // Even larger scan area
+        aspectRatio: 1.0,
+        disableFlip: false,
+        formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ],
+        experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+        },
+        verbose: true  // Enable verbose logging
+    };
+    
+    console.log('📸 Scanner config:', config);
+    console.log('🔍 Starting camera...');
     
     html5QrCode.start(
         { facingMode: "environment" },
@@ -633,8 +670,12 @@ function startScanner() {
         onScanFailure
     ).then(() => {
         scannerActive = true;
+        console.log("✅ QR Scanner started successfully!");
+        console.log("📡 Scanner is now ACTIVE and listening for QR codes...");
+        showSuccess("Camera started! Position QR code in the box.");
     }).catch(err => {
-        console.error("QR Scanner error:", err);
+        console.error("❌ QR Scanner initialization error:", err);
+        console.error("Error details:", err.message);
         showError("Camera access denied. Please check browser permissions or use manual entry.");
         stopScanner();
     });
@@ -666,27 +707,58 @@ function stopScanner() {
 }
 
 function onScanSuccess(decodedText, decodedResult) {
-    console.log(`QR Code detected: ${decodedText}`);
+    console.log('🎉 ===== QR CODE DETECTED! =====');
+    console.log('📄 Raw QR data:', decodedText);
+    console.log('📦 Full result object:', decodedResult);
+    console.log('🔍 Format:', decodedResult.result?.format || 'Unknown');
     
     // Stop scanning temporarily
     if (html5QrCode && scannerActive) {
+        console.log('⏸️ Pausing scanner...');
         html5QrCode.pause();
     }
     
-    // Process QR code (format: MemberNo_Year or PRN_Year)
-    const memberIdentifier = decodedText.split('_')[0];
+    // Process QR code - handle multiple formats:
+    // Format 1: PRN-MemberNo (e.g., "C25116-25116")
+    // Format 2: MemberNo_Year (e.g., "25116_2025")
+    // Format 3: Just MemberNo (e.g., "25116")
+    let memberIdentifier = decodedText.trim();
+    console.log('🔧 Original identifier:', memberIdentifier);
+    
+    // If format is PRN-MemberNo, extract the MemberNo (after hyphen)
+    if (memberIdentifier.includes('-')) {
+        const parts = memberIdentifier.split('-');
+        memberIdentifier = parts[1] || parts[0];  // Use second part if exists, otherwise first
+        console.log('📌 Parsed from PRN-MemberNo format: ${memberIdentifier}');
+    } 
+    // If format is MemberNo_Year, extract MemberNo (before underscore)
+    else if (memberIdentifier.includes('_')) {
+        memberIdentifier = memberIdentifier.split('_')[0];
+        console.log('📌 Parsed from MemberNo_Year format: ${memberIdentifier}');
+    }
+    
+    console.log('🎯 Final Member Identifier:', memberIdentifier);
+    
+    // Show visual feedback
+    showSuccess(`✅ QR Detected: ${decodedText}`);
+    console.log('🚀 Calling checkIn function...');
+    
     checkIn(memberIdentifier, 'QR Scan');
     
     // Resume after 3 seconds
     setTimeout(() => {
         if (html5QrCode && scannerActive) {
+            console.log("🔄 Resuming scanner...");
             html5QrCode.resume();
         }
     }, 3000);
 }
 
 function onScanFailure(error) {
-    // Silent failure - QR not detected yet
+    // Only log periodic errors, not every frame
+    if (Math.random() < 0.01) { // Log 1% of failures
+        console.log('🔍 Scanning... (no QR detected yet)');
+    }
 }
 
 // Search member by manual entry
@@ -704,46 +776,111 @@ function searchMember() {
 // Check-in function - simplified, no purpose needed
 async function checkIn(memberIdentifier, method) {
     try {
+        console.log('🎯 ===== CHECK-IN STARTED =====');
+        console.log('📤 Member ID:', memberIdentifier);
+        console.log('📤 Method:', method);
+        
+        const payload = {
+            member_identifier: memberIdentifier,
+            entry_method: method,
+            purpose: 'Library Visit'
+        };
+        console.log('📦 Payload:', JSON.stringify(payload));
+        
         const response = await fetch('api/checkin.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                member_identifier: memberIdentifier,
-                entry_method: method,
-                purpose: 'Library Visit'  // Always use default
-            })
+            headers: { 
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
         });
         
+        console.log('📡 Response status:', response.status, response.statusText);
+        
         const data = await response.json();
+        console.log('📥 Response data:', data);
         
         if (data.success) {
+            console.log('✅ CHECK-IN SUCCESS!');
+            console.log('👤 Member:', data.member);
+            
             showSuccess(data.message || 'Check-in successful!');
             displayMemberInfo(data.member);
             refreshStats();
             refreshRecentVisitors();
             
             // Clear form
-            document.getElementById('manualForm').reset();
+            document.getElementById('memberNo').value = '';
         } else {
+            console.error('❌ CHECK-IN FAILED:', data.message);
             showError(data.message || 'Check-in failed. Please try again.');
         }
     } catch (error) {
-        console.error('Check-in error:', error);
+        console.error('❌ CHECK-IN ERROR:', error);
+        console.error('Error details:', error.message, error.stack);
         showError('Network error. Please check your connection.');
     }
+    console.log('🏁 ===== CHECK-IN ENDED =====');
 }
 
 function displayMemberInfo(member) {
+    // Show BIG welcome screen
+    const welcomeDiv = document.getElementById('welcomeMessage');
+    document.getElementById('welcomeName').textContent = `Welcome, ${member.name}!`;
+    document.getElementById('welcomeDetails').textContent = `${member.branch || member.course || 'Student'} | Member #${member.member_no}`;
+    document.getElementById('welcomeTime').textContent = new Date().toLocaleString('en-IN', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    welcomeDiv.style.display = 'flex';
+    
+    // Play success sound
+    playSuccessSound();
+    
+    // Hide after 4 seconds
+    setTimeout(() => {
+        welcomeDiv.style.display = 'none';
+    }, 4000);
+    
+    // Also update small info card
     document.getElementById('infoName').textContent = member.name;
     document.getElementById('infoMemberNo').textContent = member.member_no;
     document.getElementById('infoBranch').textContent = member.branch || member.course || 'N/A';
     document.getElementById('infoTime').textContent = new Date().toLocaleString();
     document.getElementById('memberInfo').classList.add('show');
     
-    // Hide after 5 seconds
+    // Hide small card after 8 seconds
     setTimeout(() => {
         document.getElementById('memberInfo').classList.remove('show');
-    }, 5000);
+    }, 8000);
+}
+
+function playSuccessSound() {
+    // Create success beep
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (e) {
+        console.log('Audio not available');
+    }
 }
 
 function showSuccess(message) {
@@ -765,13 +902,22 @@ async function refreshStats() {
         const response = await fetch('api/footfall-stats.php');
         const data = await response.json();
         
-        if (data.success) {
-            document.getElementById('todayVisits').textContent = data.stats.today_visits || 0;
-            document.getElementById('activeVisitors').textContent = data.stats.active_visitors || 0;
-            document.getElementById('weekVisits').textContent = data.stats.week_visits || 0;
+        if (data.success && data.data) {
+            document.getElementById('todayVisits').textContent = data.data.today_visits || 0;
+            document.getElementById('activeVisitors').textContent = data.data.active_visitors || 0;
+            document.getElementById('weekVisits').textContent = data.data.week_visits || 0;
+        } else {
+            // Set defaults if no data
+            document.getElementById('todayVisits').textContent = '0';
+            document.getElementById('activeVisitors').textContent = '0';
+            document.getElementById('weekVisits').textContent = '0';
         }
     } catch (error) {
         console.error('Stats refresh error:', error);
+        // Set default values on error
+        document.getElementById('todayVisits').textContent = '0';
+        document.getElementById('activeVisitors').textContent = '0';
+        document.getElementById('weekVisits').textContent = '0';
     }
 }
 
@@ -780,22 +926,27 @@ async function refreshRecentVisitors() {
         const response = await fetch('api/recent-visitors.php?limit=5');
         const data = await response.json();
         
-        if (data.success && data.visitors) {
+        if (data.success && data.visitors && data.visitors.length > 0) {
             const container = document.getElementById('recentVisitorsList');
             container.innerHTML = data.visitors.map(v => `
                 <div class="visitor-item">
-                    <span class="visitor-name">${v.name}</span>
-                    <span class="visitor-time">${v.time}</span>
+                    <span class="visitor-name">${v.name || 'Unknown'}</span>
+                    <span class="visitor-time">${v.time || ''}</span>
                 </div>
             `).join('');
+        } else {
+            document.getElementById('recentVisitorsList').innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">No recent visitors</p>';
         }
     } catch (error) {
         console.error('Recent visitors refresh error:', error);
+        document.getElementById('recentVisitorsList').innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Unable to load recent visitors</p>';
     }
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 Footfall scanner ready');
+    
     refreshStats();
     refreshRecentVisitors();
     
