@@ -548,7 +548,69 @@ try {
                 $pdo->rollBack();
                 throw $e;
             }
+            break;
             
+        case 'get_qr_code':
+            // Get QR code for a student
+            $studentId = $_GET['studentId'] ?? 0;
+            
+            if (!$studentId) {
+                sendJson(['success' => false, 'message' => 'Student ID is required'], 400);
+            }
+            
+            // Get student data
+            $stmt = $pdo->prepare("
+                SELECT s.QRCode, s.PRN, m.MemberNo, m.MemberName
+                FROM Student s
+                INNER JOIN Member m ON s.MemberNo = m.MemberNo
+                WHERE s.StudentID = ?
+            ");
+            $stmt->execute([$studentId]);
+            $student = $stmt->fetch();
+            
+            if (!$student) {
+                sendJson(['success' => false, 'message' => 'Student not found'], 404);
+            }
+            
+            // Generate QR data string (PRN-MemberNo format)
+            $qrData = $student['PRN'] . '-' . $student['MemberNo'];
+            $qrFileName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $qrData);
+            $qrCodePath = "../../storage/qrcodes/{$qrFileName}.png";
+            
+            // Check if QR code file exists
+            if (file_exists($qrCodePath)) {
+                $qrCodeBase64 = base64_encode(file_get_contents($qrCodePath));
+            } else {
+                // Generate QR code
+                require_once '../../libs/phpqrcode/qrlib.php';
+                
+                $qrDir = '../../storage/qrcodes/';
+                
+                // Create directory if it doesn't exist
+                if (!file_exists($qrDir)) {
+                    mkdir($qrDir, 0755, true);
+                }
+                
+                // Generate QR code
+                QRcode::png($qrData, $qrCodePath, QR_ECLEVEL_L, 4);
+                
+                if (file_exists($qrCodePath)) {
+                    $qrCodeBase64 = base64_encode(file_get_contents($qrCodePath));
+                } else {
+                    sendJson(['success' => false, 'message' => 'Failed to generate QR code'], 500);
+                }
+            }
+            
+            sendJson([
+                'success' => true,
+                'qrCode' => $qrCodeBase64,
+                'qrData' => $qrData,
+                'studentName' => $student['MemberName'],
+                'prn' => $student['PRN'],
+                'memberNo' => $student['MemberNo']
+            ]);
+            break;
+        
         default:
             sendJson(['success' => false, 'message' => 'Invalid action'], 400);
     }

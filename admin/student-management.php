@@ -2,17 +2,17 @@
 // Include AJAX handler FIRST
 require_once 'ajax-handler.php';
 
-session_start();
+// Include session check and authentication
+require_once 'session_check.php';
+
+// Check page permission
+checkPagePermission('view_students');
+
+// Include database connection
 require_once '../includes/db_connect.php';
 
-// Check if user is logged in
-if (!isset($_SESSION['admin_id'])) {
-    header("Location: admin_login.php");
-    exit();
-}
-
-$admin_id = $_SESSION['admin_id'] ?? 1;
-$admin_name = $_SESSION['admin_name'] ?? 'Admin User';
+$admin_id = $current_admin['id'];
+$admin_name = $current_admin['name'];
 
 // Fetch statistics from database
 try {
@@ -66,15 +66,7 @@ try {
 }
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Management</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
+<style>
         .student-header {
             margin-bottom: 25px;
             padding-bottom: 15px;
@@ -334,26 +326,48 @@ try {
         }
 
         .action-links a {
-            padding: 4px 8px;
-            border-radius: 3px;
+            padding: 6px 10px;
+            border-radius: 4px;
             text-decoration: none;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            transition: all 0.3s ease;
+        }
+        
+        .action-links a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
         .btn-view {
             background-color: #17a2b8;
             color: white;
         }
+        
+        .btn-view:hover {
+            background-color: #138496;
+        }
 
         .btn-edit {
             background-color: #ffc107;
             color: #212529;
         }
+        
+        .btn-edit:hover {
+            background-color: #e0a800;
+        }
 
         .btn-delete {
             background-color: #dc3545;
             color: white;
+        }
+        
+        .btn-delete:hover {
+            background-color: #c82333;
         }
 
         .status-badge {
@@ -382,61 +396,104 @@ try {
         .modal {
             display: none;
             position: fixed;
-            z-index: 1000;
+            z-index: 110000;
             left: 0;
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.6);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+        
+        .modal.show {
+            display: flex !important;
         }
 
         .modal-content {
             background-color: white;
-            margin: 5% auto;
             padding: 0;
-            border-radius: 8px;
-            width: 95%;
-            max-width: 900px;
-            max-height: 85vh;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 1000px;
+            max-height: calc(100vh - 180px);
             overflow-y: auto;
-            margin-top: 160px;
-            /* Add top margin to clear navbar */
             position: relative;
-            z-index: 1001;
-            /* Ensure modal is above navbar */
+            z-index: 110001;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            margin: auto;
         }
 
         .modal-header {
-            background-color: #263c79;
+            background: linear-gradient(135deg, #263c79 0%, #1a2d5a 100%);
             color: white;
-            padding: 15px 20px;
-            border-radius: 8px 8px 0 0;
+            padding: 18px 24px;
+            border-radius: 12px 12px 0 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .modal-title {
             margin: 0;
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .close {
             color: white;
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             cursor: pointer;
             background: none;
             border: none;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
         }
 
         .close:hover {
-            opacity: 0.7;
+            background-color: rgba(255, 255, 255, 0.2);
+            transform: rotate(90deg);
         }
 
         .modal-body {
-            padding: 25px;
+            padding: 24px;
+            max-height: calc(100vh - 280px);
+            overflow-y: auto;
+        }
+
+        /* Smooth scrollbar for modal */
+        .modal-body::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
 
         .form-section {
@@ -472,7 +529,7 @@ try {
             display: block;
             font-weight: 600;
             color: #263c79;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
             font-size: 14px;
         }
 
@@ -480,15 +537,25 @@ try {
         .form-group-modal select,
         .form-group-modal textarea {
             width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 10px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
             font-size: 14px;
             box-sizing: border-box;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .form-group-modal input:focus,
+        .form-group-modal select:focus,
+        .form-group-modal textarea:focus {
+            outline: none;
+            border-color: #263c79;
+            box-shadow: 0 0 0 3px rgba(38, 60, 121, 0.1);
         }
 
         .form-group-modal textarea {
-            min-height: 80px;
+            min-height: 90px;
             resize: vertical;
         }
 
@@ -550,11 +617,17 @@ try {
         }
 
         .modal-footer {
-            padding: 15px 25px;
-            border-top: 1px solid #e9ecef;
+            padding: 18px 24px;
+            border-top: 2px solid #e9ecef;
             display: flex;
             justify-content: flex-end;
-            gap: 10px;
+            gap: 12px;
+            position: sticky;
+            bottom: 0;
+            background: white;
+            z-index: 10;
+            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+            border-radius: 0 0 12px 12px;
         }
 
         .form-actions {
@@ -617,27 +690,69 @@ try {
                 min-width: 100%;
             }
 
+            .modal {
+                padding: 10px;
+            }
+
             .modal-content {
-                margin-top: 150px;
-                /* Adjust for mobile navbar */
-                width: 98%;
-                max-height: 80vh;
+                max-width: 100%;
+                max-height: calc(100vh - 160px);
+                border-radius: 8px;
+            }
+
+            .modal-header {
+                padding: 15px 18px;
+            }
+
+            .modal-title {
+                font-size: 18px;
+            }
+
+            .modal-body {
+                padding: 18px;
+                max-height: calc(100vh - 240px);
+            }
+
+            .modal-footer {
+                padding: 15px 18px;
             }
         }
 
         @media (max-width: 480px) {
+            .modal {
+                padding: 5px;
+            }
+
             .modal-content {
-                margin-top: 135px;
-                /* Adjust for smaller mobile navbar */
-                width: 99%;
-                max-height: 75vh;
+                max-height: calc(100vh - 140px);
+            }
+
+            .modal-header {
+                padding: 12px 15px;
+            }
+
+            .modal-title {
+                font-size: 16px;
+            }
+
+            .modal-body {
+                padding: 15px;
+                max-height: calc(100vh - 200px);
+            }
+
+            .modal-footer {
+                padding: 12px 15px;
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
             }
         }
     </style>
-</head>
 
-<body>
-    <div class="student-header">
+<div class="student-header">
         <h1 class="student-title">
             <i class="fas fa-user-graduate"></i>
             Student Management
@@ -978,167 +1093,27 @@ try {
         </div>
     </div>
 
-    <!-- Add Student Modal -->
-    <div id="addStudentModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">Add New Student</h3>
-                <button class="close" onclick="closeModal('addStudentModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="addStudentForm">
-                    <!-- Member Information Section -->
-                    <div class="form-section">
-                        <div class="section-title">
-                            <i class="fas fa-user"></i>
-                            Member Information
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="memberName">Full Name <span class="required">*</span></label>
-                                <input type="text" id="memberName" name="MemberName" required>
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="memberGroup">Member Group <span class="required">*</span></label>
-                                <select id="memberGroup" name="Group" required>
-                                    <option value="">Select Group</option>
-                                    <option value="Student">Student</option>
-                                    <option value="Faculty">Faculty</option>
-                                    <option value="Staff">Staff</option>
-                                    <option value="Guest">Guest</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="memberPhone">Phone Number</label>
-                                <input type="tel" id="memberPhone" name="Phone">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="memberEmail">Email Address</label>
-                                <input type="email" id="memberEmail" name="Email">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="memberDesignation">Designation</label>
-                                <input type="text" id="memberDesignation" name="Designation">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Student Details Section -->
-                    <div class="form-section">
-                        <div class="section-title">
-                            <i class="fas fa-graduation-cap"></i>
-                            Student Details
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="studentName">Student Name <span class="required">*</span></label>
-                                <input type="text" id="studentName" name="Name" required>
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="studentPRN">PRN <span class="required">*</span></label>
-                                <input type="text" id="studentPRN" name="PRN" required>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="studentDOB">Date of Birth</label>
-                                <input type="date" id="studentDOB" name="DOB">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="studentBranch">Branch <span class="required">*</span></label>
-                                <select id="studentBranch" name="Branch" required>
-                                    <option value="">Select Branch</option>
-                                    <option value="Computer Engineering">Computer Engineering</option>
-                                    <option value="Mechanical Engineering">Mechanical Engineering</option>
-                                    <option value="Electronics Engineering">Electronics Engineering</option>
-                                    <option value="Civil Engineering">Civil Engineering</option>
-                                    <option value="Information Technology">Information Technology</option>
-                                </select>
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="studentBloodGroup">Blood Group</label>
-                                <select id="studentBloodGroup" name="BloodGroup">
-                                    <option value="">Select Blood Group</option>
-                                    <option value="A+">A+</option>
-                                    <option value="A-">A-</option>
-                                    <option value="B+">B+</option>
-                                    <option value="B-">B-</option>
-                                    <option value="AB+">AB+</option>
-                                    <option value="AB-">AB-</option>
-                                    <option value="O+">O+</option>
-                                    <option value="O-">O-</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="studentMobile">Mobile Number</label>
-                                <input type="tel" id="studentMobile" name="Mobile">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="studentAadhaar">Aadhaar Number</label>
-                                <input type="text" id="studentAadhaar" name="Aadhaar" maxlength="12">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="validTill">Valid Till</label>
-                                <input type="date" id="validTill" name="ValidTill">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="studentAddress">Address</label>
-                                <textarea id="studentAddress" name="Address" rows="3"></textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Photo Upload Section -->
-                    <div class="form-section">
-                        <div class="section-title">
-                            <i class="fas fa-camera"></i>
-                            Student Photo
-                        </div>
-                        <div class="photo-upload">
-                            <div class="photo-preview" id="photoPreview">
-                                <i class="fas fa-user" style="font-size: 48px; color: #ccc;"></i>
-                            </div>
-                            <input type="file" id="studentPhoto" name="Photo" accept="image/*" style="display: none;" onchange="previewPhoto(this)">
-                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('studentPhoto').click()">
-                                <i class="fas fa-upload"></i>
-                                Upload Photo
-                            </button>
-                            <p style="font-size: 12px; color: #6c757d; margin-top: 10px;">
-                                Recommended: 120x150 pixels, JPG/PNG format
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <!-- Form Actions -->
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button>
-                        <button type="submit" class="btn btn-success" onclick="saveStudent()">
-                            <i class="fas fa-save"></i>
-                            Create Student & Generate QR
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <!-- QR Code Modal -->
     <div id="qrCodeModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title">QR Code</h3>
+                <h3 class="modal-title">
+                    <i class="fas fa-qrcode"></i>
+                    QR Code
+                </h3>
                 <button class="close" onclick="closeModal('qrCodeModal')">&times;</button>
             </div>
-            <div class="modal-body" style="text-align: center;">
-                <img src="" alt="QR Code" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px;">
+            <div class="modal-body" style="text-align: center; padding: 30px;">
+                <div style="background: white; padding: 20px; display: inline-block; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <img id="qrCodeImage" src="" alt="QR Code" style="max-width: 300px; height: auto; display: block;">
+                </div>
+                <p id="qrCodeInfo" style="margin-top: 15px; color: #6c757d; font-size: 14px;"></p>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="justify-content: space-between;">
+                <button type="button" class="btn btn-success" onclick="downloadQRCode()">
+                    <i class="fas fa-download"></i>
+                    Download QR Code
+                </button>
                 <button type="button" class="btn btn-secondary" onclick="closeModal('qrCodeModal')">
                     <i class="fas fa-times"></i>
                     Close
@@ -1194,22 +1169,6 @@ try {
                 case 'reports':
                     loadReportsContent();
                     break;
-            }
-        }
-
-        let csrfToken = null;
-
-        // Fetch CSRF token on page load
-        async function fetchCSRFToken() {
-            try {
-                const response = await fetch('api/members.php?action=get-csrf-token');
-                const result = await response.json();
-                if (result.success) {
-                    csrfToken = result.token;
-                    console.log('✅ CSRF token loaded');
-                }
-            } catch (error) {
-                console.error('Failed to load CSRF token:', error);
             }
         }
 
@@ -1330,7 +1289,7 @@ try {
                         <span style="color: #6c757d; margin-right: 10px;">
                             <span id="selectedCount">0</span> selected
                         </span>
-                        <button class="btn btn-warning" onclick="document.getElementById('bulkOperationsModal').style.display='block'">
+                        <button class="btn btn-warning" onclick="bulkOperations(); return false;">
                             <i class="fas fa-tasks"></i>
                             Bulk Actions
                         </button>
@@ -1370,7 +1329,16 @@ try {
                         'Active': 'status-active',
                         'Inactive': 'status-inactive',
                         'Suspended': 'status-suspended'
-                    } [student.Status] || 'status-active';
+                    }[student.Status] || 'status-active';
+                    
+                    // Handle different API response field names
+                    const studentName = student.Name || student.MemberName || student.StudentName || 'N/A';
+                    const studentEmail = student.Email || student.MemberEmail || '';
+                    const studentMobile = student.Mobile || student.Contact || student.Phone || 'N/A';
+                    const studentBranch = student.Branch || 'N/A';
+                    const studentPRN = student.PRN || student.StudentID || 'N/A';
+                    const booksIssued = student.BooksIssued || 0;
+                    const validTill = student.ValidTill ? new Date(student.ValidTill).toLocaleDateString('en-IN') : 'N/A';
 
                     tableHTML += `
                         <tr>
@@ -1379,26 +1347,26 @@ try {
                             </td>
                             <td><strong>${student.MemberNo}</strong></td>
                             <td>
-                                <strong>${student.Name}</strong><br>
-                                <small style="color: #6c757d;">${student.Email}</small>
+                                <strong>${studentName}</strong><br>
+                                <small style="color: #6c757d;">${studentEmail}</small>
                             </td>
-                            <td>${student.PRN}</td>
-                            <td><span style="background: rgba(38,60,121,0.1); color: #263c79; padding: 2px 6px; border-radius: 3px; font-size: 12px;">${student.Branch}</span></td>
-                            <td>${student.Mobile}</td>
+                            <td>${studentPRN}</td>
+                            <td><span style="background: rgba(38,60,121,0.1); color: #263c79; padding: 2px 6px; border-radius: 3px; font-size: 12px;">${studentBranch}</span></td>
+                            <td>${studentMobile}</td>
                             <td><span class="status-badge ${statusClass}">${student.Status}</span></td>
-                            <td><span style="color: ${student.BooksIssued > 0 ? '#dc3545' : '#28a745'}; font-weight: 600;">${student.BooksIssued}</span></td>
-                            <td>${new Date(student.ValidTill).toLocaleDateString('en-IN')}</td>
+                            <td><span style="color: ${booksIssued > 0 ? '#dc3545' : '#28a745'}; font-weight: 600;">${booksIssued}</span></td>
+                            <td>${validTill}</td>
                             <td class="action-links">
-                                <a href="#" class="btn-view" onclick="viewStudent(${student.StudentID})">
+                                <a href="#" class="btn-view" onclick="viewStudent(${student.StudentID}); return false;">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <a href="#" class="btn-edit" onclick="editStudent(${student.StudentID})">
+                                <a href="#" class="btn-edit" onclick="editStudent(${student.StudentID}); return false;">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                <a href="#" class="btn-delete" onclick="deleteStudent(${student.StudentID})">
+                                <a href="#" class="btn-delete" onclick="deleteStudent(${student.StudentID}); return false;">
                                     <i class="fas fa-trash"></i>
                                 </a>
-                                <a href="#" class="btn-qr" onclick="viewQRCode(${student.StudentID})">
+                                <a href="#" class="btn-view" onclick="viewQRCode(${student.StudentID}); return false;" title="View QR Code">
                                     <i class="fas fa-qrcode"></i>
                                 </a>
                             </td>
@@ -1677,18 +1645,11 @@ try {
             document.getElementById('reportsContent').innerHTML = reportsHTML;
         }
 
-        // Modal functions
-        function openAddStudentModal() {
-            document.getElementById('addStudentModal').style.display = 'block';
-        }
-
+        // Modal functions (for QR Code modal)
         function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-
-            // Reset form
-            if (modalId === 'addStudentModal') {
-                document.getElementById('addStudentForm').reset();
-                document.getElementById('photoPreview').innerHTML = '<i class="fas fa-user" style="font-size: 48px; color: #ccc;"></i>';
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('show');
             }
         }
 
@@ -2108,13 +2069,22 @@ try {
         }
 
         function bulkOperations() {
-            document.getElementById('bulkOperationsModal').style.display = 'block';
+            const modal = document.getElementById('bulkOperationsModal');
+            if (modal) {
+                modal.classList.add('show');
+            } else {
+                console.error('Bulk Operations Modal not found');
+            }
         }
 
         function closeBulkModal() {
-            document.getElementById('bulkOperationsModal').style.display = 'none';
+            const modal = document.getElementById('bulkOperationsModal');
+            if (modal) {
+                modal.classList.remove('show');
+            }
             // Reset selections
-            document.querySelectorAll('.student-checkbox').forEach(cb => cb.checked = false);
+            const checkboxes = document.querySelectorAll('.student-checkbox');
+            checkboxes.forEach(cb => cb.checked = false);
             updateBulkActionButtons();
         }
 
@@ -2267,23 +2237,52 @@ try {
 
         // Close modals when clicking outside
         window.onclick = function(event) {
-            const modals = document.querySelectorAll('.modal');
-            modals.forEach(modal => {
-                if (event.target === modal) {
-                    modal.style.display = 'none';
-                }
-            });
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('show');
+            }
         };
+        
+        // Global helper to close any modal by clicking the close button
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('close') || e.target.closest('.close')) {
+                const modal = e.target.closest('.modal');
+                if (modal) {
+                    modal.classList.remove('show');
+                }
+            }
+        });
+        
+        // Close modal with ESC key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const openModals = document.querySelectorAll('.modal.show');
+                openModals.forEach(modal => {
+                    modal.classList.remove('show');
+                });
+            }
+        });
 
         // Attach showTab to the global window object
         window.showTab = showTab;
 
         // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
+        function initStudentManagement() {
+            console.log('Student Management: Initializing');
             fetchCSRFToken();
             loadStatistics();
             loadStudentsTable();
-        });
+        }
+        
+        // Run on DOMContentLoaded (for standalone page loads)
+        document.addEventListener('DOMContentLoaded', initStudentManagement);
+        
+        // Also run immediately if document is already ready (for AJAX loads)
+        if (document.readyState === 'loading') {
+            // Document still loading, wait for DOMContentLoaded
+        } else {
+            // Document already loaded, init immediately
+            initStudentManagement();
+        }
 
         async function viewQRCode(studentId) {
             try {
@@ -2291,12 +2290,26 @@ try {
                 const result = await response.json();
 
                 if (result.success) {
-                    const qrCodeData = result.qrCode;
                     const qrModal = document.getElementById('qrCodeModal');
-                    const qrImage = qrModal.querySelector('img');
-
-                    qrImage.src = `data:image/png;base64,${qrCodeData}`;
-                    qrModal.style.display = 'block';
+                    const qrImage = document.getElementById('qrCodeImage');
+                    const qrTitle = qrModal.querySelector('.modal-title');
+                    const qrInfo = document.getElementById('qrCodeInfo');
+                    
+                    // Set QR code image
+                    qrImage.src = `data:image/png;base64,${result.qrCode}`;
+                    qrImage.alt = `QR Code for ${result.studentName}`;
+                    
+                    // Store data for download
+                    qrImage.dataset.studentName = result.studentName;
+                    qrImage.dataset.prn = result.prn;
+                    qrImage.dataset.qrData = result.qrData;
+                    
+                    // Update modal title and info
+                    qrTitle.innerHTML = `<i class="fas fa-qrcode"></i> QR Code - ${result.studentName}`;
+                    qrInfo.textContent = `PRN: ${result.prn} | Member No: ${result.memberNo}`;
+                    
+                    // Show modal
+                    qrModal.classList.add('show');
                 } else {
                     alert('Error fetching QR code: ' + result.message);
                 }
@@ -2304,6 +2317,22 @@ try {
                 console.error('Error fetching QR code:', error);
                 alert('Error fetching QR code. Please try again.');
             }
+        }
+
+        function downloadQRCode() {
+            const qrImage = document.getElementById('qrCodeImage');
+            const studentName = qrImage.dataset.studentName || 'Student';
+            const prn = qrImage.dataset.prn || 'Unknown';
+            
+            // Create a temporary link to download the image
+            const link = document.createElement('a');
+            link.href = qrImage.src;
+            link.download = `QRCode_${prn}_${studentName.replace(/\s+/g, '_')}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            console.log(`QR Code downloaded for ${studentName} (${prn})`);
         }
     </script>
 
@@ -2427,6 +2456,3 @@ try {
             </div>
         </div>
     </div>
-</body>
-
-</html>

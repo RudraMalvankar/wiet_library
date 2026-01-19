@@ -2,14 +2,18 @@
 // Include AJAX handler FIRST
 require_once 'ajax-handler.php';
 
-session_start();
+// Include session check and authentication
+require_once 'session_check.php';
+
+// Check page permission
+checkPagePermission('view_books');
 
 // Include database connection and functions
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 
-$admin_id = $_SESSION['admin_id'] ?? 1;
-$admin_name = $_SESSION['admin_name'] ?? 'Admin User';
+$admin_id = $current_admin['id'];
+$admin_name = $current_admin['name'];
 
 // ============================================================
 // DATA SOURCE: DATABASE (Fully Integrated)
@@ -175,15 +179,7 @@ if (!function_exists('generateQR')) {
 }
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Books Management - Library System</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
+<style>
         * {
             margin: 0;
             padding: 0;
@@ -671,59 +667,96 @@ if (!function_exists('generateQR')) {
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.6);
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 16px;
+            padding: 20px;
             box-sizing: border-box;
-            overflow: auto;
+            overflow-y: auto;
         }
 
         .modal-content {
             background-color: white;
             padding: 0;
-            border-radius: 8px;
+            border-radius: 12px;
             width: 100%;
-            max-width: 900px;
-            max-height: calc(100vh - 120px);
+            max-width: 1000px;
+            max-height: calc(100vh - 180px);
             overflow-y: auto;
             position: relative;
             z-index: 110001;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            margin: auto;
         }
 
         .modal-header {
-            background-color: #263c79;
+            background: linear-gradient(135deg, #263c79 0%, #1a2d5a 100%);
             color: white;
-            padding: 15px 20px;
-            border-radius: 8px 8px 0 0;
+            padding: 18px 24px;
+            border-radius: 12px 12px 0 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .modal-title {
             margin: 0;
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .close {
             color: white;
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             cursor: pointer;
             background: none;
             border: none;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
         }
 
         .close:hover {
-            opacity: 0.7;
+            background-color: rgba(255, 255, 255, 0.2);
+            transform: rotate(90deg);
         }
 
         .modal-body {
-            padding: 20px;
+            padding: 24px;
+            max-height: calc(100vh - 280px);
+            overflow-y: auto;
+        }
+
+        /* Smooth scrollbar for modal */
+        .modal-body::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
 
         .form-row {
@@ -742,7 +775,7 @@ if (!function_exists('generateQR')) {
             display: block;
             font-weight: 600;
             color: #263c79;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
             font-size: 14px;
         }
 
@@ -750,24 +783,40 @@ if (!function_exists('generateQR')) {
         .form-group-modal select,
         .form-group-modal textarea {
             width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 10px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
             font-size: 14px;
             box-sizing: border-box;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .form-group-modal input:focus,
+        .form-group-modal select:focus,
+        .form-group-modal textarea:focus {
+            outline: none;
+            border-color: #263c79;
+            box-shadow: 0 0 0 3px rgba(38, 60, 121, 0.1);
         }
 
         .form-group-modal textarea {
-            min-height: 80px;
+            min-height: 90px;
             resize: vertical;
         }
 
         .modal-footer {
-            padding: 15px 20px;
-            border-top: 1px solid #e9ecef;
+            padding: 18px 24px;
+            border-top: 2px solid #e9ecef;
             display: flex;
             justify-content: flex-end;
-            gap: 10px;
+            gap: 12px;
+            position: sticky;
+            bottom: 0;
+            background: white;
+            z-index: 10;
+            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+            border-radius: 0 0 12px 12px;
         }
 
         .btn-secondary {
@@ -788,10 +837,50 @@ if (!function_exists('generateQR')) {
         }
 
         .holding-card {
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 18px;
             background: white;
+            transition: all 0.3s ease;
+        }
+
+        .holding-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-color: #cfac69;
+        }
+
+        /* Holdings table inside modal */
+        .modal-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .modal-body table th {
+            background: linear-gradient(135deg, #263c79 0%, #1a2d5a 100%);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .modal-body table td {
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 14px;
+        }
+
+        .modal-body table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .modal-body table tr:hover {
+            background-color: rgba(38, 60, 121, 0.05);
         }
 
         .holding-header {
@@ -954,20 +1043,72 @@ if (!function_exists('generateQR')) {
                 white-space: nowrap;
             }
 
+            .modal {
+                padding: 10px;
+            }
+
             .modal-content {
-                margin-top: 150px;
-                /* Adjust for mobile navbar */
-                width: 98%;
-                max-height: 80vh;
+                max-width: 100%;
+                max-height: calc(100vh - 160px);
+                border-radius: 8px;
+            }
+
+            .modal-header {
+                padding: 15px 18px;
+            }
+
+            .modal-title {
+                font-size: 18px;
+            }
+
+            .modal-body {
+                padding: 18px;
+                max-height: calc(100vh - 240px);
+            }
+
+            .modal-footer {
+                padding: 15px 18px;
+            }
+
+            .form-row {
+                flex-direction: column;
+            }
+
+            .form-group-modal {
+                min-width: 100%;
             }
         }
 
         @media (max-width: 480px) {
+            .modal {
+                padding: 5px;
+            }
+
             .modal-content {
-                margin-top: 135px;
-                /* Adjust for smaller mobile navbar */
-                width: 99%;
-                max-height: 75vh;
+                max-height: calc(100vh - 140px);
+            }
+
+            .modal-header {
+                padding: 12px 15px;
+            }
+
+            .modal-title {
+                font-size: 16px;
+            }
+
+            .modal-body {
+                padding: 15px;
+                max-height: calc(100vh - 200px);
+            }
+
+            .modal-footer {
+                padding: 12px 15px;
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
             }
         }
 
@@ -1122,10 +1263,8 @@ if (!function_exists('generateQR')) {
             background: rgba(38, 60, 121, 0.05) !important;
         }
     </style>
-</head>
 
-<body>
-    <div class="books-header" style="margin-bottom: 30px;">
+<div class="books-header" style="margin-bottom: 30px;">
         <div class="books-title" style="font-size: 28px; font-weight: 700; color: #263c79;">
             <i class="fas fa-book-open"></i> Books Management
         </div>
@@ -1741,17 +1880,34 @@ if (!function_exists('generateQR')) {
         // Ensure books table loads on initial page load
         // Only load books table once on initial page load
         let booksTableLoaded = false;
-        document.addEventListener('DOMContentLoaded', function() {
+        
+        // Initialize immediately when script loads (for AJAX loaded content)
+        function initBooksManagement() {
+            console.log('Books Management: Initializing');
+            
             // Load database-wide statistics
             loadStatistics();
             
             if (!booksTableLoaded) {
                 booksTableLoaded = true;
+                console.log('Books Management: Loading initial books table');
                 loadBooksTable();
             }
-        });
+        }
+        
+        // Run on DOMContentLoaded (for standalone page loads)
+        document.addEventListener('DOMContentLoaded', initBooksManagement);
+        
+        // Also run immediately if document is already ready (for AJAX loads)
+        if (document.readyState === 'loading') {
+            // Document still loading, wait for DOMContentLoaded
+        } else {
+            // Document already loaded, init immediately
+            initBooksManagement();
+        }
 
         function loadTabContent(tabName) {
+            console.log('Loading tab content for:', tabName);
             switch (tabName) {
                 case 'catalog':
                     loadBooksTable();
@@ -1765,6 +1921,8 @@ if (!function_exists('generateQR')) {
                 case 'reports':
                     loadReportsContent();
                     break;
+                default:
+                    console.warn('Unknown tab:', tabName);
             }
         }
 
@@ -2806,8 +2964,6 @@ if (!function_exists('generateQR')) {
     }
 
     </script>
-    </body>
-    </html>
 
 <script>
 // Basic modal accessibility helpers
