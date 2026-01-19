@@ -424,10 +424,17 @@ try {
                     $email
                 ]);
                 
-                // Generate QR code (simple format: PRN-MemberNo)
-                $qrCode = "$prn-$memberNo";
+                // Generate QR code data and image
+                require_once '../../libs/phpqrcode/qrlib.php';
+                $qrData = "$prn-$memberNo";
                 
-                // Insert into Student table
+                // Generate QR code image to memory buffer
+                ob_start();
+                QRcode::png($qrData, null, QR_ECLEVEL_L, 4);
+                $qrImageData = ob_get_contents();
+                ob_end_clean();
+                
+                // Insert into Student table with QR code image stored in BLOB
                 $stmt = $pdo->prepare("
                     INSERT INTO Student (MemberNo, Surname, MiddleName, FirstName, DOB, Gender, 
                                         BloodGroup, Branch, CourseName, ValidTill, PRN, Mobile, 
@@ -451,7 +458,7 @@ try {
                     $email,
                     $address,
                     $cardColour,
-                    $qrCode,
+                    $qrImageData,  // Store QR code PNG image data
                     $photoData
                 ]);
                 
@@ -464,7 +471,7 @@ try {
                     'message' => 'Student added successfully',
                     'memberNo' => $memberNo,
                     'studentId' => $studentId,
-                    'qrCode' => $qrCode
+                    'qrData' => $qrData
                 ]);
                 
             } catch (Exception $e) {
@@ -558,7 +565,7 @@ try {
                 sendJson(['success' => false, 'message' => 'Student ID is required'], 400);
             }
             
-            // Get student data
+            // Get student data including QR code from database
             $stmt = $pdo->prepare("
                 SELECT s.QRCode, s.PRN, m.MemberNo, m.MemberName
                 FROM Student s
@@ -572,34 +579,30 @@ try {
                 sendJson(['success' => false, 'message' => 'Student not found'], 404);
             }
             
-            // Generate QR data string (PRN-MemberNo format)
-            $qrData = $student['PRN'] . '-' . $student['MemberNo'];
-            $qrFileName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $qrData);
-            $qrCodePath = "../../storage/qrcodes/{$qrFileName}.png";
-            
-            // Check if QR code file exists
-            if (file_exists($qrCodePath)) {
-                $qrCodeBase64 = base64_encode(file_get_contents($qrCodePath));
+            // Check if QR code exists in database
+            if (!empty($student['QRCode'])) {
+                // QR code exists in database, return it
+                $qrCodeBase64 = base64_encode($student['QRCode']);
             } else {
-                // Generate QR code
+                // Generate QR code and save to database
                 require_once '../../libs/phpqrcode/qrlib.php';
                 
-                $qrDir = '../../storage/qrcodes/';
+                $qrData = $student['PRN'] . '-' . $student['MemberNo'];
                 
-                // Create directory if it doesn't exist
-                if (!file_exists($qrDir)) {
-                    mkdir($qrDir, 0755, true);
-                }
+                // Generate QR code to temporary memory buffer
+                ob_start();
+                QRcode::png($qrData, null, QR_ECLEVEL_L, 4);
+                $qrImageData = ob_get_contents();
+                ob_end_clean();
                 
-                // Generate QR code
-                QRcode::png($qrData, $qrCodePath, QR_ECLEVEL_L, 4);
+                // Save to database
+                $updateStmt = $pdo->prepare("UPDATE Student SET QRCode = ? WHERE StudentID = ?");
+                $updateStmt->execute([$qrImageData, $studentId]);
                 
-                if (file_exists($qrCodePath)) {
-                    $qrCodeBase64 = base64_encode(file_get_contents($qrCodePath));
-                } else {
-                    sendJson(['success' => false, 'message' => 'Failed to generate QR code'], 500);
-                }
+                $qrCodeBase64 = base64_encode($qrImageData);
             }
+            
+            $qrData = $student['PRN'] . '-' . $student['MemberNo'];
             
             sendJson([
                 'success' => true,
