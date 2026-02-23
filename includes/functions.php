@@ -404,40 +404,64 @@ function getOverdueBooks($pdo) {
 function getDashboardStats($pdo) {
     $stats = [];
     
-    // Total books
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Books");
-    $stats['totalBooks'] = $stmt->fetch()['total'];
-    
-    // Total holdings/copies
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Holding");
-    $stats['totalCopies'] = $stmt->fetch()['total'];
-    
-    // Available books
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Holding WHERE Status = 'Available'");
-    $stats['availableBooks'] = $stmt->fetch()['total'];
-    
-    // Books issued
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Circulation WHERE Status = 'Active'");
-    $stats['booksIssued'] = $stmt->fetch()['total'];
-    
-    // Total members
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Member");
-    $stats['totalMembers'] = $stmt->fetch()['total'];
-    
-    // Active members
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM Member WHERE Status = 'Active'");
-    $stats['activeMembers'] = $stmt->fetch()['total'];
-    
-    // Overdue books
-    $today = date('Y-m-d');
-    $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM Circulation WHERE Status = 'Active' AND DueDate < ?");
-    $stmt->execute([$today]);
-    $stats['overdueBooks'] = $stmt->fetch()['total'];
-    
-    // Today's footfall
-    $stmt = $pdo->prepare("SELECT COUNT(DISTINCT MemberNo) as total FROM Footfall WHERE Date = ?");
-    $stmt->execute([$today]);
-    $stats['todayFootfall'] = $stmt->fetch()['total'];
+    try {
+        // Total books
+        $stmt = $pdo->query("SELECT COUNT(DISTINCT CatNo) as total FROM Books");
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stats['totalBooks'] = (int)($result['total'] ?? 0);
+        
+        // Total holdings/copies
+        $stmt = $pdo->query("SELECT COUNT(*) as total FROM Holding");
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stats['totalCopies'] = (int)($result['total'] ?? 0);
+        
+        // Available books
+        $stmt = $pdo->query("SELECT COUNT(*) as total FROM Holding WHERE Status = 'Available'");
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stats['availableBooks'] = (int)($result['total'] ?? 0);
+        
+        // Books issued
+        $stmt = $pdo->query("SELECT COUNT(*) as total FROM Circulation WHERE Status = 'Active'");
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stats['booksIssued'] = (int)($result['total'] ?? 0);
+        
+        // Total members
+        $stmt = $pdo->query("SELECT COUNT(*) as total FROM Member");
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stats['totalMembers'] = (int)($result['total'] ?? 0);
+        
+        // Active members
+        $stmt = $pdo->query("SELECT COUNT(*) as total FROM Member WHERE Status = 'Active'");
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stats['activeMembers'] = (int)($result['total'] ?? 0);
+        
+        // Overdue books
+        $today = date('Y-m-d');
+        $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM Circulation WHERE Status = 'Active' AND DueDate < ?");
+        $stmt->execute([$today]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stats['overdueBooks'] = (int)($result['total'] ?? 0);
+        
+        // Today's footfall
+        $stmt = $pdo->prepare("SELECT COUNT(DISTINCT MemberNo) as total FROM Footfall WHERE Date = ?");
+        $stmt->execute([$today]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stats['todayFootfall'] = (int)($result['total'] ?? 0);
+        
+    } catch (PDOException $e) {
+        error_log("Dashboard stats error: " . $e->getMessage());
+        // Return zeros if there's an error
+        $stats = [
+            'totalBooks' => 0,
+            'totalCopies' => 0,
+            'availableBooks' => 0,
+            'booksIssued' => 0,
+            'totalMembers' => 0,
+            'activeMembers' => 0,
+            'overdueBooks' => 0,
+            'todayFootfall' => 0
+        ];
+    }
     
     return $stats;
 }

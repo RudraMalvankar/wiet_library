@@ -26,19 +26,25 @@ $display_name = $admin_name;
 
 // Dashboard Statistics - Fetch from database
 try {
+    // Ensure PDO connection is fresh and valid
+    if (!isset($pdo) || !($pdo instanceof PDO)) {
+        throw new Exception("Database connection not available");
+    }
+    
     $quick_stats = getDashboardStats($pdo);
     
     // Add additional stats
     $stmt = $pdo->query("SELECT COUNT(*) as count FROM LibraryEvents WHERE MONTH(EventDate) = MONTH(CURDATE())");
-    $quick_stats['events_this_month'] = $stmt->fetch()['count'] ?? 0;
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $quick_stats['events_this_month'] = (int)($result['count'] ?? 0);
     
     // Rename keys to match existing code
-    $quick_stats['total_books'] = $quick_stats['totalBooks'] ?? 0;
-    $quick_stats['total_copies'] = $quick_stats['totalCopies'] ?? 0;
-    $quick_stats['active_members'] = $quick_stats['activeMembers'] ?? 0;
-    $quick_stats['books_issued'] = $quick_stats['booksIssued'] ?? 0;
-    $quick_stats['books_overdue'] = $quick_stats['overdueBooks'] ?? 0;
-    $quick_stats['footfall_today'] = $quick_stats['todayFootfall'] ?? 0;
+    $quick_stats['total_books'] = (int)($quick_stats['totalBooks'] ?? 0);
+    $quick_stats['total_copies'] = (int)($quick_stats['totalCopies'] ?? 0);
+    $quick_stats['active_members'] = (int)($quick_stats['activeMembers'] ?? 0);
+    $quick_stats['books_issued'] = (int)($quick_stats['booksIssued'] ?? 0);
+    $quick_stats['books_overdue'] = (int)($quick_stats['overdueBooks'] ?? 0);
+    $quick_stats['footfall_today'] = (int)($quick_stats['todayFootfall'] ?? 0);
     $quick_stats['pending_acquisitions'] = 0; // Not yet implemented
     $quick_stats['dropbox_active'] = 0; // Not yet implemented
     $quick_stats['e_resources'] = 0; // Not yet implemented
@@ -58,6 +64,8 @@ try {
         'e_resources' => 0
     ];
     error_log("Dashboard stats error: " . $e->getMessage());
+    // Also log to a visible error for debugging
+    $dashboard_error = "Error loading statistics: " . $e->getMessage();
 }
 
 // Recent Activities - Fetch from ActivityLog table
@@ -682,6 +690,13 @@ $system_health = [
 </style>
 
 <div class="dashboard-container">
+    <?php if (isset($dashboard_error)): ?>
+        <div style="background: #dc3545; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <strong><i class="fas fa-exclamation-triangle"></i> Database Error:</strong> <?php echo htmlspecialchars($dashboard_error); ?>
+            <br><small>Please check if MySQL is running and the database connection is configured correctly.</small>
+        </div>
+    <?php endif; ?>
+    
     <!-- Dashboard Header -->
     <div class="dashboard-header">
         <h1 class="dashboard-title">
