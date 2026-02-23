@@ -68,6 +68,7 @@ function initializeAdminSession($admin) {
     $_SESSION['admin_email'] = $admin['Email'];
     $_SESSION['admin_role'] = $admin['Role'];
     $_SESSION['is_superadmin'] = (bool)$admin['IsSuperAdmin'];
+    $_SESSION['last_login'] = $admin['LastLogin']; // Store previous login time
     $_SESSION['logged_in'] = true;
     $_SESSION['login_time'] = time();
     $_SESSION['last_activity'] = time();
@@ -287,6 +288,7 @@ function getAdminDetails() {
         'email' => $_SESSION['admin_email'] ?? '',
         'role' => $_SESSION['admin_role'] ?? '',
         'is_superadmin' => $_SESSION['is_superadmin'] ?? false,
+        'last_login' => $_SESSION['last_login'] ?? null,
         'permissions' => $_SESSION['permissions'] ?? []
     ];
 }

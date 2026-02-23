@@ -14,10 +14,9 @@ if (session_status() === PHP_SESSION_NONE) {
 $isAjax = isset($_GET['ajax']) && $_GET['ajax'] == '1';
 
 if ($isAjax) {
-    // Enable error display for debugging
+    // Suppress warnings and notices in AJAX mode - only show fatal errors
+    error_reporting(E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR);
     ini_set('display_errors', 1);
-    ini_set('display_startup_errors', 1);
-    error_reporting(E_ALL);
     
     // Start output buffering to capture the page content
     ob_start();

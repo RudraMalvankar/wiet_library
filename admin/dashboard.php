@@ -19,6 +19,7 @@ require_once '../includes/functions.php';
 $admin_name = $current_admin['name'];
 $admin_id = $current_admin['id'];
 $is_superadmin = $current_admin['is_superadmin'];
+$last_login = $current_admin['last_login'] ?? date('Y-m-d H:i:s'); // Use current time if not set
 
 // Set display name for dashboard header
 $display_name = $admin_name;

@@ -778,8 +778,12 @@ $is_superadmin = $current_admin['is_superadmin'];
               throw new Error('Empty or invalid response from server');
             }
             
-            // Check for PHP errors in the response
-            if (html.includes('Fatal error') || html.includes('Parse error') || html.includes('Warning:')) {
+            // Check for PHP fatal errors at the START of the response (before any HTML/style tags)
+            const firstStyleIndex = html.indexOf('<style');
+            const checkContent = firstStyleIndex > 0 ? html.substring(0, firstStyleIndex) : html.substring(0, 500);
+            
+            if (checkContent.includes('Fatal error') || checkContent.includes('Parse error') || 
+                (checkContent.includes('Warning:') && checkContent.indexOf('Warning:') < 100)) {
               console.error('PHP Error detected in response:', html);
               mainContent.innerHTML = `
                 <div style="background: #dc3545; color: white; padding: 20px; border-radius: 8px; margin: 20px; max-height: 500px; overflow: auto;">
