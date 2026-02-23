@@ -2,7 +2,7 @@
 // Include AJAX handler FIRST
 require_once 'ajax-handler.php';
 
-session_start();
+// Session started by ajax-handler.php
 require_once '../includes/db_connect.php';
 
 // Check if user is logged in

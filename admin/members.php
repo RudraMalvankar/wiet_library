@@ -2,7 +2,7 @@
 // Include AJAX handler FIRST (before session_start)
 require_once 'ajax-handler.php';
 
-session_start();
+// Session started by ajax-handler.php
 
 // Include database connection and functions
 require_once '../includes/db_connect.php';

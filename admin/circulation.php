@@ -6,7 +6,7 @@ require_once 'ajax-handler.php';
 // error_reporting(E_ALL);
 // ini_set('display_errors', 1);
 
-session_start();
+// Session started by ajax-handler.php
 
 // Include database connection and functions
 require_once '../includes/db_connect.php';

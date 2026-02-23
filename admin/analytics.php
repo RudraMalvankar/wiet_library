@@ -2,12 +2,13 @@
 // Admin Analytics Page - Library Administration Staff
 // This file will be included in the main-content area of admin/layout.php
 
-// Include AJAX handler FIRST
+// Include AJAX handler FIRST (handles session automatically)
 require_once 'ajax-handler.php';
 
-session_start();
+// Include database connection
 require_once '../includes/db_connect.php';
 
+// Get admin info from session
 $admin_name = isset($_SESSION['admin_name']) ? $_SESSION['admin_name'] : "Library Admin";
 $admin_id = isset($_SESSION['admin_id']) ? $_SESSION['admin_id'] : "ADM2025001";
 

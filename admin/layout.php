@@ -768,11 +768,32 @@ $is_superadmin = $current_admin['is_superadmin'];
         })
           .then(response => {
             if (!response.ok) {
-              throw new Error(`Page not found: ${page}`);
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             return response.text();
           })
           .then(html => {
+            // Check if response is empty or too short
+            if (!html || html.trim().length < 10) {
+              throw new Error('Empty or invalid response from server');
+            }
+            
+            // Check for PHP errors in the response
+            if (html.includes('Fatal error') || html.includes('Parse error') || html.includes('Warning:')) {
+              console.error('PHP Error detected in response:', html);
+              mainContent.innerHTML = `
+                <div style="background: #dc3545; color: white; padding: 20px; border-radius: 8px; margin: 20px; max-height: 500px; overflow: auto;">
+                  <h3><i class="fas fa-exclamation-triangle"></i> Server Error</h3>
+                  <p style="margin: 10px 0;"><strong>The page encountered a PHP error:</strong></p>
+                  <pre style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;">${html.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                  <button onclick="location.reload()" style="margin-top: 15px; padding: 10px 20px; background: white; color: #dc3545; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
+                    <i class="fas fa-redo"></i> Reload Page
+                  </button>
+                </div>
+              `;
+              return;
+            }
+            
             // Clear any existing content and scripts
             mainContent.innerHTML = '';
             
@@ -801,15 +822,30 @@ $is_superadmin = $current_admin['is_superadmin'];
           })
           .catch(error => {
             console.error('Error loading page:', error);
+            const errorMessage = error.message || 'Unknown error occurred';
             mainContent.innerHTML = `
-              <div style="text-align: center; padding: 40px; color: #d63384; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
-                <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 15px;"></i>
-                <h3 style="color: #263c79; margin-bottom: 10px;">Page Not Found</h3>
-                <p>The requested page "${page}" could not be loaded.</p>
-                <p style="font-size: 14px; color: #666;">Please try again or contact support if the problem persists.</p>
-                <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #263c79; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                  <i class="fas fa-redo"></i> Reload Page
-                </button>
+              <div style="text-align: center; padding: 40px; color: #d63384; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); margin: 20px;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 15px; color: #dc3545;"></i>
+                <h3 style="color: #263c79; margin-bottom: 10px;">Failed to Load Page</h3>
+                <p style="margin-bottom: 5px;">The requested page "<strong>${page}</strong>" could not be loaded.</p>
+                <p style="font-size: 14px; color: #666; margin-bottom: 15px;">Error: ${errorMessage}</p>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: left;">
+                  <p style="font-size: 14px; margin: 5px 0;"><strong>Common causes:</strong></p>
+                  <ul style="font-size: 13px; color: #666; margin: 10px 0; padding-left: 20px; text-align: left; display: inline-block;">
+                    <li>Database connection issues</li>
+                    <li>PHP syntax errors in the page</li>
+                    <li>Missing required files or permissions</li>
+                    <li>Session timeout - try logging in again</li>
+                  </ul>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                  <button onclick="location.reload()" style="padding: 10px 20px; background: #263c79; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">
+                    <i class="fas fa-redo"></i> Reload Page
+                  </button>
+                  <button onclick="loadPage('dashboard')" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">
+                    <i class="fas fa-home"></i> Go to Dashboard
+                  </button>
+                </div>
               </div>
             `;
           });

@@ -58,7 +58,7 @@
 // Include AJAX handler FIRST
 require_once 'ajax-handler.php';
 
-session_start();
+// Session started by ajax-handler.php
 require_once '../includes/db_connect.php';
 
 $admin_id = $_SESSION['admin_id'] ?? 1;

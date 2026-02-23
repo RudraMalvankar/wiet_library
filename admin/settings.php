@@ -2,7 +2,7 @@
 // Include AJAX handler FIRST
 require_once 'ajax-handler.php';
 
-session_start();
+// Session started by ajax-handler.php
 
 // No database connection needed for frontend development
 // Sample data will be used to demonstrate functionality
