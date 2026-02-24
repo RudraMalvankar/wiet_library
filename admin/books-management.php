@@ -1853,6 +1853,18 @@ if (!function_exists('generateQR')) {
     </div>
 
     <script>
+        // Helper function to get correct API path (works both in direct access and when loaded via layout.php)
+        function getApiPath(apiFile) {
+            const currentPath = window.location.pathname;
+            if (currentPath.includes('/admin/layout.php') || currentPath.includes('/admin/layout2.php')) {
+                return '/wiet_lib/admin/' + apiFile;
+            } else if (currentPath.includes('/admin/')) {
+                return apiFile;
+            } else {
+                return '/wiet_lib/admin/' + apiFile;
+            }
+        }
+        
         // Tab functionality
         function showTab(tabName) {
             // Hide all tabs
@@ -1934,7 +1946,7 @@ if (!function_exists('generateQR')) {
         // Function to load database-wide statistics
         async function loadStatistics() {
             try {
-                const response = await fetch('api/books.php?action=stats');
+                const response = await fetch(getApiPath('api/books.php?action=stats'));
                 if (!response.ok) throw new Error('API error: ' + response.status);
                 const result = await response.json();
                 
@@ -2078,7 +2090,7 @@ if (!function_exists('generateQR')) {
             document.getElementById('holdingsContent').innerHTML = `<div style="text-align: center; padding: 40px; color: #6c757d;"><i class='fas fa-spinner fa-spin' style='font-size: 24px;'></i><p>Loading holdings...</p></div>`;
 
             try {
-                const response = await fetch('api/books.php?action=holdings');
+                const response = await fetch(getApiPath('api/books.php?action=holdings'));
                 if (!response.ok) throw new Error('API error: ' + response.status);
                 const text = await response.text();
                 let result;
@@ -2695,7 +2707,7 @@ if (!function_exists('generateQR')) {
           const form = document.getElementById('editBookForm');
           const formData = new FormData(form);
           formData.append('CatNo', catNo);
-          fetch('api/books.php?action=update', {
+          fetch(getApiPath('api/books.php?action=update'), {
             method: 'POST',
             body: formData
           })
@@ -2781,7 +2793,7 @@ if (!function_exists('generateQR')) {
         payload.append('CatNo', catNo);
         payload.append('CopyIndex', copyIndex);
 
-        fetch('api/books.php?action=generate-qr', {
+        fetch(getApiPath('api/books.php?action=generate-qr'), {
             method: 'POST',
             body: payload
         })
@@ -2875,7 +2887,7 @@ if (!function_exists('generateQR')) {
         };
 
         // Update holding via API
-        fetch('api/books.php?action=update-holding', {
+        fetch(getApiPath('api/books.php?action=update-holding'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
@@ -2933,7 +2945,7 @@ if (!function_exists('generateQR')) {
         const accNo = prompt('Enter Accession Number for new holding:');
         if (!accNo) return;
 
-        fetch('api/books.php?action=add-holding', {
+        fetch(getApiPath('api/books.php?action=add-holding'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

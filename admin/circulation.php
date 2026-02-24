@@ -1137,6 +1137,22 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 <!-- End page-container -->
 
 <script>
+    // Helper function to get correct API path (works both in direct access and when loaded via layout.php)
+    function getApiPath(apiFile) {
+        // Check if we're in the admin folder or being loaded dynamically
+        const currentPath = window.location.pathname;
+        if (currentPath.includes('/admin/layout.php') || currentPath.includes('/admin/layout2.php')) {
+            // When loaded through layout.php, use absolute path from root
+            return '/wiet_lib/admin/' + apiFile;
+        } else if (currentPath.includes('/admin/')) {
+            // When accessed directly, use relative path
+            return apiFile;
+        } else {
+            // Fallback to absolute path
+            return '/wiet_lib/admin/' + apiFile;
+        }
+    }
+    
     // Debounce utility for search inputs
     function debounce(func, wait) {
         let timeout;
@@ -1206,7 +1222,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         // Fetch CSRF token on page load
         async function fetchCSRFToken() {
             try {
-                const response = await fetch('api/circulation.php?action=get-csrf-token');
+                const response = await fetch(getApiPath('api/circulation.php?action=get-csrf-token'));
                 const result = await response.json();
                 if (result.success) {
                     csrfToken = result.token;
@@ -1475,7 +1491,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             issueBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
             try {
-                const response = await fetch('api/circulation.php?action=issue', {
+                const response = await fetch(getApiPath('api/circulation.php?action=issue'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1576,7 +1592,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 document.getElementById('returnScanResult').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching circulation...';
                 
                 // Get active circulation for this accession number
-                const response = await fetch('api/circulation.php?action=active');
+                const response = await fetch(getApiPath('api/circulation.php?action=active'));
                 const result = await response.json();
 
                 if (result.success && result.data) {
@@ -1670,7 +1686,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             returnBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
             try {
-                const response = await fetch('api/circulation.php?action=return', {
+                const response = await fetch(getApiPath('api/circulation.php?action=return'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1755,7 +1771,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             if (!confirm('Renew this book for 15 more days?')) return;
             
             try {
-                const response = await fetch('api/circulation.php?action=renew', {
+                const response = await fetch(getApiPath('api/circulation.php?action=renew'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -1789,7 +1805,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         // Load Active Circulations from API
         async function loadActiveCirculations() {
             try {
-                const response = await fetch('api/circulation.php?action=active');
+                const response = await fetch(getApiPath('api/circulation.php?action=active'));
                 const result = await response.json();
 
                 let tableHTML = '';
@@ -1846,7 +1862,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         // Load Return History from API
         async function loadReturnHistory() {
             try {
-                const response = await fetch('api/circulation.php?action=history');
+                const response = await fetch(getApiPath('api/circulation.php?action=history'));
                 const result = await response.json();
 
                 let tableHTML = '';
@@ -1907,18 +1923,33 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
         // Load Statistics from API
         function loadStatistics() {
-            fetch('api/circulation.php?action=stats')
-                .then(res => res.json())
+            console.log('🔄 Loading circulation statistics...');
+            fetch(getApiPath('api/circulation.php?action=stats'))
+                .then(res => {
+                    console.log('📡 Stats API Response status:', res.status);
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(result => {
+                    console.log('📊 Stats API Result:', result);
                     if (result.success && result.data) {
                         document.getElementById('totalIssued').textContent = result.data.totalIssued || 0;
                         document.getElementById('dueToday').textContent = result.data.dueToday || 0;
                         document.getElementById('overdue').textContent = result.data.overdue || 0;
                         document.getElementById('todayReturns').textContent = result.data.todayReturns || 0;
+                        console.log('✅ Statistics loaded successfully');
+                    } else {
+                        console.warn('⚠️ API returned success=false or missing data:', result);
+                        document.getElementById('totalIssued').textContent = '0';
+                        document.getElementById('dueToday').textContent = '0';
+                        document.getElementById('overdue').textContent = '0';
+                        document.getElementById('todayReturns').textContent = '0';
                     }
                 })
                 .catch(err => {
-                    console.error('Error loading circulation stats:', err);
+                    console.error('❌ Error loading circulation stats:', err);
                     document.getElementById('totalIssued').textContent = '0';
                     document.getElementById('dueToday').textContent = '0';
                     document.getElementById('overdue').textContent = '0';
