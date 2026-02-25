@@ -27,6 +27,24 @@ function checkPagePermission($permissionKey) {
         
         // Show access denied page
         http_response_code(403);
+        
+        // If this is an AJAX request, return simplified error
+        if (defined('AJAX_MODE') && AJAX_MODE === true) {
+            echo '<div style="text-align: center; padding: 60px; background: white; border-radius: 8px; margin: 20px;">';
+            echo '<i class="fas fa-ban" style="font-size: 4rem; color: #dc3545; margin-bottom: 1.5rem;"></i>';
+            echo '<h1 style="color: #263c79; margin-bottom: 1rem;">Access Denied</h1>';
+            echo '<p style="color: #666; margin-bottom: 2rem;">You do not have permission to access this page.</p>';
+            echo '<p style="background: #f8f9fa; padding: 1rem; border-radius: 10px; margin-bottom: 2rem; font-size: 0.9rem; color: #555;">';
+            echo 'Logged in as: <strong>' . htmlspecialchars($_SESSION['admin_name'] ?? 'Unknown') . '</strong><br>';
+            echo 'Role: <strong>' . htmlspecialchars($_SESSION['admin_role'] ?? 'Unknown') . '</strong>';
+            echo '</p>';
+            echo '<a href="dashboard.php" style="display: inline-block; padding: 0.8rem 2rem; background: #263c79; color: white; text-decoration: none; border-radius: 10px;">';
+            echo '<i class="fas fa-arrow-left"></i> Return to Dashboard</a>';
+            echo '</div>';
+            exit;
+        }
+        
+        // Otherwise return full HTML page
         ?>
         <!DOCTYPE html>
         <html lang="en">

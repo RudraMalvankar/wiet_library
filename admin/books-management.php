@@ -1945,6 +1945,30 @@ if (!function_exists('generateQR')) {
 
         // Function to load database-wide statistics
         async function loadStatistics() {
+            // Try to load from cache first for instant display
+            const cachedStats = sessionStorage.getItem('books_stats');
+            if (cachedStats) {
+                try {
+                    const stats = JSON.parse(cachedStats);
+                    const age = Date.now() - stats.timestamp;
+                    
+                    // If cache is less than 2 minutes old, use it immediately
+                    if (age < 120000) {
+                        const totalBooksElem = document.getElementById('totalBooks');
+                        const totalCopiesElem = document.getElementById('totalCopies');
+                        const availableCopiesElem = document.getElementById('availableCopies');
+                        const issuedCopiesElem = document.getElementById('issuedCopies');
+                        
+                        if (totalBooksElem) totalBooksElem.textContent = stats.data.totalBooks;
+                        if (totalCopiesElem) totalCopiesElem.textContent = stats.data.totalCopies;
+                        if (availableCopiesElem) availableCopiesElem.textContent = stats.data.availableCopies;
+                        if (issuedCopiesElem) issuedCopiesElem.textContent = stats.data.issuedCopies;
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse cached stats:', e);
+                }
+            }
+            
             try {
                 const response = await fetch(getApiPath('api/books.php?action=stats'));
                 if (!response.ok) throw new Error('API error: ' + response.status);
@@ -1960,6 +1984,12 @@ if (!function_exists('generateQR')) {
                     if (totalCopiesElem) totalCopiesElem.textContent = result.stats.totalCopies;
                     if (availableCopiesElem) availableCopiesElem.textContent = result.stats.availableCopies;
                     if (issuedCopiesElem) issuedCopiesElem.textContent = result.stats.issuedCopies;
+                    
+                    // Cache the results
+                    sessionStorage.setItem('books_stats', JSON.stringify({
+                        data: result.stats,
+                        timestamp: Date.now()
+                    }));
                 }
             } catch (error) {
                 console.error('Failed to load statistics:', error);

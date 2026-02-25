@@ -627,18 +627,18 @@ $is_superadmin = $current_admin['is_superadmin'];
             <span>Change Password</span>
           </a>
         </li>
-        <li class="sidebar-item">
+        <!-- <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="activity-log">
             <i class="sidebar-icon fas fa-history"></i>
             <span>Activity Log</span>
           </a>
-        </li>
-        <li class="sidebar-item">
+        </li> -->
+        <!-- <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="settings">
             <i class="sidebar-icon fas fa-cog"></i>
             <span>Settings</span>
           </a>
-        </li>
+        </li> -->
       </ul>
     </aside>
 
@@ -708,6 +708,9 @@ $is_superadmin = $current_admin['is_superadmin'];
         }
       });
 
+      // Track current page
+      let currentPage = null;
+
       // Sidebar navigation
       sidebarLinks.forEach(link => {
         link.addEventListener('click', function(e) {
@@ -722,9 +725,11 @@ $is_superadmin = $current_admin['is_superadmin'];
           // Get the page data attribute
           const page = this.getAttribute('data-page');
 
-          // Check if this is the same page - if yes, force reload
-          const currentHash = window.location.hash.substring(1);
-          const forceReload = (currentHash === page);
+          // Check if this is the same page - skip reload
+          if (currentPage === page) {
+            console.log(`Already on page: ${page}, skipping reload`);
+            return;
+          }
 
           // Update URL hash to maintain state
           window.location.hash = page;
@@ -734,16 +739,16 @@ $is_superadmin = $current_admin['is_superadmin'];
             sidebar.classList.remove('sidebar-open');
           }
 
-          // Load the page content (force reload if same page)
-          if (forceReload) {
-            console.log(`Force reloading page: ${page}`);
-          }
+          // Load the page content
           loadPage(page);
         });
       });
 
       // Function to load page content (you can modify this for PHP includes)
       function loadPage(page) {
+        // NOTE: Page caching disabled - relying on sessionStorage cache for statistics instead
+        // This ensures scripts always execute fresh and prevents stale content issues
+        
         // Show loading indicator
         mainContent.innerHTML = `
           <div style="text-align: center; padding: 60px;">
@@ -802,10 +807,12 @@ $is_superadmin = $current_admin['is_superadmin'];
             mainContent.innerHTML = '';
             
             // Remove any previously loaded scripts from this page
-            document.querySelectorAll(`script[data-page="${page}"]`).forEach(s => s.remove());
+            document.querySelectorAll(`script[data-page]`).forEach(s => s.remove());
             
             // Insert the new content
             mainContent.innerHTML = html;
+            currentPage = page;
+            console.log(`✅ Page ${page} loaded successfully`);
             
             // Execute any scripts in the loaded content
             const scripts = mainContent.querySelectorAll('script');
@@ -858,7 +865,7 @@ $is_superadmin = $current_admin['is_superadmin'];
       }
 
       // Initialize - check URL or set default active state
-      let currentPage = 'dashboard'; // Default page
+      currentPage = 'dashboard'; // Default page (already declared above)
 
       // Check if there's a hash in URL to determine current page
       if (window.location.hash) {
@@ -873,8 +880,33 @@ $is_superadmin = $current_admin['is_superadmin'];
         }
       });
 
+      // Failsafe: Clear corrupted cache if page fails to load
+      window.addEventListener('error', function(e) {
+        console.error('Page error detected, clearing cache:', e);
+        if (sessionStorage.getItem('circulation_stats') || 
+            sessionStorage.getItem('books_stats') || 
+            sessionStorage.getItem('members_stats') || 
+            sessionStorage.getItem('footfall_stats')) {
+          sessionStorage.clear();
+          console.log('SessionStorage cleared due to error');
+        }
+      });
+
       // Load the current page content
-      loadPage(currentPage);
+      try {
+        loadPage(currentPage);
+      } catch (error) {
+        console.error('Failed to load initial page:', error);
+        sessionStorage.clear();
+        mainContent.innerHTML = `
+          <div style="text-align: center; padding: 60px;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545; margin-bottom: 15px;"></i>
+            <h3 style="color: #263c79;">Failed to Load Dashboard</h3>
+            <p style="color: #666;">An error occurred. Clearing cache and reloading...</p>
+          </div>
+        `;
+        setTimeout(() => location.reload(), 2000);
+      }
     });
   </script>
 </body>

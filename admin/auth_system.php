@@ -299,6 +299,19 @@ function getAdminDetails() {
  */
 function requireLogin($loginUrl = 'login.php') {
     if (!isAdminLoggedIn()) {
+        // If this is an AJAX request, return error content instead of redirect
+        if (defined('AJAX_MODE') && AJAX_MODE === true) {
+            http_response_code(401);
+            echo '<div style="text-align: center; padding: 60px; background: white; border-radius: 8px; margin: 20px;">';
+            echo '<i class="fas fa-lock" style="font-size: 4rem; color: #dc3545; margin-bottom: 1.5rem;"></i>';
+            echo '<h1 style="color: #263c79; margin-bottom: 1rem;">Session Expired</h1>';
+            echo '<p style="color: #666; margin-bottom: 2rem;">Your session has expired. Please log in again.</p>';
+            echo '<a href="' . htmlspecialchars($loginUrl) . '" style="display: inline-block; padding: 0.8rem 2rem; background: #263c79; color: white; text-decoration: none; border-radius: 10px;">';
+            echo '<i class="fas fa-sign-in-alt"></i> Go to Login</a>';
+            echo '</div>';
+            exit();
+        }
+        
         // Store the requested URL to redirect back after login
         $_SESSION['redirect_after_login'] = $_SERVER['REQUEST_URI'];
         header("Location: $loginUrl");

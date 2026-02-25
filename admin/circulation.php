@@ -657,19 +657,19 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
     <!-- Statistics Cards -->
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-number" id="totalIssued">-</div>
+            <div class="stat-number" id="totalIssued"><i class="fas fa-spinner fa-spin"></i></div>
             <div class="stat-label">Books Currently Issued</div>
         </div>
         <div class="stat-card due-today">
-            <div class="stat-number" id="dueToday">-</div>
+            <div class="stat-number" id="dueToday"><i class="fas fa-spinner fa-spin"></i></div>
             <div class="stat-label">Due Today</div>
         </div>
         <div class="stat-card overdue">
-            <div class="stat-number" id="overdue">-</div>
+            <div class="stat-number" id="overdue"><i class="fas fa-spinner fa-spin"></i></div>
             <div class="stat-label">Overdue Books</div>
         </div>
         <div class="stat-card">
-            <div class="stat-number" id="todayReturns">-</div>
+            <div class="stat-number" id="todayReturns"><i class="fas fa-spinner fa-spin"></i></div>
             <div class="stat-label">Today's Returns</div>
         </div>
     </div>
@@ -1137,20 +1137,29 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 <!-- End page-container -->
 
 <script>
+    console.log('🔍 Circulation.php script starting...');
+    console.log('📍 Current location:', window.location.href);
+    console.log('📂 Current pathname:', window.location.pathname);
+    
     // Helper function to get correct API path (works both in direct access and when loaded via layout.php)
     function getApiPath(apiFile) {
         // Check if we're in the admin folder or being loaded dynamically
         const currentPath = window.location.pathname;
+        let resolvedPath;
+        
         if (currentPath.includes('/admin/layout.php') || currentPath.includes('/admin/layout2.php')) {
             // When loaded through layout.php, use absolute path from root
-            return '/wiet_lib/admin/' + apiFile;
+            resolvedPath = '/wiet_lib/admin/' + apiFile;
         } else if (currentPath.includes('/admin/')) {
             // When accessed directly, use relative path
-            return apiFile;
+            resolvedPath = apiFile;
         } else {
             // Fallback to absolute path
-            return '/wiet_lib/admin/' + apiFile;
+            resolvedPath = '/wiet_lib/admin/' + apiFile;
         }
+        
+        console.log(`🔗 API Path resolved: ${apiFile} → ${resolvedPath}`);
+        return resolvedPath;
     }
     
     // Debounce utility for search inputs
@@ -1924,6 +1933,28 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         // Load Statistics from API
         function loadStatistics() {
             console.log('🔄 Loading circulation statistics...');
+            
+            // Try to load from cache first for instant display
+            const cachedStats = sessionStorage.getItem('circulation_stats');
+            if (cachedStats) {
+                try {
+                    const stats = JSON.parse(cachedStats);
+                    const age = Date.now() - stats.timestamp;
+                    
+                    // If cache is less than 2 minutes old, use it immediately
+                    if (age < 120000) {
+                        console.log('📦 Using cached stats');
+                        document.getElementById('totalIssued').textContent = stats.data.totalIssued || 0;
+                        document.getElementById('dueToday').textContent = stats.data.dueToday || 0;
+                        document.getElementById('overdue').textContent = stats.data.overdue || 0;
+                        document.getElementById('todayReturns').textContent = stats.data.todayReturns || 0;
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse cached stats:', e);
+                }
+            }
+            
+            // Fetch fresh data from API
             fetch(getApiPath('api/circulation.php?action=stats'))
                 .then(res => {
                     console.log('📡 Stats API Response status:', res.status);
@@ -1939,7 +1970,14 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                         document.getElementById('dueToday').textContent = result.data.dueToday || 0;
                         document.getElementById('overdue').textContent = result.data.overdue || 0;
                         document.getElementById('todayReturns').textContent = result.data.todayReturns || 0;
-                        console.log('✅ Statistics loaded successfully');
+                        
+                        // Cache the results
+                        sessionStorage.setItem('circulation_stats', JSON.stringify({
+                            data: result.data,
+                            timestamp: Date.now()
+                        }));
+                        
+                        console.log('✅ Statistics loaded and cached successfully');
                     } else {
                         console.warn('⚠️ API returned success=false or missing data:', result);
                         document.getElementById('totalIssued').textContent = '0';
@@ -2377,8 +2415,22 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         // Clean up streams when tab changes
         // Initialize everything when page loads
         function initCirculationPage() {
+            console.log('🚀 initCirculationPage() called');
+            console.log('📋 Document ready state:', document.readyState);
             console.log('✅ Circulation page loaded successfully');
             console.log('📅 Current date:', new Date().toLocaleDateString());
+            
+            // Check if critical elements exist
+            const totalIssuedEl = document.getElementById('totalIssued');
+            const dueTodayEl = document.getElementById('dueToday');
+            const overdueEl = document.getElementById('overdue');
+            const todayReturnsEl = document.getElementById('todayReturns');
+            
+            console.log('🔍 Checking stat elements:');
+            console.log('  - totalIssued:', totalIssuedEl ? '✓ Found' : '✗ NOT FOUND');
+            console.log('  - dueToday:', dueTodayEl ? '✓ Found' : '✗ NOT FOUND');
+            console.log('  - overdue:', overdueEl ? '✓ Found' : '✗ NOT FOUND');
+            console.log('  - todayReturns:', todayReturnsEl ? '✓ Found' : '✗ NOT FOUND');
             
             // Fetch CSRF token first
             fetchCSRFToken();
@@ -2416,10 +2468,18 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         }
         
         // Run on DOMContentLoaded OR immediately if already loaded (for AJAX)
+        console.log('🔍 Checking document ready state for initialization...');
+        console.log('   Ready state:', document.readyState);
+        
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initCirculationPage);
+            console.log('⏳ Document still loading, waiting for DOMContentLoaded...');
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('✅ DOMContentLoaded fired!');
+                initCirculationPage();
+            });
         } else {
             // Document already loaded (AJAX case)
+            console.log('⚡ Document already loaded, running init immediately...');
             initCirculationPage();
         }
 

@@ -670,6 +670,24 @@ function showTab(tabName) {
 
 // Load statistics
 async function loadStatistics() {
+    // Try to load from cache first for instant display
+    const cachedStats = sessionStorage.getItem('footfall_stats');
+    if (cachedStats) {
+        try {
+            const stats = JSON.parse(cachedStats);
+            const age = Date.now() - stats.timestamp;
+            
+            // If cache is less than 2 minutes old, use it immediately
+            if (age < 120000) {
+                document.getElementById('totalVisits').textContent = stats.data.today_visits || 0;
+                document.getElementById('uniqueVisitors').textContent = stats.data.week_visits || 0;
+                document.getElementById('activeNow').textContent = stats.data.active_visitors || 0;
+            }
+        } catch (e) {
+            console.warn('Failed to parse cached stats:', e);
+        }
+    }
+    
     try {
         const response = await fetch(getApiPath('../footfall/api/footfall-stats.php'));
         const data = await response.json();
@@ -678,6 +696,12 @@ async function loadStatistics() {
             document.getElementById('totalVisits').textContent = data.data.today_visits || 0;
             document.getElementById('uniqueVisitors').textContent = data.data.week_visits || 0;
             document.getElementById('activeNow').textContent = data.data.active_visitors || 0;
+            
+            // Cache the results
+            sessionStorage.setItem('footfall_stats', JSON.stringify({
+                data: data.data,
+                timestamp: Date.now()
+            }));
         }
     } catch (error) {
         console.error('Error loading statistics:', error);

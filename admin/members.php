@@ -1680,6 +1680,27 @@ $memberEntitlements = [
 
         // Load statistics
         async function loadStatistics() {
+            // Try to load from cache first for instant display
+            const cachedStats = sessionStorage.getItem('members_stats');
+            if (cachedStats) {
+                try {
+                    const stats = JSON.parse(cachedStats);
+                    const age = Date.now() - stats.timestamp;
+                    
+                    // If cache is less than 2 minutes old, use it immediately
+                    if (age < 120000) {
+                        document.getElementById('totalMembers').textContent = stats.data.totalMembers;
+                        document.getElementById('activeMembers').textContent = stats.data.activeMembers;
+                        document.getElementById('facultyMembers').textContent = stats.data.facultyMembers;
+                        document.getElementById('staffMembers').textContent = stats.data.staffMembers;
+                        document.getElementById('studentMembers').textContent = stats.data.studentMembers;
+                        document.getElementById('inactiveMembers').textContent = stats.data.inactiveMembers;
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse cached stats:', e);
+                }
+            }
+            
             try {
                 const response = await fetch(getApiPath('api/members.php?action=list'));
                 const result = await response.json();
@@ -1699,14 +1720,27 @@ $memberEntitlements = [
                     document.getElementById('staffMembers').textContent = staffMembers;
                     document.getElementById('studentMembers').textContent = studentMembers;
                     document.getElementById('inactiveMembers').textContent = inactiveMembers;
+                    
+                    // Cache the results
+                    sessionStorage.setItem('members_stats', JSON.stringify({
+                        data: {
+                            totalMembers,
+                            activeMembers,
+                            facultyMembers,
+                            staffMembers,
+                            studentMembers,
+                            inactiveMembers
+                        },
+                        timestamp: Date.now()
+                    }));
                 } else {
-                    // Show dash if failed
-                    document.getElementById('totalMembers').textContent = '-';
-                    document.getElementById('activeMembers').textContent = '-';
-                    document.getElementById('facultyMembers').textContent = '-';
-                    document.getElementById('staffMembers').textContent = '-';
-                    document.getElementById('studentMembers').textContent = '-';
-                    document.getElementById('inactiveMembers').textContent = '-';
+                    // Show 0 if failed
+                    document.getElementById('totalMembers').textContent = '0';
+                    document.getElementById('activeMembers').textContent = '0';
+                    document.getElementById('facultyMembers').textContent = '0';
+                    document.getElementById('staffMembers').textContent = '0';
+                    document.getElementById('studentMembers').textContent = '0';
+                    document.getElementById('inactiveMembers').textContent = '0';
                 }
             } catch (error) {
                 console.error('Error loading statistics:', error);
