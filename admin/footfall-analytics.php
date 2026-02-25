@@ -612,6 +612,21 @@ body {
 </div>
 
 <script>
+// Helper function to get correct API path (works both in direct access and when loaded via layout.php)
+function getApiPath(apiFile) {
+    const currentPath = window.location.pathname;
+    if (currentPath.includes('/admin/layout.php') || currentPath.includes('/admin/layout2.php')) {
+        // When loaded through layout.php, use absolute path from root
+        return '/wiet_lib/' + apiFile.replace('../', '');
+    } else if (currentPath.includes('/admin/')) {
+        // When accessed directly from admin folder
+        return apiFile;
+    } else {
+        // Fallback to absolute path
+        return '/wiet_lib/' + apiFile.replace('../', '');
+    }
+}
+
 // Global variables
 let dailyChart, hourlyChart, purposeChart, branchChart;
 
@@ -656,7 +671,7 @@ function showTab(tabName) {
 // Load statistics
 async function loadStatistics() {
     try {
-        const response = await fetch('../footfall/api/footfall-stats.php');
+        const response = await fetch(getApiPath('../footfall/api/footfall-stats.php'));
         const data = await response.json();
         
         if (data.success) {
@@ -819,7 +834,7 @@ async function loadAllRecords() {
     const dateTo = document.getElementById('recordsDateTo').value;
     
     try {
-        const response = await fetch(`../footfall/api/footfall-records.php?date_from=${dateFrom}&date_to=${dateTo}&limit=100`);
+        const response = await fetch(getApiPath(`../footfall/api/footfall-records.php?date_from=${dateFrom}&date_to=${dateTo}&limit=100`));
         const data = await response.json();
         
         if (data.success && data.data.records) {
@@ -854,7 +869,7 @@ async function loadAllRecords() {
 // Load active visitors
 async function loadActiveVisitors() {
     try {
-        const response = await fetch('../footfall/api/footfall-records.php?status=Active&limit=50');
+        const response = await fetch(getApiPath('../footfall/api/footfall-records.php?status=Active&limit=50'));
         const data = await response.json();
         
         if (data.success && data.data.records) {
@@ -912,7 +927,7 @@ async function checkoutVisitor(memberNo) {
 // Load report stats
 async function loadReportStats() {
     try {
-        const response = await fetch('../footfall/api/footfall-stats.php');
+        const response = await fetch(getApiPath('../footfall/api/footfall-stats.php'));
         const data = await response.json();
         
         if (data.success) {

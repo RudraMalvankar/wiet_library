@@ -928,8 +928,20 @@ $system_health = [
         </div>
 
         <script>
-            // Dashboard interactivity
-            document.addEventListener('DOMContentLoaded', function() {
+            // Helper function to get correct API path (works both in direct access and when loaded via layout.php)
+            function getApiPath(apiFile) {
+                const currentPath = window.location.pathname;
+                if (currentPath.includes('/admin/layout.php') || currentPath.includes('/admin/layout2.php')) {
+                    return '/wiet_lib/admin/' + apiFile;
+                } else if (currentPath.includes('/admin/')) {
+                    return apiFile;
+                } else {
+                    return '/wiet_lib/admin/' + apiFile;
+                }
+            }
+            
+            // Dashboard initialization
+            function initDashboard() {
                 // Quick action cards navigation
                 document.querySelectorAll('.action-card[data-page], .alert-card[data-page]').forEach(card => {
                     card.addEventListener('click', function() {
@@ -971,9 +983,16 @@ $system_health = [
                 // Animate stat numbers on load
                 animateNumbers();
 
-                    // Auto-refresh dashboard data every 30 seconds
-                    setInterval(refreshDashboardData, 30000);
-            });
+                // Auto-refresh dashboard data every 30 seconds
+                setInterval(refreshDashboardData, 30000);
+            }
+            
+            // Run on DOMContentLoaded OR immediately if already loaded (for AJAX)
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initDashboard);
+            } else {
+                initDashboard();
+            }
 
             function animateNumbers() {
                 document.querySelectorAll('.stat-number').forEach(element => {
@@ -996,7 +1015,7 @@ $system_health = [
 
             function refreshDashboardData() {
                     // Fetch live dashboard stats from API and update the DOM
-                    fetch('api/dashboard.php')
+                    fetch(getApiPath('api/dashboard.php'))
                         .then(resp => resp.json())
                         .then(json => {
                             if (!json.success) throw new Error(json.message || 'API returned failure');

@@ -1020,6 +1020,18 @@ $memberEntitlements = [
     </div>
 
     <script>
+        // Helper function to get correct API path (works both in direct access and when loaded via layout.php)
+        function getApiPath(apiFile) {
+            const currentPath = window.location.pathname;
+            if (currentPath.includes('/admin/layout.php') || currentPath.includes('/admin/layout2.php')) {
+                return '/wiet_lib/admin/' + apiFile;
+            } else if (currentPath.includes('/admin/')) {
+                return apiFile;
+            } else {
+                return '/wiet_lib/admin/' + apiFile;
+            }
+        }
+        
         // Global variables
         const memberEntitlements = <?php echo json_encode($memberEntitlements); ?>;
         let selectedMembers = [];
@@ -1044,7 +1056,7 @@ $memberEntitlements = [
             };
 
             try {
-                const response = await fetch('api/members.php', {
+                const response = await fetch(getApiPath('api/members.php'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1432,7 +1444,7 @@ $memberEntitlements = [
             };
 
             try {
-                const response = await fetch('api/members.php', {
+                const response = await fetch(getApiPath('api/members.php'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1527,7 +1539,7 @@ $memberEntitlements = [
             }
 
             try {
-                const response = await fetch('api/members.php', {
+                const response = await fetch(getApiPath('api/members.php'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1669,7 +1681,7 @@ $memberEntitlements = [
         // Load statistics
         async function loadStatistics() {
             try {
-                const response = await fetch('api/members.php?action=list');
+                const response = await fetch(getApiPath('api/members.php?action=list'));
                 const result = await response.json();
                 
                 if (result.success) {
@@ -1712,10 +1724,17 @@ $memberEntitlements = [
         };
 
         // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
+        function initMembersPage() {
             loadStatistics();
             loadMembersTable();
-        });
+        }
+        
+        // Run on DOMContentLoaded OR immediately if already loaded (for AJAX)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initMembersPage);
+        } else {
+            initMembersPage();
+        }
     </script>
 </body>
 

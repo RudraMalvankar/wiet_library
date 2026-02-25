@@ -2376,7 +2376,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
         // Clean up streams when tab changes
         // Initialize everything when page loads
-        document.addEventListener('DOMContentLoaded', function() {
+        function initCirculationPage() {
             console.log('✅ Circulation page loaded successfully');
             console.log('📅 Current date:', new Date().toLocaleDateString());
             
@@ -2413,7 +2413,15 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                     openQuickScan();
                 }
             });
-        });
+        }
+        
+        // Run on DOMContentLoaded OR immediately if already loaded (for AJAX)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initCirculationPage);
+        } else {
+            // Document already loaded (AJAX case)
+            initCirculationPage();
+        }
 
         // Make all functions globally accessible for onclick handlers
         window.startMemberScan = startMemberScan;
