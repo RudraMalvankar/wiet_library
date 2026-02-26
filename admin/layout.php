@@ -552,13 +552,13 @@ $is_superadmin = $current_admin['is_superadmin'];
             <i class="sidebar-icon fas fa-users"></i>
             <span>Members</span>
           </a>
-        </li>
+        <!-- </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="book-assignments">
             <i class="sidebar-icon fas fa-clipboard-list"></i>
             <span>Book Assignments</span>
           </a>
-        </li>
+        </li> -->
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="fine-management">
             <i class="sidebar-icon fas fa-money-bill-wave"></i>

@@ -26,18 +26,10 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 // ============================================================
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
+<!-- ZXing Library for QR/Barcode Scanning -->
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>Circulation Management</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
+<style>
     /* Spinner overlay for camera loading */
     .camera-loading-overlay {
         position: absolute;
@@ -637,12 +629,8 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
     </style>
-    <!-- Add QR Code scanning library -->
-    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
-</head>
 
-<body>
-<div class="page-container">
+<div class="circulation-page-wrapper">
     <div class="circulation-header">
         <h1 class="circulation-title">
             <i class="fas fa-exchange-alt"></i>
@@ -2009,6 +1997,16 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 memberCodeReader = new ZXing.BrowserQRCodeReader();
                 bookCodeReader = new ZXing.BrowserMultiFormatReader();
                 returnCodeReader = new ZXing.BrowserMultiFormatReader();
+                
+                // Set fast scanning for all readers
+                memberCodeReader.timeBetweenDecodingAttempts = 100;
+                bookCodeReader.timeBetweenDecodingAttempts = 100;
+                returnCodeReader.timeBetweenDecodingAttempts = 100;
+                
+                console.log('✅ QR/Barcode readers initialized with fast scanning');
+            } else {
+                console.warn('⚠️ ZXing library not loaded yet, retrying in 100ms...');
+                setTimeout(initializeCodeReaders, 100);
             }
         }
 
@@ -2018,7 +2016,13 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 document.getElementById('memberCameraLoading').style.display = 'flex';
                 
                 const constraints = {
-                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        focusMode: 'continuous',
+                        zoom: 1.0
+                    }
                 };
                 try {
                     memberStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -2037,21 +2041,26 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 placeholder.style.display = 'none';
                 scanBtn.disabled = true;
                 stopBtn.disabled = false;
+                
+                // Wait for video to be ready
+                await video.play();
                 document.getElementById('memberCameraLoading').style.display = 'none';
+                document.getElementById('memberScanningOverlay').style.display = 'flex';
 
-                // Start QR code detection
+                // Start fast QR code detection
                 if (memberCodeReader) {
+                    const hints = new Map();
+                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                    
                     memberCodeReader.decodeFromVideoDevice(null, 'memberVideo', (result, error) => {
                         if (result) {
+                            // Play beep on successful scan
+                            const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUKbh8LdjHAU3kdfy0HotBS17yPLaizsKFFyz6eqmVRQKRp/g8r5sIQUrgc7y2Yk2CBlpu/DknE4MDlCl4fC3YxwFN5HX8tB6LQUte8jy2os7ChRcs+nqplUUCkmf4PK+bCEFK4HO8tmJNggZabvw5JxODA5QpeHwt2McBTeR1/LQei0FLXvI8tqLOwo=');
+                            beep.play().catch(() => {});
                             handleMemberScanResult(result.text);
                         }
                     });
                 }
-
-                document.getElementById('memberScanningOverlay').style.display = 'flex';
-                setTimeout(() => {
-                    document.getElementById('memberScanningOverlay').style.display = 'none';
-                }, 3000);
 
             } catch (error) {
                 console.error('Error accessing camera:', error);
@@ -2116,7 +2125,13 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 document.getElementById('bookCameraLoading').style.display = 'flex';
                 
                 const constraints = {
-                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        focusMode: 'continuous',
+                        zoom: 1.0
+                    }
                 };
                 try {
                     bookStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -2135,20 +2150,33 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 placeholder.style.display = 'none';
                 scanBtn.disabled = true;
                 stopBtn.disabled = false;
+                
+                // Wait for video to be ready
+                await video.play();
                 document.getElementById('bookCameraLoading').style.display = 'none';
+                document.getElementById('bookScanningOverlay').style.display = 'flex';
 
+                // Start fast barcode detection with multiple formats
                 if (bookCodeReader) {
+                    const hints = new Map();
+                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                        ZXing.BarcodeFormat.QR_CODE,
+                        ZXing.BarcodeFormat.CODE_128,
+                        ZXing.BarcodeFormat.CODE_39,
+                        ZXing.BarcodeFormat.EAN_13,
+                        ZXing.BarcodeFormat.EAN_8
+                    ]);
+                    
                     bookCodeReader.decodeFromVideoDevice(null, 'bookVideo', (result, error) => {
                         if (result) {
+                            // Play beep on successful scan
+                            const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUKbh8LdjHAU3kdfy0HotBS17yPLaizsKFFyz6eqmVRQKRp/g8r5sIQUrgc7y2Yk2CBlpu/DknE4MDlCl4fC3YxwFN5HX8tB6LQUte8jy2os7ChRcs+nqplUUCkmf4PK+bCEFK4HO8tmJNggZabvw5JxODA5QpeHwt2McBTeR1/LQei0FLXvI8tqLOwo=');
+                            beep.play().catch(() => {});
                             handleBookScanResult(result.text);
                         }
                     });
                 }
-
-                document.getElementById('bookScanningOverlay').style.display = 'flex';
-                setTimeout(() => {
-                    document.getElementById('bookScanningOverlay').style.display = 'none';
-                }, 3000);
 
             } catch (error) {
                 console.error('Error accessing camera:', error);
@@ -2204,7 +2232,13 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 document.getElementById('returnCameraLoading').style.display = 'flex';
                 
                 const constraints = {
-                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        focusMode: 'continuous',
+                        zoom: 1.0
+                    }
                 };
                 try {
                     returnStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -2223,20 +2257,33 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 placeholder.style.display = 'none';
                 scanBtn.disabled = true;
                 stopBtn.disabled = false;
+                
+                // Wait for video to be ready
+                await video.play();
                 document.getElementById('returnCameraLoading').style.display = 'none';
+                document.getElementById('returnScanningOverlay').style.display = 'flex';
 
+                // Start fast barcode detection with multiple formats
                 if (returnCodeReader) {
+                    const hints = new Map();
+                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                        ZXing.BarcodeFormat.QR_CODE,
+                        ZXing.BarcodeFormat.CODE_128,
+                        ZXing.BarcodeFormat.CODE_39,
+                        ZXing.BarcodeFormat.EAN_13,
+                        ZXing.BarcodeFormat.EAN_8
+                    ]);
+                    
                     returnCodeReader.decodeFromVideoDevice(null, 'returnVideo', (result, error) => {
                         if (result) {
+                            // Play beep on successful scan
+                            const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUKbh8LdjHAU3kdfy0HotBS17yPLaizsKFFyz6eqmVRQKRp/g8r5sIQUrgc7y2Yk2CBlpu/DknE4MDlCl4fC3YxwFN5HX8tB6LQUte8jy2os7ChRcs+nqplUUCkmf4PK+bCEFK4HO8tmJNggZabvw5JxODA5QpeHwt2McBTeR1/LQei0FLXvI8tqLOwo=');
+                            beep.play().catch(() => {});
                             handleReturnScanResult(result.text);
                         }
                     });
                 }
-
-                document.getElementById('returnScanningOverlay').style.display = 'flex';
-                setTimeout(() => {
-                    document.getElementById('returnScanningOverlay').style.display = 'none';
-                }, 3000);
 
             } catch (error) {
                 console.error('Error accessing camera:', error);
