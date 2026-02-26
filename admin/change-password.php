@@ -4,12 +4,12 @@ session_start();
 
 // Check if user is supposed to change password
 if (!isset($_SESSION['must_change_password']) || !isset($_SESSION['temp_email'])) {
-    header('Location: ../../admin_login.php');
+    header('Location: admin_login.php');
     exit();
 }
 
 // Include the admin authentication system
-require_once '../../admin_auth_system.php';
+require_once 'admin_auth_system.php';
 
 $email = $_SESSION['temp_email'];
 $error_message = '';
@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 // Redirect after 2 seconds
                 echo "<script>
                     setTimeout(function() {
-                        window.location.href = 'layout.php';
+                        window.location.href = 'dashboard.php';
                     }, 2000);
                 </script>";
             }
@@ -332,7 +332,7 @@ $admin_name = isset($credentials[$email]) ? $credentials[$email]['name'] : 'Admi
 <body>
     <div class="change-password-container">
         <div class="watermark">
-            <img src="../images/watumull%20logo.png" alt="Watumull Logo">
+            <img src="../images/watumull logo.png" alt="Watumull Logo">
         </div>
         
         <div class="form-content">
@@ -480,7 +480,7 @@ $admin_name = isset($credentials[$email]) ? $credentials[$email]['name'] : 'Admi
         
         function logout() {
             if (confirm('Are you sure you want to logout? You will need to contact the administrator to reset your password.')) {
-                window.location.href = '../../admin_login.php?logout=1';
+                window.location.href = 'admin_login.php?logout=1';
             }
         }
 

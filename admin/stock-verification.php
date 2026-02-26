@@ -1,23 +1,16 @@
 <?php
-// Include AJAX handler FIRST
-require_once 'ajax-handler.php';
+// Stock Verification Page - Content only (no html/body tags)
+// This file will be included in the main content area
 
-// Session started by ajax-handler.php
+// Session started by layout.php
+require_once 'session_check.php';
 require_once '../includes/db_connect.php';
-require_once '../includes/functions.php';
 
 $admin_id = $_SESSION['admin_id'] ?? 1;
-$admin_name = $_SESSION['admin_name'] ?? 'Admin User';
+$admin_name = $current_admin['name'] ?? 'Admin User';
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Verification - Library Management</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
+<style>
         * {
             margin: 0;
             padding: 0;
@@ -428,14 +421,13 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-    </style>
-</head>
-<body>
-    <div class="container">
+</style>
+
+<div class="container">
         <div class="header">
             <h1><i class="fas fa-clipboard-check"></i> Stock Verification</h1>
             <div>
-                <button class="btn btn-secondary" onclick="window.location.href='dashboard.php'">
+                <button class="btn btn-secondary" onclick="window.location.hash=''; document.querySelector('[data-page=dashboard]').click();">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </button>
             </div>
@@ -1035,5 +1027,4 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         window.clearSession = clearSession;
         window.generateReport = generateReport;
     </script>
-</body>
-</html>
+</div>
