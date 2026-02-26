@@ -1478,14 +1478,14 @@ if (!function_exists('generateQR')) {
                 <i class="fas fa-warehouse"></i>
                 Holdings Management
             </button>
-            <button class="tab-btn" onclick="showTab('acquisition')">
+            <!-- <button class="tab-btn" onclick="showTab('acquisition')">
                 <i class="fas fa-shopping-cart"></i>
                 Acquisition
-            </button>
-            <button class="tab-btn" onclick="showTab('reports')">
+            </button> -->
+            <!-- <button class="tab-btn" onclick="showTab('reports')">
                 <i class="fas fa-chart-pie"></i>
                 Reports
-            </button>
+            </button> -->
         </div>
 
         <!-- Books Catalog Tab -->

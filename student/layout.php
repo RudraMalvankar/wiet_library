@@ -9,6 +9,44 @@ require_once 'student_session_check.php';
 // Student information is now available from session check
 // Variables available: $student_id, $member_no, $student_name, $student_email, 
 // $student_branch, $student_course, $student_prn, $books_issued
+
+// ============================================================
+// FETCH UNREAD NOTIFICATIONS COUNT
+// ============================================================
+$unread_notifications_count = 0;
+try {
+    require_once '../includes/db_connect.php';
+    
+    // Count unread admin notifications + system notifications (overdue, due soon)
+    $notif_stmt = $pdo->prepare("
+        SELECT COUNT(*) as unread_count
+        FROM Notifications
+        WHERE (MemberNo = ? OR MemberNo IS NULL)
+        AND IsRead = 0
+    ");
+    $notif_stmt->execute([$member_no]);
+    $result = $notif_stmt->fetch(PDO::FETCH_ASSOC);
+    $unread_admin_notifs = $result['unread_count'] ?? 0;
+    
+    // Count overdue books as notifications
+    $overdue_stmt = $pdo->prepare("
+        SELECT COUNT(*) as overdue_count
+        FROM Circulation c
+        WHERE c.MemberNo = ?
+        AND c.Status = 'Active'
+        AND c.DueDate < CURRENT_DATE
+    ");
+    $overdue_stmt->execute([$member_no]);
+    $overdue_result = $overdue_stmt->fetch(PDO::FETCH_ASSOC);
+    $overdue_count = $overdue_result['overdue_count'] ?? 0;
+    
+    // Total unread notifications
+    $unread_notifications_count = $unread_admin_notifs + $overdue_count;
+    
+} catch (Exception $e) {
+    error_log("Unread notifications count error: " . $e->getMessage());
+    $unread_notifications_count = 0;
+}
 ?>
 
 <!DOCTYPE html>
@@ -226,7 +264,19 @@ require_once 'student_session_check.php';
     width: 20px;
     text-align: center;
   }
-
+  /* Notification Badge */
+  .notification-badge {
+    background-color: #dc3545;
+    color: white;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: auto;
+    min-width: 20px;
+    text-align: center;
+    line-height: 16px;
+  }
   /* Main Content Area */
   .main-content {
     margin-left: 220px;
@@ -481,6 +531,9 @@ require_once 'student_session_check.php';
           <a href="#" class="sidebar-link" data-page="notifications">
             <i class="sidebar-icon fas fa-bell"></i>
             Notifications
+            <?php if ($unread_notifications_count > 0): ?>
+              <span class="notification-badge"><?php echo $unread_notifications_count; ?></span>
+            <?php endif; ?>
           </a>
         </li>
         <li class="sidebar-item">

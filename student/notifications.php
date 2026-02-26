@@ -30,6 +30,63 @@ $member_no = $_SESSION['member_no'] ?? null;
 // Fetch real notifications from database
 $notifications = [];
 
+// DEBUG: Log what we're looking for
+error_log("Student Notifications - Member No: " . $member_no);
+
+// ============================================================
+// 1. FETCH ADMIN-CREATED NOTIFICATIONS FROM DATABASE
+// ============================================================
+try {
+    $admin_notif_stmt = $pdo->prepare("
+        SELECT 
+            NotificationID,
+            Title,
+            Message,
+            Type,
+            IsRead,
+            CreatedDate
+        FROM Notifications
+        WHERE (MemberNo = ? OR MemberNo IS NULL)
+        ORDER BY CreatedDate DESC
+        LIMIT 50
+    ");
+    $admin_notif_stmt->execute([$member_no]);
+    
+    // DEBUG: Log how many we found
+    error_log("Admin notifications fetched: " . $admin_notif_stmt->rowCount());
+    $admin_notifications = $admin_notif_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Add admin notifications to the list
+    foreach ($admin_notifications as $admin_notif) {
+        $type_map = [
+            'Due Reminder' => 'warning',
+            'Overdue Notice' => 'error',
+            'New Arrivals' => 'info',
+            'Event Reminder' => 'info',
+            'System Maintenance' => 'warning',
+            'Membership Expiry' => 'warning'
+        ];
+        
+        $notifications[] = [
+            'id' => 'admin_' . $admin_notif['NotificationID'],
+            'notification_db_id' => $admin_notif['NotificationID'], // For marking as read
+            'title' => $admin_notif['Title'],
+            'message' => $admin_notif['Message'],
+            'type' => $type_map[$admin_notif['Type']] ?? 'info',
+            'category' => strtolower(str_replace(' ', '_', $admin_notif['Type'])),
+            'date' => $admin_notif['CreatedDate'],
+            'read' => (bool)$admin_notif['IsRead'],
+            'action_required' => false,
+            'is_admin_notification' => true
+        ];
+    }
+} catch (PDOException $e) {
+    error_log("Admin notifications fetch error: " . $e->getMessage());
+}
+
+// ============================================================
+// 2. FETCH SYSTEM-GENERATED NOTIFICATIONS (OVERDUE, DUE SOON, ETC)
+// ============================================================
 try {
     // Get overdue books (warning notifications)
     $overdue_stmt = $pdo->prepare("
@@ -96,8 +153,14 @@ try {
             'book_title' => $book['Title']
         ];
     }
+} catch (PDOException $e) {
+    error_log("Overdue/due books fetch error: " . $e->getMessage());
+}
     
-    // Get recent library events
+// ============================================================
+// 3. FETCH LIBRARY EVENTS
+// ============================================================
+try {
     $events_stmt = $pdo->query("
         SELECT 
             EventID,
@@ -125,8 +188,14 @@ try {
             'action_required' => false
         ];
     }
+} catch (PDOException $e) {
+    error_log("Library events fetch error: " . $e->getMessage());
+}
     
-    // Get activity log notifications
+// ============================================================
+// 4. FETCH ACTIVITY LOG
+// ============================================================
+try {
     $activity_stmt = $pdo->prepare("
         SELECT 
             Action,
@@ -159,10 +228,8 @@ try {
             'action_required' => false
         ];
     }
-    
 } catch (PDOException $e) {
-    error_log("Notifications fetch error: " . $e->getMessage());
-    $notifications = []; // Ensure array exists even on error
+    error_log("Activity log fetch error: " . $e->getMessage());
 }
 
 // Ensure notifications is an array
@@ -576,6 +643,18 @@ $action_required_count = count(array_filter($notifications, function ($n) {
     <p class="notifications-subtitle">Stay updated with library alerts, due dates, and important announcements</p>
 </div>
 
+<!-- DEBUG INFO (Remove after testing) -->
+<?php if (count($notifications) === 0): ?>
+<div style="background: #fff3cd; border: 2px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 8px;">
+    <h3 style="color: #856404; margin: 0 0 10px 0;">🔍 Debug Info</h3>
+    <p style="margin: 5px 0;"><strong>Member No:</strong> <?php echo $member_no ?? 'NOT SET'; ?></p>
+    <p style="margin: 5px 0;"><strong>Student ID:</strong> <?php echo $student_id ?? 'NOT SET'; ?></p>
+    <p style="margin: 5px 0;"><strong>Total Notifications Found:</strong> <?php echo count($notifications); ?></p>
+    <p style="margin: 5px 0; color: #dc3545;"><strong>⚠️ No notifications are being loaded from database!</strong></p>
+    <p style="margin: 5px 0;">Please check: <a href="test_notifications_debug.php" target="_blank">Notifications Debug Page</a></p>
+</div>
+<?php endif; ?>
+
 <!-- Statistics Overview -->
 <div class="notifications-stats">
     <div class="stat-card danger">
@@ -659,7 +738,7 @@ $action_required_count = count(array_filter($notifications, function ($n) {
 
                         <div class="notification-actions">
                             <?php if (!$notification['read']): ?>
-                                <button class="notification-btn" onclick="markAsRead(<?php echo $notification['id']; ?>)">
+                                <button class="notification-btn" onclick="markAsRead('<?php echo $notification['id']; ?>', <?php echo isset($notification['notification_db_id']) ? $notification['notification_db_id'] : 'null'; ?>)">
                                     Mark Read
                                 </button>
                             <?php endif; ?>
@@ -735,7 +814,7 @@ $action_required_count = count(array_filter($notifications, function ($n) {
         }
     }
 
-    function markAsRead(notificationId) {
+    function markAsRead(notificationId, dbNotificationId) {
         const notification = document.querySelector(`[data-id="${notificationId}"]`);
         notification.classList.remove('unread');
 
@@ -748,8 +827,31 @@ $action_required_count = count(array_filter($notifications, function ($n) {
         // Update unread count
         updateUnreadCount();
 
-        // In real implementation, make AJAX call to server
-        console.log('Marking notification as read:', notificationId);
+        // If this is an admin notification, update the database
+        if (dbNotificationId) {
+            fetch('mark_notification_read.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    notification_id: dbNotificationId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Notification marked as read in database');
+                } else {
+                    console.error('Failed to mark notification as read:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error marking notification as read:', error);
+            });
+        } else {
+            console.log('Marking system notification as read (client-side only):', notificationId);
+        }
     }
 
     function markAllAsRead() {

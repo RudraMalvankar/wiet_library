@@ -144,7 +144,27 @@ try {
 
 // Generate dynamic notifications
 $notifications = [];
+$unread_notifications_count_dashboard = 0;
 try {
+    // -1. Check for admin notifications (NEW!)
+    $admin_notif_query = "
+        SELECT COUNT(*) as admin_notif_count
+        FROM Notifications
+        WHERE (MemberNo = :member_no OR MemberNo IS NULL)
+        AND IsRead = 0
+    ";
+    $stmt = $pdo->prepare($admin_notif_query);
+    $stmt->execute(['member_no' => $member_no]);
+    $admin_notif_result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $admin_notif_count = (int)($admin_notif_result['admin_notif_count'] ?? 0);
+    
+    if ($admin_notif_count > 0) {
+        $notifications[] = [
+            'type' => 'info',
+            'message' => 'You have ' . $admin_notif_count . ' new notification(s) from the library administration.'
+        ];
+    }
+    
     // 1. Check for overdue books
     $overdue_query = "
         SELECT COUNT(*) as overdue_count
@@ -156,10 +176,15 @@ try {
     $stmt = $pdo->prepare($overdue_query);
     $stmt->execute(['member_no' => $member_no]);
     $overdue_result = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($overdue_result['overdue_count'] > 0) {
+    $overdue_count = (int)($overdue_result['overdue_count'] ?? 0);
+    
+    // Calculate total unread notifications
+    $unread_notifications_count_dashboard = $admin_notif_count + $overdue_count;
+    
+    if ($overdue_count > 0) {
         $notifications[] = [
             'type' => 'warning',
-            'message' => 'You have ' . $overdue_result['overdue_count'] . ' overdue book(s). Please return them to avoid additional fines.'
+            'message' => 'You have ' . $overdue_count . ' overdue book(s). Please return them to avoid additional fines.'
         ];
     }
     
@@ -552,6 +577,12 @@ try {
     <div class="stat-card info">
         <span class="stat-number"><?php echo $quick_stats['recommendations']; ?></span>
         <div class="stat-label">Recommendations</div>
+    </div>
+    <div class="stat-card warning" onclick="window.location.hash=''; document.querySelector('[data-page=notifications]').click();" style="cursor: pointer;">
+        <span class="stat-number"><?php echo $unread_notifications_count_dashboard; ?></span>
+        <div class="stat-label">
+            <i class="fas fa-bell"></i> New Notifications
+        </div>
     </div>
 </div>
 

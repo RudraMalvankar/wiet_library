@@ -833,7 +833,12 @@ $deliveryLogs = [];
     <!-- Inline Create Notification Form -->
     <div class="form-section" style="margin-bottom:30px;">
         <form id="createNotificationInlineForm" onsubmit="saveNotificationInline(); return false;">
-            <div class="section-title">Create Notification</div>
+            <div class="section-title">
+                Create Notification
+                <span style="float: right; font-size: 12px; color: #6c757d; font-weight: normal;">
+                    <i class="fas fa-info-circle"></i> Notifications are saved as DRAFT by default (not sent automatically)
+                </span>
+            </div>
             <div class="form-row">
                 <div class="form-group-modal">
                     <label for="notificationTypeInline">Type <span class="required">*</span></label>
@@ -895,9 +900,12 @@ $deliveryLogs = [];
             </div>
             <div class="form-actions" style="justify-content:flex-start;">
                 <button type="submit" class="btn btn-success">
-                    <i class="fas fa-paper-plane"></i>
-                    Create Notification
+                    <i class="fas fa-save"></i>
+                    Save as Draft
                 </button>
+                <span style="margin-left: 10px; color: #6c757d; font-size: 13px;">
+                    <i class="fas fa-lock"></i> Will NOT be sent until you approve
+                </span>
             </div>
         </form>
     </div>
@@ -1148,16 +1156,44 @@ $deliveryLogs = [];
         // Inline Create Notification handler
         function saveNotificationInline() {
             const formData = new FormData(document.getElementById('createNotificationInlineForm'));
-            const notificationData = Object.fromEntries(formData);
-            notificationData.Channels = Array.from(document.getElementById('notificationChannelsInline').selectedOptions).map(opt => opt.value);
-            notificationData.NotificationID = sampleNotifications.length + 1;
-            notificationData.Status = 'Draft';
-            notificationData.CreatedBy = 1;
-            notificationData.CreatedDate = new Date().toISOString();
-            sampleNotifications.push(notificationData);
-            alert('Notification created successfully!');
-            loadNotificationsList();
-            document.getElementById('createNotificationInlineForm').reset();
+            const notificationData = {
+                Type: formData.get('Type'),
+                Title: formData.get('Title'),
+                Message: formData.get('Message'),
+                Recipients: formData.get('Recipients'),
+                Channels: Array.from(document.getElementById('notificationChannelsInline').selectedOptions).map(opt => opt.value),
+                Priority: formData.get('Priority'),
+                ScheduledDate: formData.get('ScheduledDate'),
+                Status: 'Draft'
+            };
+            
+            // Send to API
+            fetch('api/save_notification.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(notificationData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    alert('✅ Notification saved successfully!\n\n📨 Sent to: ' + data.count + ' student(s)\n\n⚠️ Students will see this notification when they log in to their portal.');
+                    
+                    // Reset form
+                    document.getElementById('createNotificationInlineForm').reset();
+                    
+                    // Reload notifications list
+                    location.reload();
+                } else {
+                    alert('❌ Error saving notification:\n' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('❌ Failed to save notification. Please try again.');
+            });
         }
         // Global variables
         const sampleNotifications = <?php echo json_encode($sampleNotifications); ?>;
@@ -1480,23 +1516,71 @@ $deliveryLogs = [];
 
         function saveAsDraft() {
             const formData = new FormData(document.getElementById('createNotificationForm'));
-            const notificationData = Object.fromEntries(formData);
+            const notificationData = {
+                Type: formData.get('Type'),
+                Title: formData.get('Title'),
+                Message: formData.get('Message'),
+                Recipients: formData.get('Recipients'),
+                Status: 'Draft'
+            };
 
-            console.log('Saving notification as draft:', notificationData);
-            alert('Notification saved as draft successfully!');
-            closeModal('createNotificationModal');
-            loadNotificationsList();
+            // Send to API
+            fetch('api/save_notification.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(notificationData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Notification saved!\n\n📨 Saved for: ' + data.count + ' student(s)\n\n✅ Students can now view this notification in their portal.');
+                    closeModal('createNotificationModal');
+                    location.reload();
+                } else {
+                    alert('❌ Error saving notification:\n' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('❌ Failed to save notification. Please try again.');
+            });
         }
 
         function sendNotification() {
             const formData = new FormData(document.getElementById('createNotificationForm'));
-            const notificationData = Object.fromEntries(formData);
+            const notificationData = {
+                Type: formData.get('Type'),
+                Title: formData.get('Title'),
+                Message: formData.get('Message'),
+                Recipients: formData.get('Recipients'),
+                Status: 'Sent'
+            };
 
-            if (confirm('Are you sure you want to send this notification now?')) {
-                console.log('Sending notification:', notificationData);
-                alert('Notification sent successfully!');
-                closeModal('createNotificationModal');
-                loadNotificationsList();
+            if (confirm('⚠️ CONFIRM SEND\n\nAre you sure you want to send this notification NOW to the selected recipients?\n\nThis action cannot be undone.')) {
+                // Send to API
+                fetch('api/save_notification.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(notificationData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('✅ Notification sent successfully!\n\n📨 Delivered to: ' + data.count + ' student(s)\n\nStudents will see this in their portal when they log in.');
+                        closeModal('createNotificationModal');
+                        location.reload();
+                    } else {
+                        alert('❌ Error sending notification:\n' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('❌ Failed to send notification. Please try again.');
+                });
             }
         }
 
