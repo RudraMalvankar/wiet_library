@@ -11,28 +11,13 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
 ?>
 
 <style>
-        * {
+        .stock-verification-container {
+            max-width: 100%;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .header {
+        .stock-verification-container .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -41,19 +26,31 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             border-bottom: 3px solid #cfac69;
         }
 
-        .header h1 {
+        .stock-verification-container .header h1 {
             color: #263c79;
             font-size: 28px;
         }
 
-        .stats-bar {
+        .stock-verification-container .stats-bar {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(5, 1fr);
             gap: 15px;
             margin-bottom: 30px;
         }
 
-        .stat-box {
+        @media (max-width: 1200px) {
+            .stock-verification-container .stats-bar {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stock-verification-container .stats-bar {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .stock-verification-container .stat-box {
             background: linear-gradient(135deg, #263c79 0%, #3d5a9e 100%);
             color: white;
             padding: 20px;
@@ -61,30 +58,30 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             text-align: center;
         }
 
-        .stat-box.verified {
+        .stock-verification-container .stat-box.verified {
             background: linear-gradient(135deg, #28a745 0%, #34ce57 100%);
         }
 
-        .stat-box.damaged {
+        .stock-verification-container .stat-box.damaged {
             background: linear-gradient(135deg, #dc3545 0%, #e55561 100%);
         }
 
-        .stat-box.lost {
+        .stock-verification-container .stat-box.lost {
             background: linear-gradient(135deg, #ffc107 0%, #ffcd38 100%);
         }
 
-        .stat-number {
+        .stock-verification-container .stat-number {
             font-size: 32px;
             font-weight: 700;
             margin-bottom: 5px;
         }
 
-        .stat-label {
+        .stock-verification-container .stat-label {
             font-size: 14px;
             opacity: 0.9;
         }
 
-        .scan-section {
+        .stock-verification-container .scan-section {
             background: #f8f9fa;
             border: 2px dashed #cfac69;
             border-radius: 10px;
@@ -93,7 +90,7 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             text-align: center;
         }
 
-        .camera-container {
+        .stock-verification-container .camera-container {
             position: relative;
             max-width: 640px;
             margin: 20px auto;
@@ -102,13 +99,47 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             overflow: hidden;
         }
 
-        .camera-video {
+        .stock-verification-container .camera-video {
             width: 100%;
             height: auto;
             display: none;
         }
 
-        .camera-placeholder {
+        .stock-verification-container .scanning-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 280px;
+            height: 280px;
+            border: 3px solid #cfac69;
+            border-radius: 10px;
+            pointer-events: none;
+            display: none;
+            z-index: 5;
+        }
+
+        .stock-verification-container .scanning-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #cfac69, transparent);
+            animation: scan 2s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+
+        .stock-verification-container .scanning-overlay.active {
+            display: block;
+        }
+
+        .stock-verification-container .camera-placeholder {
             display: flex;
             align-items: center;
             justify-content: center;
@@ -117,16 +148,16 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             color: white;
         }
 
-        .camera-placeholder i {
+        .stock-verification-container .camera-placeholder i {
             font-size: 64px;
             margin-bottom: 15px;
         }
 
-        .scan-controls {
+        .stock-verification-container .scan-controls {
             margin: 20px 0;
         }
 
-        .btn {
+        .stock-verification-container .btn {
             padding: 12px 30px;
             border: none;
             border-radius: 6px;
@@ -137,39 +168,39 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             margin: 0 10px;
         }
 
-        .btn-primary {
+        .stock-verification-container .btn-primary {
             background: #263c79;
             color: white;
         }
 
-        .btn-primary:hover {
+        .stock-verification-container .btn-primary:hover {
             background: #1a2850;
         }
 
-        .btn-success {
+        .stock-verification-container .btn-success {
             background: #28a745;
             color: white;
         }
 
-        .btn-success:hover {
+        .stock-verification-container .btn-success:hover {
             background: #218838;
         }
 
-        .btn-secondary {
+        .stock-verification-container .btn-secondary {
             background: #6c757d;
             color: white;
         }
 
-        .btn:disabled {
+        .stock-verification-container .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
 
-        .manual-entry {
+        .stock-verification-container .manual-entry {
             margin-top: 20px;
         }
 
-        .form-control {
+        .stock-verification-container .form-control {
             width: 100%;
             max-width: 400px;
             padding: 12px;
@@ -180,7 +211,7 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             display: block;
         }
 
-        .book-info-card {
+        .stock-verification-container .book-info-card {
             background: white;
             border: 2px solid #cfac69;
             border-radius: 10px;
@@ -189,7 +220,7 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             display: none;
         }
 
-        .book-info-card.show {
+        .stock-verification-container .book-info-card.show {
             display: block;
             animation: slideIn 0.3s ease;
         }
@@ -205,43 +236,43 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             }
         }
 
-        .book-details {
+        .stock-verification-container .book-details {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
         }
 
-        .detail-item {
+        .stock-verification-container .detail-item {
             display: flex;
             flex-direction: column;
         }
 
-        .detail-label {
+        .stock-verification-container .detail-label {
             font-size: 12px;
             color: #666;
             text-transform: uppercase;
             margin-bottom: 5px;
         }
 
-        .detail-value {
+        .stock-verification-container .detail-value {
             font-size: 16px;
             font-weight: 600;
             color: #263c79;
         }
 
-        .condition-selector {
+        .stock-verification-container .condition-selector {
             margin: 20px 0;
         }
 
-        .condition-buttons {
+        .stock-verification-container .condition-buttons {
             display: flex;
             justify-content: center;
             gap: 15px;
             flex-wrap: wrap;
         }
 
-        .condition-btn {
+        .stock-verification-container .condition-btn {
             padding: 15px 30px;
             border: 2px solid #ddd;
             background: white;
@@ -252,42 +283,42 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             font-weight: 600;
         }
 
-        .condition-btn:hover {
+        .stock-verification-container .condition-btn:hover {
             border-color: #cfac69;
             transform: translateY(-2px);
         }
 
-        .condition-btn.selected {
+        .stock-verification-container .condition-btn.selected {
             background: #263c79;
             color: white;
             border-color: #263c79;
         }
 
-        .condition-btn.good.selected {
+        .stock-verification-container .condition-btn.good.selected {
             background: #28a745;
             border-color: #28a745;
         }
 
-        .condition-btn.fair.selected {
+        .stock-verification-container .condition-btn.fair.selected {
             background: #ffc107;
             border-color: #ffc107;
         }
 
-        .condition-btn.damaged.selected {
+        .stock-verification-container .condition-btn.damaged.selected {
             background: #dc3545;
             border-color: #dc3545;
         }
 
-        .condition-btn.lost.selected {
+        .stock-verification-container .condition-btn.lost.selected {
             background: #6c757d;
             border-color: #6c757d;
         }
 
-        .remarks-section {
+        .stock-verification-container .remarks-section {
             margin: 20px 0;
         }
 
-        .remarks-section textarea {
+        .stock-verification-container .remarks-section textarea {
             width: 100%;
             max-width: 600px;
             padding: 12px;
@@ -299,11 +330,11 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             font-family: inherit;
         }
 
-        .verified-list {
+        .stock-verification-container .verified-list {
             margin-top: 30px;
         }
 
-        .verified-item {
+        .stock-verification-container .verified-item {
             background: #f8f9fa;
             border-left: 4px solid #28a745;
             padding: 15px;
@@ -314,34 +345,34 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             align-items: center;
         }
 
-        .verified-item.damaged {
+        .stock-verification-container .verified-item.damaged {
             border-left-color: #dc3545;
         }
 
-        .verified-item.fair {
+        .stock-verification-container .verified-item.fair {
             border-left-color: #ffc107;
         }
 
-        .verified-item.lost {
+        .stock-verification-container .verified-item.lost {
             border-left-color: #6c757d;
         }
 
-        .verified-item-info {
+        .stock-verification-container .verified-item-info {
             flex: 1;
         }
 
-        .verified-item-accno {
+        .stock-verification-container .verified-item-accno {
             font-weight: 700;
             color: #263c79;
             font-size: 18px;
         }
 
-        .verified-item-title {
+        .stock-verification-container .verified-item-title {
             color: #666;
             margin-top: 5px;
         }
 
-        .verified-item-condition {
+        .stock-verification-container .verified-item-condition {
             display: inline-block;
             padding: 4px 12px;
             border-radius: 20px;
@@ -350,49 +381,49 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             margin-top: 5px;
         }
 
-        .verified-item-condition.good {
+        .stock-verification-container .verified-item-condition.good {
             background: #28a745;
             color: white;
         }
 
-        .verified-item-condition.fair {
+        .stock-verification-container .verified-item-condition.fair {
             background: #ffc107;
             color: #333;
         }
 
-        .verified-item-condition.damaged {
+        .stock-verification-container .verified-item-condition.damaged {
             background: #dc3545;
             color: white;
         }
 
-        .verified-item-condition.lost {
+        .stock-verification-container .verified-item-condition.lost {
             background: #6c757d;
             color: white;
         }
 
-        .action-buttons {
+        .stock-verification-container .action-buttons {
             margin-top: 30px;
             text-align: center;
         }
 
-        .scan-result {
+        .stock-verification-container .scan-result {
             margin: 10px 0;
             padding: 10px;
             border-radius: 6px;
             font-weight: 600;
         }
 
-        .scan-result.success {
+        .stock-verification-container .scan-result.success {
             background: #d4edda;
             color: #155724;
         }
 
-        .scan-result.error {
+        .stock-verification-container .scan-result.error {
             background: #f8d7da;
             color: #721c24;
         }
 
-        .loading-overlay {
+        .stock-verification-container .loading-overlay {
             position: absolute;
             top: 0;
             left: 0;
@@ -407,7 +438,7 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             z-index: 10;
         }
 
-        .spinner {
+        .stock-verification-container .spinner {
             border: 4px solid #f3f3f3;
             border-top: 4px solid #cfac69;
             border-radius: 50%;
@@ -423,7 +454,7 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
         }
 </style>
 
-<div class="container">
+<div class="stock-verification-container">
         <div class="header">
             <h1><i class="fas fa-clipboard-check"></i> Stock Verification</h1>
             <div>
@@ -466,6 +497,7 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
                     <div class="spinner"></div>
                     <span>Initializing camera...</span>
                 </div>
+                <div class="scanning-overlay" id="scanningOverlay"></div>
                 <video id="bookVideo" class="camera-video" autoplay playsinline></video>
                 <div class="camera-placeholder" id="cameraPlaceholder">
                     <div>
@@ -588,16 +620,16 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
         };
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeCodeReader();
-            loadSessionData();
-            updateStats();
-        });
+        initializeCodeReader();
+        loadSessionData();
+        updateStats();
 
         function initializeCodeReader() {
             if (typeof ZXing !== 'undefined') {
                 codeReader = new ZXing.BrowserMultiFormatReader();
-                console.log('QR/Barcode reader initialized');
+                // Set scan delay to minimal for instant scanning
+                codeReader.timeBetweenDecodingAttempts = 100; // Scan every 100ms
+                console.log('QR/Barcode reader initialized with fast scanning');
             } else {
                 console.warn('ZXing library not loaded yet, retrying in 100ms...');
                 setTimeout(initializeCodeReader, 100);
@@ -609,7 +641,13 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
                 document.getElementById('cameraLoading').style.display = 'flex';
                 
                 const constraints = {
-                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        focusMode: 'continuous',
+                        zoom: 1.0
+                    }
                 };
 
                 videoStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -623,12 +661,33 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
                 placeholder.style.display = 'none';
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
+                
+                // Wait for video to be ready
+                await video.play();
                 document.getElementById('cameraLoading').style.display = 'none';
+                
+                // Show scanning overlay
+                document.getElementById('scanningOverlay').classList.add('active');
 
-                // Start scanning
+                // Start fast continuous scanning
                 if (codeReader) {
+                    const hints = new Map();
+                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                        ZXing.BarcodeFormat.QR_CODE,
+                        ZXing.BarcodeFormat.CODE_128,
+                        ZXing.BarcodeFormat.CODE_39,
+                        ZXing.BarcodeFormat.EAN_13,
+                        ZXing.BarcodeFormat.EAN_8
+                    ]);
+                    
                     codeReader.decodeFromVideoDevice(null, 'bookVideo', (result, error) => {
                         if (result) {
+                            // Play beep sound on successful scan
+                            const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUKbh8LdjHAU3kdfy0HotBS17yPLaizsKFFyz6eq' +
+                                'mVRQKRp/g8r5sIQUrgc7y2Yk2CBlpu/DknE4MDlCl4fC3YxwFN5HX8tB6LQUte8jy2os7ChRcs+nqplUUCkmf4PK+bCEFK4HO8tmJNggZabvw5JxODA5QpeHwt2McBTeR1/LQei0FLXvI8tqLOwp0XLPQ6aZVFApJn+Dyvmw=');
+                            beep.play().catch(() => {});
+                            
                             handleScanResult(result.text);
                         }
                     });
@@ -655,9 +714,11 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             const placeholder = document.getElementById('cameraPlaceholder');
             const startBtn = document.getElementById('startBtn');
             const stopBtn = document.getElementById('stopBtn');
+            const scanOverlay = document.getElementById('scanningOverlay');
 
             video.style.display = 'none';
             placeholder.style.display = 'flex';
+            scanOverlay.classList.remove('active');
             startBtn.disabled = false;
             stopBtn.disabled = true;
         }
