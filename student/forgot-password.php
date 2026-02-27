@@ -6,6 +6,13 @@
 
 session_start();
 require_once '../includes/db_connect.php';
+require_once '../includes/functions.php';
+
+// Rate limiting: max 5 password reset attempts per minute per IP
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !checkRateLimit('forgot_pw_' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 5, 60)) {
+    http_response_code(429);
+    die('<p style="text-align:center;color:red;margin-top:40px;">Too many attempts. Please wait a minute and try again.</p>');
+}
 
 $message = "";
 $message_type = "";
@@ -43,8 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $message = "Your account is not active. Please contact the library office.";
                     $message_type = "error";
                 } else {
-                    // Generate 6-digit OTP
-                    $otp = sprintf("%06d", mt_rand(0, 999999));
+                    // Generate 6-digit OTP (cryptographically secure)
+                    $otp = sprintf("%06d", random_int(0, 999999));
                     
                     // Generate unique reset token
                     $reset_token = bin2hex(random_bytes(32));

@@ -22,6 +22,8 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
 
 // Include database connection
 require_once '../includes/db_connect.php';
+require_once '../includes/functions.php';
+$page_csrf_token = generateCSRFToken();
 
 // Session variables for student info
 $student_id = $_SESSION['student_id'] ?? null;
@@ -775,6 +777,8 @@ $action_required_count = count(array_filter($notifications, function ($n) {
 </div>
 
 <script>
+    const CSRF_TOKEN = '<?= htmlspecialchars($page_csrf_token) ?>';
+
     function filterNotifications(category) {
         // Update active tab
         document.querySelectorAll('.filter-tab').forEach(tab => {
@@ -835,7 +839,8 @@ $action_required_count = count(array_filter($notifications, function ($n) {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    notification_id: dbNotificationId
+                    notification_id: dbNotificationId,
+                    csrf_token: CSRF_TOKEN
                 })
             })
             .then(response => response.json())

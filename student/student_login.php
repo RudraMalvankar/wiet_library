@@ -2,7 +2,13 @@
 // Student Login Page
 session_start();
 require_once '../includes/db_connect.php';
+require_once '../includes/functions.php';
 
+// Brute-force rate limiting: max 10 login attempts per minute per IP
+if (!checkRateLimit('student_login_' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 10, 60)) {
+    http_response_code(429);
+    die('<p style="text-align:center;color:red;margin-top:40px;">Too many login attempts. Please wait a minute and try again.</p>');
+}
 $error_message = "";
 $success_message = "";
 
@@ -56,8 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 // Check if student has a hashed password
                 if (!empty($student['Password']) && password_verify($password, $student['Password'])) {
                     $password_valid = true;
-                } 
-                // Fallback to default password (123456) for students without hashed password
+                }
+                // Default password for first-time login before student sets their own
                 elseif ($password === '123456') {
                     $password_valid = true;
                 }
