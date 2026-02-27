@@ -205,7 +205,7 @@ $personalized_stats = [
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
 
-    .sidebar {
+    .rec-sidebar {
         display: flex;
         flex-direction: column;
         gap: 20px;
@@ -580,7 +580,7 @@ $personalized_stats = [
             grid-template-columns: 1fr;
         }
 
-        .sidebar {
+        .rec-sidebar {
             order: -1;
         }
 
@@ -742,7 +742,7 @@ $personalized_stats = [
     </div>
 
     <!-- Sidebar -->
-    <div class="sidebar">
+    <div class="rec-sidebar">
         <!-- Recommendation Stats -->
         <div class="sidebar-card">
             <h3 class="card-title">
