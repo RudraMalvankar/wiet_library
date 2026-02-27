@@ -7,7 +7,7 @@
 // ============================================================
 // ✅ Overdue books - FROM Circulation + Books + Holding
 // ✅ Due soon books - FROM Circulation + Books + Holding
-// ✅ Library events - FROM LibraryEvents
+// ✅ Library events - FROM library_events
 // ✅ Activity log - FROM ActivityLog
 // ============================================================
 
@@ -167,7 +167,7 @@ try {
             EventTitle,
             StartDate,
             Venue
-        FROM LibraryEvents
+        FROM library_events
         WHERE Status IN ('Active', 'Upcoming')
         AND StartDate >= CURRENT_DATE
         ORDER BY StartDate ASC

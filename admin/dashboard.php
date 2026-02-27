@@ -34,7 +34,7 @@ try {
     $quick_stats = getDashboardStats($pdo);
     
     // Add additional stats
-    $stmt = $pdo->query("SELECT COUNT(*) as count FROM LibraryEvents WHERE MONTH(EventDate) = MONTH(CURDATE())");
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM library_events WHERE MONTH(StartDate) = MONTH(CURDATE())");
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     $quick_stats['events_this_month'] = (int)($result['count'] ?? 0);
     

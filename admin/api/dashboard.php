@@ -98,6 +98,10 @@ try {
         ];
     }
 
+    // Additional stats - events this month
+    $eventsStmt = $pdo->query("SELECT COUNT(*) as count FROM library_events WHERE MONTH(StartDate) = MONTH(CURDATE())");
+    $eventsThisMonth = (int)($eventsStmt->fetch()['count'] ?? 0);
+
     // Build critical alerts (simple example: overdue count)
     $alerts = [];
     if (!empty($stats['overdueBooks'])) {
@@ -111,56 +115,31 @@ try {
         ];
     }
 
-    // Return JSON payload
+    // Return JSON payload with both camelCase (legacy) and snake_case keys (JS frontend)
     sendJson([
         'success' => true,
         'data' => array_merge($stats, [
-            'recent_activities' => $recent,
-            'critical_alerts' => $alerts,
-            'most_issued_books' => $mostIssued,
-            'active_borrowers' => $activeBorrowers,
-            'circulation_trend' => $circulationTrend,
-            'footfall_trend' => $footfallTrend
+            // Snake_case aliases for dashboard JS
+            'total_books'        => (int)($stats['totalBooks'] ?? 0),
+            'total_copies'       => (int)($stats['totalCopies'] ?? 0),
+            'active_members'     => (int)($stats['activeMembers'] ?? 0),
+            'books_issued'       => (int)($stats['booksIssued'] ?? 0),
+            'books_overdue'      => (int)($stats['overdueBooks'] ?? 0),
+            'footfall_today'     => (int)($stats['todayFootfall'] ?? 0),
+            'events_this_month'  => $eventsThisMonth,
+            'e_resources'        => 0,
+            'pending_acquisitions' => 0,
+            'dropbox_active'     => 0,
+            // Additional data
+            'recent_activities'  => $recent,
+            'critical_alerts'    => $alerts,
+            'most_issued_books'  => $mostIssued,
+            'active_borrowers'   => $activeBorrowers,
+            'circulation_trend'  => $circulationTrend,
+            'footfall_trend'     => $footfallTrend
         ])
     ]);
 
 } catch (Exception $e) {
     sendJson(['success' => false, 'message' => $e->getMessage()], 500);
 }
-
-?>
-<?php
-// Lightweight API endpoint returning dashboard stats as JSON
-session_start();
-require_once '../../includes/db_connect.php';
-require_once '../../includes/functions.php';
-
-try {
-    $stats = getDashboardStats($pdo);
-
-    // Additional stats
-    $stmt = $pdo->query("SELECT COUNT(*) as count FROM LibraryEvents WHERE MONTH(EventDate) = MONTH(CURDATE())");
-    $stats['eventsThisMonth'] = (int) ($stmt->fetch()['count'] ?? 0);
-
-    // Map keys to the names used by the frontend
-    $response = [
-        'total_books' => (int) ($stats['totalBooks'] ?? 0),
-        'total_copies' => (int) ($stats['totalCopies'] ?? 0),
-        'active_members' => (int) ($stats['activeMembers'] ?? 0),
-        'books_issued' => (int) ($stats['booksIssued'] ?? 0),
-        'books_overdue' => (int) ($stats['overdueBooks'] ?? 0),
-        'footfall_today' => (int) ($stats['todayFootfall'] ?? 0),
-        'events_this_month' => (int) ($stats['eventsThisMonth'] ?? 0),
-        'e_resources' => 0,
-        'pending_acquisitions' => 0,
-        'dropbox_active' => 0
-    ];
-
-    sendJson(['success' => true, 'data' => $response]);
-
-} catch (Exception $e) {
-    error_log('Dashboard API error: ' . $e->getMessage());
-    sendJson(['success' => false, 'message' => 'Unable to fetch dashboard stats'], 500);
-}
-
-?>

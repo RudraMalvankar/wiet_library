@@ -27,7 +27,7 @@ $member_no = $_SESSION['member_no'] ?? null;
 // - Quick stats from Circulation + Return + Books tables
 // - Recent activity from ActivityLog table
 // - Upcoming due books from Circulation + Holding + Books tables
-// - Dynamic notifications from Circulation + LibraryEvents tables
+// - Dynamic notifications from Circulation + library_events tables
 // ============================================================
 
 // Fetch quick stats from database
@@ -220,11 +220,11 @@ try {
     
     // 4. Check for upcoming library events (within 7 days)
     $events_query = "
-        SELECT EventName, EventDate
-        FROM LibraryEvents
-        WHERE EventDate BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
-        AND Status = 'Active'
-        ORDER BY EventDate ASC
+        SELECT EventTitle, StartDate
+        FROM library_events
+        WHERE StartDate BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+        AND Status IN ('Active', 'Upcoming')
+        ORDER BY StartDate ASC
         LIMIT 1
     ";
     $stmt = $pdo->prepare($events_query);
@@ -233,7 +233,7 @@ try {
     if ($upcoming_event) {
         $notifications[] = [
             'type' => 'info',
-            'message' => 'Upcoming event: "' . htmlspecialchars($upcoming_event['EventName']) . '" on ' . date('M j, Y', strtotime($upcoming_event['EventDate']))
+            'message' => 'Upcoming event: "' . htmlspecialchars($upcoming_event['EventTitle']) . '" on ' . date('M j, Y', strtotime($upcoming_event['StartDate']))
         ];
     }
     

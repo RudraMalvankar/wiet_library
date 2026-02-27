@@ -5,6 +5,13 @@ require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 header('Content-Type: application/json');
 
+// Admin authentication check
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized. Admin login required.']);
+    exit;
+}
+
 // Rate limiting
 if (!checkRateLimit('book_assignments_api', 100, 60)) {
     http_response_code(429);

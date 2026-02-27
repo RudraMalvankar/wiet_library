@@ -31,6 +31,22 @@ if ($adminId !== null) {
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
+// CSRF protection for state-changing POST operations
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !in_array($action, ['get-csrf-token', 'list-backups', 'backup-history'])) {
+    $csrfToken = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!validateCSRFToken($csrfToken)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token. Please refresh the page.']);
+        exit;
+    }
+}
+
+// Handle CSRF token request
+if ($action === 'get-csrf-token') {
+    echo json_encode(['success' => true, 'token' => generateCSRFToken()]);
+    exit;
+}
+
 // Database configuration
 $dbHost = DB_HOST;
 $dbName = DB_NAME;
