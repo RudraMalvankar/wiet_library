@@ -62,7 +62,7 @@ try {
             'expiry_date' => $student_data['ValidTill'] ?? 'N/A',
             'status' => $student_data['Status'],
             'barcode' => str_pad($student_data['MemberNo'], 12, '0', STR_PAD_LEFT),
-            'qr_code' => $student_data['QRCode'] ?? ($student_data['PRN'] . '_' . date('Y')),
+            'qr_code' => ($student_data['PRN'] ?? $student_data['StudentID']) . '_' . date('Y'),
             'email' => $student_data['Email'],
             'mobile' => $student_data['Mobile'],
             'books_issued' => $student_data['BooksIssued'],
@@ -627,16 +627,17 @@ $card_features = [
     </ul>
 </div>
 
+<!-- External Libraries for QR Code and Barcode -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
 <script>
     // QR Code generation using QRCode.js
     function generateQRCode() {
         const qrContainer = document.getElementById('qrcode');
         if (!qrContainer) return;
-        
-        // Clear existing QR code
         qrContainer.innerHTML = '';
-        
-        // Generate QR code
         new QRCode(qrContainer, {
             text: '<?php echo htmlspecialchars($digital_card['qr_code']); ?>',
             width: 150,
@@ -651,7 +652,6 @@ $card_features = [
     function generateBarcode() {
         const barcodeElement = document.getElementById('barcode');
         if (!barcodeElement) return;
-        
         try {
             JsBarcode(barcodeElement, '<?php echo htmlspecialchars($digital_card['barcode']); ?>', {
                 format: 'CODE128',
@@ -663,10 +663,21 @@ $card_features = [
             });
         } catch (error) {
             console.error('Barcode generation error:', error);
-            barcodeElement.innerHTML = '<text y="30" x="50%" text-anchor="middle">Barcode Error</text>';
         }
     }
 
+    // Works both on direct load (DOMContentLoaded) and AJAX load (poll until libs available)
+    (function initCodes() {
+        if (typeof QRCode !== 'undefined' && typeof JsBarcode !== 'undefined') {
+            generateQRCode();
+            generateBarcode();
+        } else {
+            setTimeout(initCodes, 50);
+        }
+    })();
+</script>
+
+<script>
     // Download card as PNG
     async function downloadCard() {
         try {
@@ -787,16 +798,5 @@ $card_features = [
         
         printWindow.document.close();
     }
-
-    // Initialize codes when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        generateQRCode();
-        generateBarcode();
-    });
 </script>
-
-<!-- External Libraries for QR Code and Barcode -->
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 

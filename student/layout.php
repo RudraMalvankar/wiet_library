@@ -160,12 +160,43 @@ try {
     cursor: pointer;
     padding: 8px;
     border-radius: 4px;
-    display: none;
-    /* Hidden by default, shown only on mobile */
+    display: block;
+    /* Always visible for sidebar collapse/expand */
+    transition: all 0.3s ease;
+    position: relative;
   }
 
   .sidebar-toggle:hover {
     background-color: rgba(38, 60, 121, 0.1);
+    transform: scale(1.1);
+  }
+
+  .sidebar-toggle:active {
+    transform: scale(0.95);
+  }
+
+  /* Tooltip for sidebar toggle */
+  .sidebar-toggle::after {
+    content: 'Toggle Sidebar';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(5px);
+    background: rgba(38, 60, 121, 0.95);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 1001;
+  }
+
+  .sidebar-toggle:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(8px);
   }
 
   .navbar-right {
@@ -206,19 +237,39 @@ try {
   /* Sidebar Styles */
   .sidebar {
     position: fixed;
-    /* Fixed positioning so it doesn't scroll */
     top: 142px;
-    /* Distance from top of page */
     left: 0;
     width: 220px;
     height: calc(100vh - 142px);
-    /* Updated to match the new top position */
     background-color: #263c79;
-    overflow: hidden;
-    /* No scrolling needed since all items fit */
+    overflow-x: hidden;
+    overflow-y: auto;
     z-index: 998;
-    transition: transform 0.3s ease;
+    transition: all 0.3s ease;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Sidebar collapsed state */
+  .sidebar.collapsed {
+    width: 60px;
+  }
+
+  .sidebar.collapsed .sidebar-link span {
+    display: none;
+  }
+
+  .sidebar.collapsed .sidebar-icon {
+    margin-right: 0;
+    font-size: 20px;
+  }
+
+  .sidebar.collapsed .sidebar-link {
+    justify-content: center;
+    padding: 12px 10px;
+  }
+
+  .sidebar.collapsed .notification-badge {
+    display: none;
   }
 
   .sidebar-menu {
@@ -287,6 +338,11 @@ try {
     background-color: white;
     position: relative;
     z-index: 2;
+    transition: margin-left 0.3s ease;
+  }
+
+  .main-content.expanded {
+    margin-left: 60px;
   }
 
   /* Main content headings - extra bold */
@@ -314,24 +370,22 @@ try {
   .watermark {
     position: fixed;
     left: 220px;
-    /* Start after sidebar */
     top: 142px;
-    /* Start after banner and navbar */
     width: calc(100vw - 220px);
-    /* Full width minus sidebar */
     height: calc(100vh - 142px);
-    /* Full height minus top elements */
     display: flex;
     align-items: center;
     justify-content: center;
     opacity: 0.15;
-    /* 15% opacity as requested */
     z-index: 3;
-    /* Higher than main content (which is z-index: 2) */
     pointer-events: none;
-    /* Allows text to be clickable above watermark */
     user-select: none;
-    /* Prevents watermark from being selected */
+    transition: left 0.3s ease, width 0.3s ease;
+  }
+
+  .watermark.expanded {
+    left: 60px;
+    width: calc(100vw - 60px);
   }
 
   .watermark img {
@@ -481,7 +535,7 @@ try {
       </div>
       <div class="navbar-right">
         <p class="welcome-text">Welcome, <?php echo htmlspecialchars($student_name); ?></p>
-        <a href="../../student_login.php" class="logout-btn">
+        <a href="student_logout.php" class="logout-btn">
           <i class="fas fa-sign-out-alt"></i>
           Logout
         </a>
@@ -494,43 +548,43 @@ try {
         <li class="sidebar-item">
           <a href="#" class="sidebar-link active" data-page="dashboard">
             <i class="sidebar-icon fas fa-tachometer-alt"></i>
-            Dashboard
+            <span>Dashboard</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="my-books">
             <i class="sidebar-icon fas fa-book"></i>
-            My Books
+            <span>My Books</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="borrowing-history">
             <i class="sidebar-icon fas fa-history"></i>
-            Borrowing History
+            <span>Borrowing History</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="search-books">
             <i class="sidebar-icon fas fa-search"></i>
-            Search Books
+            <span>Search Books</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="e-resources">
             <i class="sidebar-icon fas fa-laptop"></i>
-            E-Resources
+            <span>E-Resources</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="my-footfall">
             <i class="sidebar-icon fas fa-chart-line"></i>
-            My Footfall
+            <span>My Footfall</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="notifications">
             <i class="sidebar-icon fas fa-bell"></i>
-            Notifications
+            <span>Notifications</span>
             <?php if ($unread_notifications_count > 0): ?>
               <span class="notification-badge"><?php echo $unread_notifications_count; ?></span>
             <?php endif; ?>
@@ -539,31 +593,31 @@ try {
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="digital-id">
             <i class="sidebar-icon fas fa-id-card"></i>
-            Digital ID
+            <span>Digital ID</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="recommendations">
             <i class="sidebar-icon fas fa-thumbs-up"></i>
-            Recommendations
+            <span>Recommendations</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="my-profile">
             <i class="sidebar-icon fas fa-user"></i>
-            My Profile
+            <span>My Profile</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="chatbot">
             <i class="sidebar-icon fas fa-robot"></i>
-            Library Assistant
+            <span>Library Assistant</span>
           </a>
         </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="library-events">
             <i class="sidebar-icon fas fa-calendar"></i>
-            Library Events
+            <span>Library Events</span>
           </a>
         </li>
       </ul>
@@ -592,16 +646,32 @@ try {
     document.addEventListener('DOMContentLoaded', function() {
       const sidebarToggle = document.getElementById('sidebarToggle');
       const sidebar = document.getElementById('sidebar');
+      const mainContent = document.getElementById('main-content');
+      const watermark = document.getElementById('watermark');
       const sidebarLinks = document.querySelectorAll('.sidebar-link');
       const contentArea = document.getElementById('content-area');
 
-      // Mobile sidebar toggle
+      // Sidebar toggle: desktop = collapse/expand, mobile = open/close
       if (sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
-          if (sidebar) {
+          if (window.innerWidth > 768) {
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+            if (watermark) watermark.classList.toggle('expanded');
+            localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+          } else {
             sidebar.classList.toggle('sidebar-open');
           }
         });
+      }
+
+      // Restore collapsed state from localStorage on desktop
+      if (window.innerWidth > 768) {
+        if (localStorage.getItem('sidebarCollapsed') === 'true') {
+          sidebar.classList.add('collapsed');
+          mainContent.classList.add('expanded');
+          if (watermark) watermark.classList.add('expanded');
+        }
       }
 
       // Close sidebar when clicking outside on mobile
