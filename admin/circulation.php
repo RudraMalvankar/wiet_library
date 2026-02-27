@@ -311,14 +311,13 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
         .scan-area {
             border: 2px dashed #cfac69;
-            padding: 15px;
+            padding: 10px;
             text-align: center;
             border-radius: 8px;
             background: white;
-            margin: 15px auto;
+            margin: 10px auto;
             width: 100%;
             max-width: 380px;
-            min-height: 400px;
             position: relative;
             overflow: hidden;
         }
@@ -338,11 +337,11 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         .camera-container {
             position: relative;
             width: 100%;
-            height: 300px;
-            background: #f8f9fa;
-            border-radius: 4px;
+            height: 220px;
+            background: #1a1a1a;
+            border-radius: 6px;
             overflow: hidden;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .camera-video {
@@ -404,37 +403,100 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             background-color: #5a6268;
         }
 
+        /* Scanning overlay: only shows a corner bracket frame + animated line, NOT a blocking dark overlay */
         .scanning-overlay {
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(38, 60, 121, 0.8);
             display: none;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 14px;
+            pointer-events: none;
             z-index: 10;
+        }
+        /* Corner bracket indicators */
+        .scanning-overlay::before,
+        .scanning-overlay::after {
+            content: '';
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            border-color: #cfac69;
+            border-style: solid;
+        }
+        .scanning-overlay::before {
+            top: 12px; left: 12px;
+            border-width: 3px 0 0 3px;
+        }
+        .scanning-overlay::after {
+            bottom: 12px; right: 12px;
+            border-width: 0 3px 3px 0;
+        }
+        .scanning-overlay .scan-corners-br {
+            position: absolute;
+            bottom: 12px; left: 12px;
+            width: 28px; height: 28px;
+            border: 3px solid #cfac69;
+            border-right: none; border-top: none;
+        }
+        .scanning-overlay .scan-corners-tr {
+            position: absolute;
+            top: 12px; right: 12px;
+            width: 28px; height: 28px;
+            border: 3px solid #cfac69;
+            border-left: none; border-bottom: none;
+        }
+        .scanning-overlay .scan-label {
+            position: absolute;
+            bottom: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.55);
+            color: #cfac69;
+            font-size: 11px;
+            padding: 2px 10px;
+            border-radius: 10px;
+            white-space: nowrap;
+            letter-spacing: 0.5px;
         }
 
         .scanning-line {
             position: absolute;
-            width: 100%;
+            top: 0;
+            left: 12px;
+            right: 12px;
             height: 2px;
             background: linear-gradient(90deg, transparent, #cfac69, transparent);
-            animation: scan-line 2s infinite;
+            animation: scan-line 1.6s ease-in-out infinite;
         }
 
         @keyframes scan-line {
-            0% {
-                top: 0;
-            }
+            0%   { top: 12px;  opacity: 1; }
+            90%  { top: calc(100% - 12px); opacity: 1; }
+            100% { top: calc(100% - 12px); opacity: 0; }
+        }
 
-            100% {
-                top: 100%;
-            }
+        /* Big success flash banner */
+        .scan-success-banner {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(21,87,36,0.88);
+            color: #fff;
+            z-index: 30;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 6px;
+            gap: 6px;
+            animation: flashIn 0.18s ease-out;
+        }
+        .scan-success-banner i { font-size: 32px; color: #6fcf97; }
+        @keyframes flashIn {
+            from { opacity: 0; transform: scale(0.92); }
+            to   { opacity: 1; transform: scale(1); }
         }
 
         .scan-result {
@@ -713,10 +775,10 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                                         </div>
                                     </div>
                                     <div class="scanning-overlay" id="memberScanningOverlay">
-                                        <div>
-                                            <div class="scanning-line"></div>
-                                            <i class="fas fa-camera"></i> Scanning...
-                                        </div>
+                                        <div class="scanning-line"></div>
+                                        <div class="scan-corners-br"></div>
+                                        <div class="scan-corners-tr"></div>
+                                        <div class="scan-label"><i class="fas fa-qrcode"></i> Scanning...</div>
                                     </div>
                                     <div class="scan-controls">
                                         <button class="btn-scan" onclick="startMemberScan()" id="memberScanBtn" aria-label="Start member camera scan" tabindex="0">
@@ -793,10 +855,10 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                                         </div>
                                     </div>
                                     <div class="scanning-overlay" id="bookScanningOverlay">
-                                        <div>
-                                            <div class="scanning-line"></div>
-                                            <i class="fas fa-camera"></i> Scanning...
-                                        </div>
+                                        <div class="scanning-line"></div>
+                                        <div class="scan-corners-br"></div>
+                                        <div class="scan-corners-tr"></div>
+                                        <div class="scan-label"><i class="fas fa-barcode"></i> Scanning...</div>
                                     </div>
                                     <div class="scan-controls">
                                         <button class="btn-scan" onclick="startBookScan()" id="bookScanBtn" aria-label="Start book camera scan" tabindex="0">
@@ -913,10 +975,10 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                                     </div>
                                 </div>
                                 <div class="scanning-overlay" id="returnScanningOverlay">
-                                    <div>
-                                        <div class="scanning-line"></div>
-                                        <i class="fas fa-camera"></i> Scanning...
-                                    </div>
+                                    <div class="scanning-line"></div>
+                                    <div class="scan-corners-br"></div>
+                                    <div class="scan-corners-tr"></div>
+                                    <div class="scan-label"><i class="fas fa-barcode"></i> Scanning...</div>
                                 </div>
                                 <div class="scan-controls">
                                     <button class="btn-scan" onclick="startReturnScan()" id="returnScanBtn" aria-label="Start return camera scan" tabindex="0">
@@ -1232,45 +1294,64 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
         // Show notification to user
         function showNotification(message, type = 'info') {
-            // Create notification element if it doesn't exist
             let notification = document.getElementById('notification-toast');
             if (!notification) {
                 notification = document.createElement('div');
                 notification.id = 'notification-toast';
-                notification.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    right: 20px;
-                    padding: 15px 20px;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                    z-index: 10000;
-                    max-width: 400px;
-                    font-size: 14px;
-                    font-weight: 500;
-                    display: none;
-                    animation: slideIn 0.3s ease-out;
-                `;
                 document.body.appendChild(notification);
             }
-
-            // Set color based on type
-            const colors = {
-                'success': '#28a745',
-                'error': '#dc3545',
-                'warning': '#ffc107',
-                'info': '#17a2b8'
+            notification.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                padding: 28px 40px;
+                border-radius: 14px;
+                box-shadow: 0 8px 40px rgba(0,0,0,0.35);
+                z-index: 99999;
+                max-width: 480px;
+                width: 90%;
+                font-size: 18px;
+                font-weight: 700;
+                text-align: center;
+                line-height: 1.5;
+                animation: ntfIn 0.2s ease-out;
+            `;
+            const styles = {
+                success: { bg: '#1a7a3c', color: '#fff', icon: '✅' },
+                error:   { bg: '#b91c1c', color: '#fff', icon: '❌' },
+                warning: { bg: '#b45309', color: '#fff', icon: '⚠️' },
+                info:    { bg: '#1d4ed8', color: '#fff', icon: 'ℹ️' }
             };
-            notification.style.backgroundColor = colors[type] || colors['info'];
-            notification.style.color = type === 'warning' ? '#212529' : 'white';
-            notification.textContent = message;
+            const s = styles[type] || styles.info;
+            notification.style.backgroundColor = s.bg;
+            notification.style.color = s.color;
+            notification.innerHTML = `<div style="font-size:38px;margin-bottom:10px">${s.icon}</div>${message}`;
             notification.style.display = 'block';
-
-            // Auto hide after 5 seconds
-            setTimeout(() => {
+            // Add backdrop
+            let backdrop = document.getElementById('ntf-backdrop');
+            if (!backdrop) {
+                backdrop = document.createElement('div');
+                backdrop.id = 'ntf-backdrop';
+                backdrop.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);z-index:99998;';
+                backdrop.onclick = () => { notification.style.display='none'; backdrop.style.display='none'; };
+                document.body.appendChild(backdrop);
+            }
+            backdrop.style.display = 'block';
+            clearTimeout(notification._hideTimer);
+            notification._hideTimer = setTimeout(() => {
                 notification.style.display = 'none';
-            }, 5000);
+                backdrop.style.display = 'none';
+            }, type === 'success' ? 2500 : 5000);
         }
+        // inject animation CSS once
+        (function(){
+            if (document.getElementById('ntf-style')) return;
+            const s = document.createElement('style');
+            s.id = 'ntf-style';
+            s.textContent = '@keyframes ntfIn{from{opacity:0;transform:translate(-50%,-50%) scale(0.85)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}';
+            document.head.appendChild(s);
+        })();
 
         function loadTabContent(tabName) {
             switch (tabName) {
@@ -1452,7 +1533,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
         async function issueBook() {
             if (!selectedMember || !selectedBook) {
-                alert('Please select both a member and a book');
+                showNotification('Please select both a member and a book', 'error');
                 return;
             }
 
@@ -1461,23 +1542,25 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             const remarks = document.getElementById('remarks').value;
 
             if (!issueDate || !dueDate) {
-                alert('Please enter issue date and due date');
+                showNotification('Please enter issue date and due date', 'error');
                 return;
             }
 
-            // Validate dates
-            const issue = new Date(issueDate);
-            const due = new Date(dueDate);
+            // Validate dates — parse as local dates to avoid UTC offset bug
+            const [issY, issM, issD] = issueDate.split('-').map(Number);
+            const [dueY, dueM, dueD] = dueDate.split('-').map(Number);
+            const issue = new Date(issY, issM - 1, issD);
+            const due = new Date(dueY, dueM - 1, dueD);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
             if (issue > due) {
-                alert('Due date cannot be before issue date!');
+                showNotification('Due date cannot be before issue date!', 'error');
                 return;
             }
 
             if (issue > today) {
-                alert('Issue date cannot be in the future!');
+                showNotification('Issue date cannot be in the future!', 'error');
                 return;
             }
 
@@ -1490,9 +1573,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             try {
                 const response = await fetch(getApiPath('api/circulation.php?action=issue'), {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         csrf_token: csrfToken,
                         memberNo: selectedMember.MemberNo,
@@ -1506,30 +1587,26 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 const result = await response.json();
 
                 if (result.success) {
-                    // Show success message with details
-                    alert(`✓ Book Issued Successfully!\n\n` +
-                          `Member: ${selectedMember.MemberName}\n` +
-                          `Book: ${selectedBook.Title}\n` +
-                          `Accession No: ${selectedBook.AccNo}\n` +
-                          `Issue Date: ${issueDate}\n` +
-                          `Due Date: ${dueDate}\n\n` +
-                          `Please return the book by the due date to avoid fines.`);
-                    
-                    // Reset form and refresh data
+                    showNotification(
+                        `Book Issued Successfully!<br><br>` +
+                        `<span style="font-size:14px;font-weight:400">` +
+                        `<b>Member:</b> ${selectedMember.MemberName}<br>` +
+                        `<b>Book:</b> ${selectedBook.Title}<br>` +
+                        `<b>Acc No:</b> ${selectedBook.AccNo}<br>` +
+                        `<b>Due Date:</b> ${dueDate}</span>`,
+                        'success'
+                    );
                     resetIssueForm();
-                    loadStatistics(); // Refresh dashboard stats
-                    loadActiveCirculations(); // Refresh active circulations list
-                    
-                    // Optionally switch to active circulations tab
-                    // showTab('active');
+                    loadStatistics();
+                    loadActiveCirculations();
                 } else {
-                    alert('❌ Error issuing book:\n\n' + (result.message || 'Unknown error occurred'));
+                    showNotification((result.message || 'Unknown error occurred'), 'error');
                     issueBtn.disabled = false;
                     issueBtn.innerHTML = originalText;
                 }
             } catch (error) {
                 console.error('Error issuing book:', error);
-                alert('❌ Failed to issue book. Please check your connection and try again.\n\nError: ' + error.message);
+                showNotification('Failed to issue book. Please check your connection.', 'error');
                 issueBtn.disabled = false;
                 issueBtn.innerHTML = originalText;
             }
@@ -1562,7 +1639,9 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             document.getElementById('bookScanError').textContent = '';
             
             // Disable issue button
-            document.getElementById('issueBtn').disabled = true;
+            const issueBtnEl = document.getElementById('issueBtn');
+            issueBtnEl.disabled = true;
+            issueBtnEl.innerHTML = '<i class="fas fa-check-circle"></i> Issue Book';
             
             console.log('Issue form reset complete');
         }
@@ -1657,7 +1736,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
         async function returnBook() {
             if (!returnBookData) {
-                alert('Please scan a book to return');
+                showNotification('Please scan a book to return', 'error');
                 return;
             }
 
@@ -1668,10 +1747,24 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
             // Confirm return if there's a fine
             if (fineAmount > 0) {
-                const confirmMsg = `Book is overdue. Fine amount: ₹${fineAmount.toFixed(2)}\n\n` +
-                                   `Has the member paid the fine?\n\n` +
-                                   `Click OK to proceed with return, or Cancel to go back.`;
-                if (!confirm(confirmMsg)) {
+                const proceed = await new Promise(resolve => {
+                    showNotification(
+                        `Overdue fine: <b>₹${fineAmount.toFixed(2)}</b><br><br>` +
+                        `<span style="font-size:15px;font-weight:400">Click the backdrop to cancel, or this will proceed in 6 seconds.</span>`,
+                        'warning'
+                    );
+                    // Let user cancel via backdrop, else auto-proceed
+                    const backdrop = document.getElementById('ntf-backdrop');
+                    let resolved = false;
+                    if (backdrop) {
+                        const prev = backdrop.onclick;
+                        backdrop.onclick = () => { if (!resolved) { resolved=true; resolve(false); } backdrop.onclick=prev; };
+                    }
+                    setTimeout(() => { if (!resolved) { resolved=true; resolve(true); } }, 6000);
+                });
+                if (!proceed) {
+                    returnBtn.disabled = false;
+                    returnBtn.innerHTML = originalText;
                     return;
                 }
             }
@@ -1685,9 +1778,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             try {
                 const response = await fetch(getApiPath('api/circulation.php?action=return'), {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         csrf_token: csrfToken,
                         circulationId: returnBookData.CirculationID,
@@ -1701,37 +1792,29 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 const result = await response.json();
 
                 if (result.success) {
-                    // Show success message with details
-                    let successMsg = `✓ Book Returned Successfully!\n\n` +
-                                    `Book: ${returnBookData.Title}\n` +
-                                    `Member: ${returnBookData.MemberName}\n` +
-                                    `Return Date: ${returnDate}\n` +
-                                    `Condition: ${condition}`;
-                    
-                    if (fineAmount > 0) {
-                        successMsg += `\n\n💰 Fine Collected: ₹${fineAmount.toFixed(2)}`;
-                    } else {
-                        successMsg += `\n\n✓ Returned on time - No fine`;
-                    }
-                    
-                    alert(successMsg);
-                    
-                    // Reset form and refresh data
+                    const fineMsg = fineAmount > 0
+                        ? `<br><b>Fine Collected:</b> ₹${fineAmount.toFixed(2)}`
+                        : '<br>Returned on time — No fine';
+                    showNotification(
+                        `Book Returned Successfully!<br><br>` +
+                        `<span style="font-size:14px;font-weight:400">` +
+                        `<b>Book:</b> ${returnBookData.Title}<br>` +
+                        `<b>Member:</b> ${returnBookData.MemberName}<br>` +
+                        `<b>Condition:</b> ${condition}${fineMsg}</span>`,
+                        'success'
+                    );
                     resetReturnForm();
-                    loadStatistics(); // Refresh dashboard stats
-                    loadActiveCirculations(); // Refresh active circulations list
-                    loadReturnHistory(); // Refresh return history
-                    
-                    // Optionally switch to history tab
-                    // showTab('history');
+                    loadStatistics();
+                    loadActiveCirculations();
+                    loadReturnHistory();
                 } else {
-                    alert('❌ Error returning book:\n\n' + (result.message || 'Unknown error occurred'));
+                    showNotification((result.message || 'Unknown error occurred'), 'error');
                     returnBtn.disabled = false;
                     returnBtn.innerHTML = originalText;
                 }
             } catch (error) {
                 console.error('Error returning book:', error);
-                alert('❌ Failed to return book. Please check your connection and try again.\n\nError: ' + error.message);
+                showNotification('Failed to return book. Please check your connection.', 'error');
                 returnBtn.disabled = false;
                 returnBtn.innerHTML = originalText;
             }
@@ -1758,7 +1841,9 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             document.getElementById('returnScanError').textContent = '';
             
             // Disable return button
-            document.getElementById('returnBtn').disabled = true;
+            const returnBtnEl = document.getElementById('returnBtn');
+            returnBtnEl.disabled = true;
+            returnBtnEl.innerHTML = '<i class="fas fa-check-circle"></i> Return Book';
             
             console.log('Return form reset complete');
         }
@@ -1898,7 +1983,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         // Action Functions
         function renewBook(circulationId) {
             console.log('Renewing book for circulation:', circulationId);
-            alert('Book renewed successfully! New due date: ' + new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toLocaleDateString());
+            showNotification('Book renewed successfully!<br><small style="font-weight:400">New due date: ' + new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toLocaleDateString() + '</small>', 'success');
             loadActiveCirculations();
         }
 
@@ -1998,16 +2083,28 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 bookCodeReader = new ZXing.BrowserMultiFormatReader();
                 returnCodeReader = new ZXing.BrowserMultiFormatReader();
                 
-                // Set fast scanning for all readers
-                memberCodeReader.timeBetweenDecodingAttempts = 100;
-                bookCodeReader.timeBetweenDecodingAttempts = 100;
-                returnCodeReader.timeBetweenDecodingAttempts = 100;
+                // Fast decode attempts
+                memberCodeReader.timeBetweenDecodingAttempts = 80;
+                bookCodeReader.timeBetweenDecodingAttempts = 80;
+                returnCodeReader.timeBetweenDecodingAttempts = 80;
                 
-                console.log('✅ QR/Barcode readers initialized with fast scanning');
+                console.log('✅ QR/Barcode readers initialized');
             } else {
-                console.warn('⚠️ ZXing library not loaded yet, retrying in 100ms...');
+                console.warn('⚠️ ZXing library not loaded yet, retrying...');
                 setTimeout(initializeCodeReaders, 100);
             }
+        }
+
+        // Show a big green success banner inside the camera container for 1.5s
+        function showScanBanner(containerEl, message) {
+            // Remove any previous banner
+            const existing = containerEl.querySelector('.scan-success-banner');
+            if (existing) existing.remove();
+            const banner = document.createElement('div');
+            banner.className = 'scan-success-banner';
+            banner.innerHTML = `<i class="fas fa-check-circle"></i><span>${message}</span>`;
+            containerEl.appendChild(banner);
+            setTimeout(() => banner.remove(), 1800);
         }
 
         // Member scanning functions
@@ -2015,15 +2112,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             try {
                 document.getElementById('memberCameraLoading').style.display = 'flex';
                 
-                const constraints = {
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        focusMode: 'continuous',
-                        zoom: 1.0
-                    }
-                };
+                const constraints = { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
                 try {
                     memberStream = await navigator.mediaDevices.getUserMedia(constraints);
                 } catch (err) {
@@ -2041,22 +2130,15 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 placeholder.style.display = 'none';
                 scanBtn.disabled = true;
                 stopBtn.disabled = false;
-                
-                // Wait for video to be ready
                 await video.play();
                 document.getElementById('memberCameraLoading').style.display = 'none';
-                document.getElementById('memberScanningOverlay').style.display = 'flex';
+                // Show scanning overlay (transparent corner brackets, not blocking)
+                document.getElementById('memberScanningOverlay').style.display = 'block';
 
-                // Start fast QR code detection
                 if (memberCodeReader) {
-                    const hints = new Map();
-                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-                    
                     memberCodeReader.decodeFromVideoDevice(null, 'memberVideo', (result, error) => {
                         if (result) {
-                            // Play beep on successful scan
-                            const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUKbh8LdjHAU3kdfy0HotBS17yPLaizsKFFyz6eqmVRQKRp/g8r5sIQUrgc7y2Yk2CBlpu/DknE4MDlCl4fC3YxwFN5HX8tB6LQUte8jy2os7ChRcs+nqplUUCkmf4PK+bCEFK4HO8tmJNggZabvw5JxODA5QpeHwt2McBTeR1/LQei0FLXvI8tqLOwo=');
-                            beep.play().catch(() => {});
+                            playBeep();
                             handleMemberScanResult(result.text);
                         }
                     });
@@ -2114,7 +2196,9 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             }
 
             document.getElementById('memberNo').value = memberNo;
-            showScanResult('memberScanResult', `✅ Member QR scanned: ${memberNo}`);
+            // Show big success banner inside camera container
+            const camContainer = document.getElementById('memberVideo').closest('.camera-container');
+            if (camContainer) showScanBanner(camContainer, memberNo);
             searchMember();
             stopMemberScan();
         }
@@ -2124,15 +2208,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             try {
                 document.getElementById('bookCameraLoading').style.display = 'flex';
                 
-                const constraints = {
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        focusMode: 'continuous',
-                        zoom: 1.0
-                    }
-                };
+                const constraints = { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
                 try {
                     bookStream = await navigator.mediaDevices.getUserMedia(constraints);
                 } catch (err) {
@@ -2150,29 +2226,14 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 placeholder.style.display = 'none';
                 scanBtn.disabled = true;
                 stopBtn.disabled = false;
-                
-                // Wait for video to be ready
                 await video.play();
                 document.getElementById('bookCameraLoading').style.display = 'none';
-                document.getElementById('bookScanningOverlay').style.display = 'flex';
+                document.getElementById('bookScanningOverlay').style.display = 'block';
 
-                // Start fast barcode detection with multiple formats
                 if (bookCodeReader) {
-                    const hints = new Map();
-                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                        ZXing.BarcodeFormat.QR_CODE,
-                        ZXing.BarcodeFormat.CODE_128,
-                        ZXing.BarcodeFormat.CODE_39,
-                        ZXing.BarcodeFormat.EAN_13,
-                        ZXing.BarcodeFormat.EAN_8
-                    ]);
-                    
                     bookCodeReader.decodeFromVideoDevice(null, 'bookVideo', (result, error) => {
                         if (result) {
-                            // Play beep on successful scan
-                            const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUKbh8LdjHAU3kdfy0HotBS17yPLaizsKFFyz6eqmVRQKRp/g8r5sIQUrgc7y2Yk2CBlpu/DknE4MDlCl4fC3YxwFN5HX8tB6LQUte8jy2os7ChRcs+nqplUUCkmf4PK+bCEFK4HO8tmJNggZabvw5JxODA5QpeHwt2McBTeR1/LQei0FLXvI8tqLOwo=');
-                            beep.play().catch(() => {});
+                            playBeep();
                             handleBookScanResult(result.text);
                         }
                     });
@@ -2221,7 +2282,8 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             }
 
             document.getElementById('accNo').value = accNo;
-            showScanResult('bookScanResult', `✅ Book scanned: ${accNo}`);
+            const camContainer = document.getElementById('bookVideo').closest('.camera-container');
+            if (camContainer) showScanBanner(camContainer, accNo);
             searchBook();
             stopBookScan();
         }
@@ -2231,15 +2293,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             try {
                 document.getElementById('returnCameraLoading').style.display = 'flex';
                 
-                const constraints = {
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        focusMode: 'continuous',
-                        zoom: 1.0
-                    }
-                };
+                const constraints = { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
                 try {
                     returnStream = await navigator.mediaDevices.getUserMedia(constraints);
                 } catch (err) {
@@ -2257,29 +2311,14 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 placeholder.style.display = 'none';
                 scanBtn.disabled = true;
                 stopBtn.disabled = false;
-                
-                // Wait for video to be ready
                 await video.play();
                 document.getElementById('returnCameraLoading').style.display = 'none';
-                document.getElementById('returnScanningOverlay').style.display = 'flex';
+                document.getElementById('returnScanningOverlay').style.display = 'block';
 
-                // Start fast barcode detection with multiple formats
                 if (returnCodeReader) {
-                    const hints = new Map();
-                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                        ZXing.BarcodeFormat.QR_CODE,
-                        ZXing.BarcodeFormat.CODE_128,
-                        ZXing.BarcodeFormat.CODE_39,
-                        ZXing.BarcodeFormat.EAN_13,
-                        ZXing.BarcodeFormat.EAN_8
-                    ]);
-                    
                     returnCodeReader.decodeFromVideoDevice(null, 'returnVideo', (result, error) => {
                         if (result) {
-                            // Play beep on successful scan
-                            const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUKbh8LdjHAU3kdfy0HotBS17yPLaizsKFFyz6eqmVRQKRp/g8r5sIQUrgc7y2Yk2CBlpu/DknE4MDlCl4fC3YxwFN5HX8tB6LQUte8jy2os7ChRcs+nqplUUCkmf4PK+bCEFK4HO8tmJNggZabvw5JxODA5QpeHwt2McBTeR1/LQei0FLXvI8tqLOwo=');
-                            beep.play().catch(() => {});
+                            playBeep();
                             handleReturnScanResult(result.text);
                         }
                     });
@@ -2328,28 +2367,41 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             }
 
             document.getElementById('returnAccNo').value = accNo;
-            showScanResult('returnScanResult', `✅ Book scanned for return: ${accNo}`);
+            const camContainer = document.getElementById('returnVideo').closest('.camera-container');
+            if (camContainer) showScanBanner(camContainer, accNo);
             searchReturnBook();
             stopReturnScan();
+        }
+
+        // Shared beep helper
+        function playBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.connect(g); g.connect(ctx.destination);
+                o.type = 'sine'; o.frequency.value = 880;
+                g.gain.setValueAtTime(0.3, ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+                o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.15);
+            } catch(e) {}
         }
 
         // Utility functions for scan results
         function showScanResult(elementId, message) {
             const element = document.getElementById(elementId);
+            if (!element) return;
             element.textContent = message;
             element.style.display = 'block';
-            setTimeout(() => {
-                element.style.display = 'none';
-            }, 5000);
+            setTimeout(() => { element.style.display = 'none'; }, 4000);
         }
 
         function showScanError(elementId, message) {
             const element = document.getElementById(elementId);
+            if (!element) return;
             element.textContent = message;
             element.style.display = 'block';
-            setTimeout(() => {
-                element.style.display = 'none';
-            }, 5000);
+            setTimeout(() => { element.style.display = 'none'; }, 5000);
         }
 
         // Legacy simulation functions for backward compatibility
