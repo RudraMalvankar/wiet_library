@@ -11,7 +11,15 @@ require_once '../../libs/phpqrcode/phpqrcode.php';
 header('Content-Type: application/json');
 
 session_start();
-$adminId = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? 1;
+
+// Authentication check
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized. Please login.']);
+    exit;
+}
+
+$adminId = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? null;
 
 $type = $_GET['type'] ?? '';
 $action = $_GET['action'] ?? '';

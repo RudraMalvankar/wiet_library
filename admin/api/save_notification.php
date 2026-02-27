@@ -14,9 +14,17 @@ if (!isset($_SESSION['admin_id'])) {
 }
 
 require_once '../../includes/db_connect.php';
+require_once '../../includes/functions.php';
 
 // Get JSON input
-$input = json_decode(file_get_contents('php://input'), true);
+$input = json_decode(file_get_contents('php://input'), true) ?? [];
+
+// CSRF protection on POST
+if (!validateCSRFToken($input['csrf_token'] ?? '')) {
+    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token. Please refresh the page.']);
+    http_response_code(403);
+    exit();
+}
 
 $type = $input['Type'] ?? '';
 $title = $input['Title'] ?? '';

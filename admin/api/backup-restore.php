@@ -14,6 +14,13 @@ session_start();
 // Get admin ID and verify it exists
 $adminId = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? null;
 
+// Authentication check — must be logged in
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized. Please login.']);
+    exit;
+}
+
 // If we have an admin ID, verify it exists in the database
 if ($adminId !== null) {
     try {

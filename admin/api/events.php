@@ -13,6 +13,13 @@ if (!checkRateLimit($identifier, 100, 60)) {
     exit();
 }
 
+// Authentication check
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized. Please login.']);
+    exit;
+}
+
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
 // CSRF validation for POST requests

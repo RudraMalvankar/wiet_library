@@ -1,5 +1,10 @@
 <?php
 // Quick test to check if the stats API is working
+session_start();
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    header('Location: login.php'); exit;
+}
+
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 

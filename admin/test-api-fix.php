@@ -1,3 +1,9 @@
+<?php
+session_start();
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    header('Location: login.php'); exit;
+}
+?>
 <!DOCTYPE html>
 <html>
 <head>

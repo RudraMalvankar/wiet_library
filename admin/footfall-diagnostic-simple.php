@@ -4,6 +4,11 @@
  * Tests database directly without additional API calls
  */
 
+session_start();
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    header('Location: login.php'); exit;
+}
+
 require_once '../includes/db_connect.php';
 ?>
 <!DOCTYPE html>

@@ -18,6 +18,11 @@ if (!checkRateLimit($identifier, 100, 60)) {
     sendJson(['success' => false, 'message' => 'Rate limit exceeded. Please try again later.'], 429);
 }
 
+// Authentication check
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    sendJson(['success' => false, 'message' => 'Unauthorized. Please login.'], 401);
+}
+
 // Helper: generate QR file and return filename; uses phpqrcode if available
 function generate_qr_file($text) {
     $baseDir = realpath(__DIR__ . '/../../storage');

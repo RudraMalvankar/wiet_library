@@ -4,8 +4,15 @@
  * Tests database tables, columns, views, and data integrity
  */
 
+session_start();
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
+
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+// Removed Access-Control-Allow-Origin wildcard
 
 require_once '../includes/db_connect.php';
 

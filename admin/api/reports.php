@@ -16,7 +16,12 @@ if (!checkRateLimit($identifier, 100, 60)) {
     sendJson(['success' => false, 'message' => 'Rate limit exceeded. Please try again later.'], 429);
 }
 
-$adminId = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? 1;
+// Authentication check
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    sendJson(['success' => false, 'message' => 'Unauthorized. Please login.'], 401);
+}
+
+$adminId = $_SESSION['admin_id'] ?? $_SESSION['AdminID'] ?? null;
 
 $action = $_GET['action'] ?? '';
 $export = $_GET['export'] ?? '';

@@ -571,12 +571,12 @@ $is_superadmin = $current_admin['is_superadmin'];
             <span>Reports</span>
           </a>
         </li>
-        <li class="sidebar-item">
+        <!-- <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="inventory">
             <i class="sidebar-icon fas fa-warehouse"></i>
             <span>Inventory</span>
           </a>
-        </li>
+        </li> -->
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="stock-verification">
             <i class="sidebar-icon fas fa-check-circle"></i>

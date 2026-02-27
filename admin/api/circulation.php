@@ -13,9 +13,14 @@ header('Content-Type: application/json');
 session_start();
 
 // Rate limiting check
-$identifier = $_SESSION['AdminID'] ?? $_SERVER['REMOTE_ADDR'];
+$identifier = $_SESSION['AdminID'] ?? $_SESSION['admin_id'] ?? $_SERVER['REMOTE_ADDR'];
 if (!checkRateLimit($identifier, 100, 60)) {
     sendJson(['success' => false, 'message' => 'Rate limit exceeded. Please try again later.'], 429);
+}
+
+// Authentication check
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    sendJson(['success' => false, 'message' => 'Unauthorized. Please login.'], 401);
 }
 
 $method = $_SERVER['REQUEST_METHOD'];

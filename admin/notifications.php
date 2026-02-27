@@ -4,6 +4,7 @@ require_once 'ajax-handler.php';
 
 // Session started by ajax-handler.php
 require_once '../includes/db_connect.php';
+require_once '../includes/functions.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['admin_id'])) {
@@ -1153,6 +1154,8 @@ $deliveryLogs = [];
     </div>
 
     <script>
+        const pageCSRFToken = '<?= htmlspecialchars(generateCSRFToken()) ?>';
+
         // Inline Create Notification handler
         function saveNotificationInline() {
             const formData = new FormData(document.getElementById('createNotificationInlineForm'));
@@ -1164,7 +1167,8 @@ $deliveryLogs = [];
                 Channels: Array.from(document.getElementById('notificationChannelsInline').selectedOptions).map(opt => opt.value),
                 Priority: formData.get('Priority'),
                 ScheduledDate: formData.get('ScheduledDate'),
-                Status: 'Draft'
+                Status: 'Draft',
+                csrf_token: pageCSRFToken
             };
             
             // Send to API
@@ -1521,7 +1525,8 @@ $deliveryLogs = [];
                 Title: formData.get('Title'),
                 Message: formData.get('Message'),
                 Recipients: formData.get('Recipients'),
-                Status: 'Draft'
+                Status: 'Draft',
+                csrf_token: pageCSRFToken
             };
 
             // Send to API
@@ -1555,7 +1560,8 @@ $deliveryLogs = [];
                 Title: formData.get('Title'),
                 Message: formData.get('Message'),
                 Recipients: formData.get('Recipients'),
-                Status: 'Sent'
+                Status: 'Sent',
+                csrf_token: pageCSRFToken
             };
 
             if (confirm('⚠️ CONFIRM SEND\n\nAre you sure you want to send this notification NOW to the selected recipients?\n\nThis action cannot be undone.')) {

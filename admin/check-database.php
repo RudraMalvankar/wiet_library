@@ -4,6 +4,11 @@
  * Run this to see current Footfall table structure
  */
 
+session_start();
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    header('Location: login.php'); exit;
+}
+
 require_once '../includes/db_connect.php';
 
 echo "<html><head><title>DB Check</title>";
