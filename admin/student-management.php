@@ -1903,10 +1903,26 @@ try {
         }
 
         // Verification functions
-        function generateQRCodes() {
-            if (confirm('Generate QR codes for all students?\n\nThis will create QR codes for students who don\'t have one.')) {
-                alert('QR code generation started...\n\nProcessing students in background.\nYou will be notified when complete.');
-                // TODO: Implement QR generation API
+        async function generateQRCodes() {
+            if (!confirm('Generate QR codes for all students without one?\nThey will be saved to the database.')) return;
+            const btn = event && event.target ? event.target.closest('[onclick]') : null;
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            try {
+                const res  = await fetch('api/qr-generator.php?type=member-all');
+                const data = await res.json();
+                if (data.success) {
+                    alert('✅ ' + data.message + '\n' + (data.count || 0) + ' QR codes generated and saved.\n\nOpen QR Generator to download or print them.');
+                    if (confirm('Open QR Generator to download / print the sheet?')) {
+                        window.open('qr-generator.php', '_blank');
+                    }
+                } else {
+                    alert('❌ Error: ' + data.message);
+                }
+            } catch (e) {
+                alert('❌ Network error: ' + e.message);
+            } finally {
+                if (btn) btn.innerHTML = orig;
             }
         }
 
@@ -1982,19 +1998,41 @@ try {
             // TODO: Implement camera-based QR scanner
         }
 
-        function bulkQRGeneration() {
+        async function bulkQRGeneration() {
             const selectedStudents = Array.from(document.querySelectorAll('.student-checkbox:checked'))
                 .map(cb => cb.value);
-            
+
             if (selectedStudents.length === 0) {
                 alert('Please select students from the Students tab first, then return here to generate QR codes.');
                 showTab('students');
                 return;
             }
-            
-            if (confirm(`Generate QR codes for ${selectedStudents.length} selected student(s)?`)) {
-                alert(`Generating QR codes for ${selectedStudents.length} students...\n\nProcessing will complete shortly.`);
-                // TODO: Implement bulk QR generation
+
+            if (!confirm(`Generate & save QR codes for ${selectedStudents.length} selected student(s)?`)) return;
+
+            const btn = event && event.target ? event.target.closest('[onclick]') : null;
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+
+            try {
+                const res  = await fetch('api/qr-generator.php?type=bulk-students', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({studentIds: selectedStudents})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('✅ ' + data.message + '\n' + (data.count || 0) + ' QR codes generated and saved.');
+                    if (confirm('Open QR Generator to download / print the sheet?')) {
+                        window.open('qr-generator.php', '_blank');
+                    }
+                } else {
+                    alert('❌ Error: ' + data.message);
+                }
+            } catch (e) {
+                alert('❌ Network error: ' + e.message);
+            } finally {
+                if (btn) btn.innerHTML = orig;
             }
         }
 
