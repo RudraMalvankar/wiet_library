@@ -719,18 +719,24 @@ function onScanSuccess(decodedText, decodedResult) {
     }
     
     // Process QR code - handle multiple formats:
-    // Format 1: PRN-MemberNo (e.g., "C25116-25116")
-    // Format 2: MemberNo_Year (e.g., "25116_2025")
-    // Format 3: Just MemberNo (e.g., "25116")
+    // Format 1: MEMBER:25143 (our generated QR format)
+    // Format 2: PRN-MemberNo (e.g., "C25116-25116")
+    // Format 3: MemberNo_Year (e.g., "25116_2025")
+    // Format 4: Just MemberNo (e.g., "25116")
     let memberIdentifier = decodedText.trim();
     console.log('🔧 Original identifier:', memberIdentifier);
-    
+
+    // Strip MEMBER: prefix if present
+    if (memberIdentifier.toUpperCase().startsWith('MEMBER:')) {
+        memberIdentifier = memberIdentifier.substring(7).trim();
+        console.log('📌 Stripped MEMBER: prefix:', memberIdentifier);
+    }
     // If format is PRN-MemberNo, extract the MemberNo (after hyphen)
-    if (memberIdentifier.includes('-')) {
+    else if (memberIdentifier.includes('-')) {
         const parts = memberIdentifier.split('-');
         memberIdentifier = parts[1] || parts[0];  // Use second part if exists, otherwise first
         console.log('📌 Parsed from PRN-MemberNo format: ${memberIdentifier}');
-    } 
+    }
     // If format is MemberNo_Year, extract MemberNo (before underscore)
     else if (memberIdentifier.includes('_')) {
         memberIdentifier = memberIdentifier.split('_')[0];

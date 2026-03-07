@@ -1374,8 +1374,10 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         }
 
         async function searchMember() {
-            const memberNo = document.getElementById('memberNo').value.trim();
-            
+            let memberNo = document.getElementById('memberNo').value.trim();
+            // Strip QR prefix if present (e.g. 'MEMBER:25143' -> '25143')
+            if (memberNo.toUpperCase().startsWith('MEMBER:')) { memberNo = memberNo.substring(7).trim(); }
+
             if (!memberNo) {
                 showScanError('memberScanError', 'Please enter a Member Number');
                 return;
@@ -1445,8 +1447,11 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         }
 
         async function searchBook() {
-            const accNo = document.getElementById('accNo').value.trim();
-            
+            let accNo = document.getElementById('accNo').value.trim();
+            // Strip QR prefix if present (e.g. 'BOOK:BE8986' -> 'BE8986')
+            if (accNo.toUpperCase().startsWith('BOOK:')) { accNo = accNo.substring(5).trim(); }
+            document.getElementById('accNo').value = accNo;
+
             if (!accNo) {
                 showScanError('bookScanError', 'Please enter an Accession Number');
                 return;
@@ -1656,8 +1661,11 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         }
 
         async function searchReturnBook() {
-            const accNo = document.getElementById('returnAccNo').value.trim();
-            
+            let accNo = document.getElementById('returnAccNo').value.trim();
+            // Strip QR prefix if present
+            if (accNo.toUpperCase().startsWith('BOOK:')) { accNo = accNo.substring(5).trim(); }
+            document.getElementById('returnAccNo').value = accNo;
+
             if (!accNo) {
                 showScanError('returnScanError', 'Please enter an Accession Number');
                 return;
@@ -2176,23 +2184,23 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         function handleMemberScanResult(scannedData) {
             console.log('Member scan result:', scannedData);
 
-            // Extract member number from scanned data
-            // QR Code Format: PRN-MemberNo (e.g., "C25116-25116")
-            let memberNo = scannedData;
+            let memberNo = scannedData.trim();
 
-            // Parse QR code format: PRN-MemberNo
-            if (scannedData.includes('-')) {
-                const parts = scannedData.split('-');
-                memberNo = parts[parts.length - 1]; // Get MemberNo (last part)
-                console.log('Extracted MemberNo from QR:', memberNo);
+            // Handle our QR format: 'MEMBER:25143'
+            if (memberNo.toUpperCase().startsWith('MEMBER:')) {
+                memberNo = memberNo.substring(7).trim();
+            // Legacy format: 'PRN-MemberNo' (e.g. 'C25116-25116')
+            } else if (memberNo.includes('-')) {
+                const parts = memberNo.split('-');
+                memberNo = parts[parts.length - 1];
             }
 
-            // If it's a JSON or structured data, try to extract member number
+            // If it's JSON, try to extract member number
             try {
                 const data = JSON.parse(scannedData);
                 memberNo = data.memberNo || data.MemberNo || data.id || memberNo;
             } catch (e) {
-                // Not JSON, use the extracted memberNo
+                // Not JSON, use extracted memberNo
             }
 
             document.getElementById('memberNo').value = memberNo;
@@ -2273,12 +2281,17 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
             let accNo = scannedData.trim();
 
+            // Handle our QR format: 'BOOK:BE8986'
+            if (accNo.toUpperCase().startsWith('BOOK:')) {
+                accNo = accNo.substring(5).trim();
+            }
+
             // If it's JSON format, extract accession number
             try {
                 const data = JSON.parse(scannedData);
-                accNo = data.accNo || data.AccNo || data.AccessionNo || data.barcode || scannedData;
+                accNo = data.accNo || data.AccNo || data.AccessionNo || data.barcode || accNo;
             } catch (e) {
-                // Not JSON, use raw scanned data as AccNo
+                // Not JSON, use extracted accNo
             }
 
             document.getElementById('accNo').value = accNo;
@@ -2358,12 +2371,17 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
             let accNo = scannedData.trim();
 
+            // Handle our QR format: 'BOOK:BE8986'
+            if (accNo.toUpperCase().startsWith('BOOK:')) {
+                accNo = accNo.substring(5).trim();
+            }
+
             // If it's JSON format, extract accession number
             try {
                 const data = JSON.parse(scannedData);
-                accNo = data.accNo || data.AccNo || data.AccessionNo || data.barcode || scannedData;
+                accNo = data.accNo || data.AccNo || data.AccessionNo || data.barcode || accNo;
             } catch (e) {
-                // Not JSON, use raw scanned data as AccNo
+                // Not JSON, use extracted accNo
             }
 
             document.getElementById('returnAccNo').value = accNo;

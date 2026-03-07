@@ -726,14 +726,17 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
         function handleScanResult(scannedData) {
             console.log('Scanned:', scannedData);
 
-            let accNo = scannedData;
+            let accNo = scannedData.trim();
+
+            // Strip QR prefix if present (e.g. 'BOOK:BE8986' -> 'BE8986')
+            if (accNo.toUpperCase().startsWith('BOOK:')) { accNo = accNo.substring(5).trim(); }
 
             // Try to parse JSON if it's structured data
             try {
                 const data = JSON.parse(scannedData);
-                accNo = data.accNo || data.AccNo || data.barcode || scannedData;
+                accNo = data.accNo || data.AccNo || data.barcode || accNo;
             } catch (e) {
-                accNo = scannedData;
+                // not JSON
             }
 
             document.getElementById('accNoInput').value = accNo;
@@ -743,8 +746,11 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
         }
 
         async function searchBook() {
-            const accNo = document.getElementById('accNoInput').value.trim();
-            
+            let accNo = document.getElementById('accNoInput').value.trim();
+            // Strip QR prefix if user typed it manually
+            if (accNo.toUpperCase().startsWith('BOOK:')) { accNo = accNo.substring(5).trim(); }
+            document.getElementById('accNoInput').value = accNo;
+
             if (!accNo) {
                 showScanResult('Please enter or scan an accession number', 'error');
                 return;
