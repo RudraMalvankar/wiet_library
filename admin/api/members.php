@@ -9,6 +9,26 @@ require_once '../../includes/functions.php';
 
 header('Content-Type: application/json');
 
+function normalizeNamePart($value): string {
+    $value = trim((string)($value ?? ''));
+    if ($value === '') {
+        return '';
+    }
+    return preg_replace('/\s+/', ' ', $value);
+}
+
+function buildFullName($firstName, $middleName, $lastName): string {
+    $parts = [
+        normalizeNamePart($firstName),
+        normalizeNamePart($middleName),
+        normalizeNamePart($lastName)
+    ];
+    $parts = array_values(array_filter($parts, function ($part) {
+        return $part !== '';
+    }));
+    return implode(' ', $parts);
+}
+
 // Start session for authentication and CSRF
 session_start();
 
@@ -138,9 +158,19 @@ try {
             }
             
             $data = json_decode(file_get_contents('php://input'), true);
+
+            $composedName = buildFullName(
+                $data['FirstName'] ?? '',
+                $data['MiddleName'] ?? '',
+                $data['Surname'] ?? ($data['LastName'] ?? '')
+            );
+            $memberName = normalizeNamePart($data['MemberName'] ?? '');
+            if ($memberName === '' && $composedName !== '') {
+                $memberName = $composedName;
+            }
             
             // Validate required fields
-            if (empty($data['MemberName']) || empty($data['Group'])) {
+            if ($memberName === '' || empty($data['Group'])) {
                 sendJson(['success' => false, 'message' => 'Member name and group are required'], 400);
             }
             
@@ -159,7 +189,7 @@ try {
             
             $stmt->execute([
                 $memberNo,
-                $data['MemberName'],
+                $memberName,
                 $data['Group'],
                 $data['Designation'] ?? null,
                 $data['Phone'] ?? null,
@@ -232,9 +262,22 @@ try {
             
             $data = json_decode(file_get_contents('php://input'), true);
             $memberNo = $data['MemberNo'] ?? 0;
+
+            $composedName = buildFullName(
+                $data['FirstName'] ?? '',
+                $data['MiddleName'] ?? '',
+                $data['Surname'] ?? ($data['LastName'] ?? '')
+            );
+            $memberName = normalizeNamePart($data['MemberName'] ?? '');
+            if ($memberName === '' && $composedName !== '') {
+                $memberName = $composedName;
+            }
             
             if (!$memberNo) {
                 sendJson(['success' => false, 'message' => 'Member number is required'], 400);
+            }
+            if ($memberName === '') {
+                sendJson(['success' => false, 'message' => 'Member name is required'], 400);
             }
             
             // Update member
@@ -246,7 +289,7 @@ try {
             ");
             
             $stmt->execute([
-                $data['MemberName'],
+                $memberName,
                 $data['Group'],
                 $data['Designation'] ?? null,
                 $data['Phone'] ?? null,
@@ -372,9 +415,9 @@ try {
             }
             
             // Get form data
-            $surname = $_POST['Surname'] ?? '';
-            $middleName = $_POST['MiddleName'] ?? '';
-            $firstName = $_POST['FirstName'] ?? '';
+            $surname = normalizeNamePart($_POST['Surname'] ?? ($_POST['LastName'] ?? ''));
+            $middleName = normalizeNamePart($_POST['MiddleName'] ?? '');
+            $firstName = normalizeNamePart($_POST['FirstName'] ?? '');
             $prn = $_POST['PRN'] ?? '';
             $branch = $_POST['Branch'] ?? '';
             $courseName = $_POST['CourseName'] ?? '';
@@ -404,7 +447,7 @@ try {
             $memberNo = ($result['maxNo'] ?? 0) + 1;
             
             // Create full name for Member table
-            $fullName = trim("$firstName $middleName $surname");
+            $fullName = buildFullName($firstName, $middleName, $surname);
             
             // Start transaction
             $pdo->beginTransaction();

@@ -1663,8 +1663,44 @@ try {
             }
         }
 
+        function normalizeNamePart(value) {
+            return (value || '').trim().replace(/\s+/g, ' ');
+        }
+
+        function buildMemberNameFromForm(form) {
+            if (!form) return '';
+
+            const firstName = normalizeNamePart(form.querySelector('[name="FirstName"]')?.value || '');
+            const middleName = normalizeNamePart(form.querySelector('[name="MiddleName"]')?.value || '');
+            const surname = normalizeNamePart(form.querySelector('[name="Surname"]')?.value || form.querySelector('[name="LastName"]')?.value || '');
+            const fullName = [firstName, middleName, surname].filter(Boolean).join(' ');
+
+            const memberNameInput = form.querySelector('[name="MemberName"]');
+            if (memberNameInput && fullName) {
+                memberNameInput.value = fullName;
+            }
+
+            return fullName;
+        }
+
+        function attachMemberNameAutoCompose(formId) {
+            const form = document.getElementById(formId);
+            if (!form) return;
+
+            ['[name="FirstName"]', '[name="MiddleName"]', '[name="Surname"]', '[name="LastName"]'].forEach(selector => {
+                const field = form.querySelector(selector);
+                if (field) {
+                    field.addEventListener('input', () => buildMemberNameFromForm(form));
+                    field.addEventListener('blur', () => buildMemberNameFromForm(form));
+                }
+            });
+
+            buildMemberNameFromForm(form);
+        }
+
         async function saveStudent() {
             const form = document.getElementById('addStudentForm');
+            buildMemberNameFromForm(form);
             const formData = new FormData(form);
             
             // Add action parameter
@@ -1696,6 +1732,7 @@ try {
 
         async function saveStudentInline() {
             const form = document.getElementById('addStudentInlineForm');
+            buildMemberNameFromForm(form);
             const formData = new FormData(form);
             
             // Add action parameter
@@ -1774,6 +1811,7 @@ try {
                     document.getElementById('studentAddressInline').value = student.Address || '';
                     document.getElementById('studentValidTillInline').value = student.ValidTill || '';
                     document.getElementById('studentCardColourInline').value = student.CardColour || '';
+                    buildMemberNameFromForm(document.getElementById('addStudentInlineForm'));
                     
                     // Store student ID for update
                     document.getElementById('addStudentInlineForm').dataset.studentId = studentId;
@@ -2307,6 +2345,8 @@ try {
         function initStudentManagement() {
             console.log('Student Management: Initializing');
             fetchCSRFToken();
+            attachMemberNameAutoCompose('addStudentInlineForm');
+            attachMemberNameAutoCompose('addStudentForm');
             loadStatistics();
             loadStudentsTable();
         }

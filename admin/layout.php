@@ -589,12 +589,12 @@ $is_superadmin = $current_admin['is_superadmin'];
             <span>Library Events</span>
           </a>
         </li>
-        <!-- <li class="sidebar-item">
+        <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="bulk-import">
             <i class="sidebar-icon fas fa-upload"></i>
             <span>Bulk Import</span>
           </a>
-        </li> -->
+        </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="qr-generator">
             <i class="sidebar-icon fas fa-qrcode"></i>
