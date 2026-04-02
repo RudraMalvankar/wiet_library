@@ -62,7 +62,7 @@ try {
             'expiry_date' => $student_data['ValidTill'] ?? 'N/A',
             'status' => $student_data['Status'],
             'barcode' => str_pad($student_data['MemberNo'], 12, '0', STR_PAD_LEFT),
-            'qr_code' => ($student_data['PRN'] ?? $student_data['StudentID']) . '_' . date('Y'),
+            'qr_code' => 'MEMBER:' . $student_data['MemberNo'],
             'email' => $student_data['Email'],
             'mobile' => $student_data['Mobile'],
             'books_issued' => $student_data['BooksIssued'],
@@ -83,7 +83,7 @@ try {
         'expiry_date' => 'N/A',
         'status' => 'Active',
         'barcode' => str_pad($member_no, 12, '0', STR_PAD_LEFT),
-        'qr_code' => $student_id . '_' . date('Y')
+        'qr_code' => 'MEMBER:' . (string)$member_no
     ];
 }
 

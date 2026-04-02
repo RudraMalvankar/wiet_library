@@ -50,7 +50,7 @@ try {
             'expiry_date' => $row['ValidTill'] ?: null,
             'status' => $row['Status'] ?: 'Active',
             'barcode' => str_pad((string)$row['MemberNo'], 12, '0', STR_PAD_LEFT),
-            'qr_code' => ($row['PRN'] ?: $row['StudentID']) . '_' . date('Y'),
+            'qr_code' => 'MEMBER:' . (string)$row['MemberNo'],
             'email' => $row['Email'] ?: '',
             'mobile' => $row['Mobile'] ?: '',
             'books_issued' => (int)($row['BooksIssued'] ?? 0),

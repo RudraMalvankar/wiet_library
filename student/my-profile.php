@@ -176,9 +176,6 @@ $student_profile['preferences'] = [
     'privacy_profile' => 'Private'
 ];
 ?>
-    ['action' => 'Downloaded "Digital Signal Processing" eBook', 'date' => '2025-09-08', 'type' => 'download']
-];
-?>
 
 <style>
     .profile-header {
