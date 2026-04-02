@@ -265,6 +265,9 @@ $unread_count = count(array_filter($notifications, function ($n) {
 $action_required_count = count(array_filter($notifications, function ($n) {
     return $n['action_required'];
 }));
+
+// Show raw debug diagnostics only when explicitly requested.
+$show_notifications_debug = isset($_GET['debug_notifications']) && $_GET['debug_notifications'] === '1';
 ?>
 
 <style>
@@ -645,15 +648,15 @@ $action_required_count = count(array_filter($notifications, function ($n) {
     <p class="notifications-subtitle">Stay updated with library alerts, due dates, and important announcements</p>
 </div>
 
-<!-- DEBUG INFO (Remove after testing) -->
-<?php if (count($notifications) === 0): ?>
+<!-- DEBUG INFO (Visible only in explicit debug mode) -->
+<?php if (count($notifications) === 0 && $show_notifications_debug): ?>
 <div style="background: #fff3cd; border: 2px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 8px;">
     <h3 style="color: #856404; margin: 0 0 10px 0;">🔍 Debug Info</h3>
     <p style="margin: 5px 0;"><strong>Member No:</strong> <?php echo $member_no ?? 'NOT SET'; ?></p>
     <p style="margin: 5px 0;"><strong>Student ID:</strong> <?php echo $student_id ?? 'NOT SET'; ?></p>
     <p style="margin: 5px 0;"><strong>Total Notifications Found:</strong> <?php echo count($notifications); ?></p>
-    <p style="margin: 5px 0; color: #dc3545;"><strong>⚠️ No notifications are being loaded from database!</strong></p>
-    <p style="margin: 5px 0;">Please check: <a href="test_notifications_debug.php" target="_blank">Notifications Debug Page</a></p>
+    <p style="margin: 5px 0; color: #dc3545;"><strong>⚠️ Notification list is empty for this member/context.</strong></p>
+    <p style="margin: 5px 0;">Tip: verify rows in <code>Notifications</code> for this <code>MemberNo</code> or global entries (<code>MemberNo IS NULL</code>).</p>
 </div>
 <?php endif; ?>
 
@@ -700,6 +703,13 @@ $action_required_count = count(array_filter($notifications, function ($n) {
 
 <!-- Notifications List -->
 <div class="notifications-list" id="notifications-container">
+    <?php if (count($notifications) === 0): ?>
+        <div class="empty-state">
+            <i class="fas fa-bell-slash"></i>
+            <h3>No notifications yet</h3>
+            <p>You are all caught up. New alerts will appear here when available.</p>
+        </div>
+    <?php else: ?>
     <?php foreach ($notifications as $notification): ?>
         <div class="notification-item <?php echo !$notification['read'] ? 'unread' : ''; ?>"
             data-category="<?php echo $notification['category']; ?>"
@@ -774,6 +784,7 @@ $action_required_count = count(array_filter($notifications, function ($n) {
             </div>
         </div>
     <?php endforeach; ?>
+    <?php endif; ?>
 </div>
 
 <script>

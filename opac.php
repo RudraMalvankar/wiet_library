@@ -155,6 +155,33 @@ try {
         position: relative;
     }
 
+    .college-banner {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(38, 60, 121, 0.06);
+        border: 1px solid rgba(38, 60, 121, 0.15);
+        border-radius: 999px;
+        padding: 6px 14px;
+        margin-bottom: 12px;
+    }
+
+    .college-banner img {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .college-banner-text {
+        color: #263c79;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        font-family: 'Poppins', sans-serif;
+    }
+
     .logo {
         width: 70px;
         height: 70px;
@@ -632,6 +659,20 @@ try {
             font-size: 1.4rem;
         }
 
+        .college-banner {
+            padding: 5px 10px;
+            gap: 8px;
+        }
+
+        .college-banner img {
+            width: 20px;
+            height: 20px;
+        }
+
+        .college-banner-text {
+            font-size: 10px;
+        }
+
         .search-subtitle {
             font-size: 0.8rem;
         }
@@ -894,6 +935,10 @@ try {
             </div>
             
             <div class="search-header">
+                <div class="college-banner">
+                    <img src="images/watumull%20logo.png" alt="College Logo">
+                    <span class="college-banner-text">Watumull Institute Of Technology</span>
+                </div>
                 <div class="logo">
                     <i class="fas fa-search"></i>
                 </div>
@@ -936,7 +981,7 @@ try {
                 </div>
 
                 <div class="search-actions">
-                    <a href="wiet_lib/index.php" class="back-btn">
+                    <a href="index.php" class="back-btn">
                         <i class="fas fa-arrow-left"></i>
                         Back to Home
                     </a>

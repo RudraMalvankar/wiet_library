@@ -12,6 +12,10 @@ header('Content-Type: application/json');
 // Start session for authentication and CSRF
 session_start();
 
+$method = $_SERVER['REQUEST_METHOD'];
+$action = $_GET['action'] ?? '';
+$hasAdminSession = isset($_SESSION['admin_id']) || isset($_SESSION['AdminID']);
+
 // Rate limiting check
 $identifier = $_SESSION['AdminID'] ?? $_SESSION['admin_id'] ?? $_SERVER['REMOTE_ADDR'];
 if (!checkRateLimit($identifier, 100, 60)) {
@@ -19,7 +23,9 @@ if (!checkRateLimit($identifier, 100, 60)) {
 }
 
 // Authentication check
-if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+// OPAC uses action=list for public catalog search, so allow only this read-only route without admin session.
+$isPublicOpacSearch = ($method === 'GET' && $action === 'list');
+if (!$hasAdminSession && !$isPublicOpacSearch) {
     sendJson(['success' => false, 'message' => 'Unauthorized. Please login.'], 401);
 }
 
@@ -144,11 +150,6 @@ function generate_qr_png($text) {
 
     return null;
 }
-
-session_start();
-
-$method = $_SERVER['REQUEST_METHOD'];
-$action = $_GET['action'] ?? '';
 
 try {
     switch ($action) {

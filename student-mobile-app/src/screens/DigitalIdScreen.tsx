@@ -41,7 +41,7 @@ export function DigitalIdScreen() {
 
       {!loading && card ? (
         <View style={styles.cardWrap}>
-          <Text style={styles.college}>WALCHAND INSTITUTE OF TECHNOLOGY</Text>
+          <Text style={styles.college}>WATUMULL INSTITUTE OF TECHNOLOGY</Text>
           <Text style={styles.name}>{card.name}</Text>
           <Text style={styles.meta}>Member: {card.member_code}</Text>
           <Text style={styles.meta}>PRN: {card.student_id}</Text>

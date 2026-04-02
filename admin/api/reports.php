@@ -565,11 +565,11 @@ switch ($action) {
             // Category-wise Stock
             $stmt = $pdo->query("
                 SELECT 
-                    b.Category,
+                    COALESCE(b.Subject, 'Uncategorized') as Category,
                     COUNT(h.AccNo) as count
                 FROM Books b
                 LEFT JOIN Holding h ON b.CatNo = h.CatNo
-                GROUP BY b.Category
+                GROUP BY COALESCE(b.Subject, 'Uncategorized')
                 ORDER BY count DESC
                 LIMIT 10
             ");
@@ -590,7 +590,7 @@ switch ($action) {
                             b.CatNo,
                             b.Title,
                             b.Author1 as Author,
-                            b.Category,
+                            COALESCE(b.Subject, 'Uncategorized') as Category,
                             COUNT(h.AccNo) as TotalCopies,
                             COUNT(CASE WHEN h.AccNo NOT IN (SELECT c.AccNo FROM Circulation c WHERE NOT EXISTS (SELECT 1 FROM `Return` r WHERE r.CirculationID = c.CirculationID)) THEN 1 END) as Available,
                             COALESCE(h.`Condition`, 'Good') as Status
@@ -609,14 +609,14 @@ switch ($action) {
                             b.Title,
                             b.Author1 as Author,
                             b.Publisher,
-                            b.Category,
+                            COALESCE(b.Subject, 'Uncategorized') as Category,
                             h.AccNo,
-                            h.Price,
-                            h.PurchaseDate
+                            COALESCE(b.ItemPrice, 0) as Price,
+                            COALESCE(b.BillDate, h.AccDate) as PurchaseDate
                         FROM Holding h
                         INNER JOIN Books b ON h.CatNo = b.CatNo
-                        WHERE DATE(h.PurchaseDate) BETWEEN ? AND ?
-                        ORDER BY h.PurchaseDate DESC
+                        WHERE DATE(COALESCE(b.BillDate, h.AccDate)) BETWEEN ? AND ?
+                        ORDER BY COALESCE(b.BillDate, h.AccDate) DESC
                     ");
                     $stmt->execute([$from, $to]);
                     $details = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -643,7 +643,7 @@ switch ($action) {
                         SELECT 
                             b.Title,
                             b.Author1 as Author,
-                            b.Category,
+                            COALESCE(b.Subject, 'Uncategorized') as Category,
                             COUNT(h.AccNo) as TotalCopies,
                             COUNT(CASE WHEN h.AccNo NOT IN (SELECT c.AccNo FROM Circulation c WHERE NOT EXISTS (SELECT 1 FROM `Return` r WHERE r.CirculationID = c.CirculationID)) THEN 1 END) as Available
                         FROM Books b

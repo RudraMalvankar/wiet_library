@@ -301,7 +301,7 @@ header('Content-Disposition: attachment; filename="library_books_catalog_' . dat
     <div class="footer">
         <p><strong>WIET Library Management System</strong></p>
         <p>This is an automatically generated report. All data is subject to real-time changes.</p>
-        <p>© <?php echo date('Y'); ?> - Walchand Institute of Engineering and Technology</p>
+                    <p>© <?php echo date('Y'); ?> - Watumull Institute of Engineering and Technology</p>
     </div>
     
     <script>
