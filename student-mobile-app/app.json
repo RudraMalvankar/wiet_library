@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "WIET Student Library",
+    "slug": "wiet-student-library",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "com.wiet.studentlibrary"
+    },
+    "ios": {
+      "bundleIdentifier": "com.wiet.studentlibrary"
+    },
+    "extra": {
+      "apiBaseUrl": "http://10.0.2.2/wiet_lib/student/api/mobile"
+    }
+  }
+}
