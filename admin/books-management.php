@@ -1474,7 +1474,7 @@ if (!function_exists('generateQR')) {
                 <i class="fas fa-list"></i>
                 Books Catalog
             </button>
-            <button class="tab-btn" onclick="showTab('holdings')">
+            <button class="tab-btn" onclick="showTab('holdings')" style="display: none;">
                 <i class="fas fa-warehouse"></i>
                 Holdings Management
             </button>
@@ -1545,7 +1545,7 @@ if (!function_exists('generateQR')) {
         </div>
 
         <!-- Holdings Management Tab -->
-        <div id="holdings" class="tab-content">
+        <div id="holdings" class="tab-content" style="display: none;">
             <div id="holdingsContent">
                 <div style="text-align: center; padding: 40px; color: #6c757d;">
                     <i class="fas fa-warehouse" style="font-size: 48px; margin-bottom: 15px;"></i>
@@ -1889,6 +1889,11 @@ if (!function_exists('generateQR')) {
             loadTabContent(tabName);
         }
 
+        // Paginated Books Table
+        let booksPage = 1;
+        let booksPageSize = 20;
+        let booksTotal = 0;
+
         // Ensure books table loads on initial page load
         // Only load books table once on initial page load
         let booksTableLoaded = false;
@@ -1937,11 +1942,6 @@ if (!function_exists('generateQR')) {
                     console.warn('Unknown tab:', tabName);
             }
         }
-
-        // Paginated Books Table
-        let booksPage = 1;
-        let booksPageSize = 20;
-        let booksTotal = 0;
 
         // Function to load database-wide statistics
         async function loadStatistics() {

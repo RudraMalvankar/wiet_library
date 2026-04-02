@@ -791,6 +791,24 @@ $db_pass = '';
     </div>
 
     <script>
+        let backupCsrfToken = '';
+
+        async function getBackupCsrfToken() {
+            if (backupCsrfToken) {
+                return backupCsrfToken;
+            }
+
+            const response = await fetch('api/backup-restore.php?action=get-csrf-token');
+            const result = await response.json();
+
+            if (!result.success || !result.token) {
+                throw new Error(result.message || 'Failed to load CSRF token');
+            }
+
+            backupCsrfToken = result.token;
+            return backupCsrfToken;
+        }
+
         function showTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
@@ -803,7 +821,7 @@ $db_pass = '';
             event.target.classList.add('active');
         }
 
-        function createBackup(type) {
+        async function createBackup(type) {
             const name = document.getElementById('backupName').value;
             const compression = document.getElementById('compression').value;
             const progressDiv = document.getElementById('backupProgress');
@@ -818,27 +836,30 @@ $db_pass = '';
             formData.append('backupType', type);
             formData.append('compression', compression);
             formData.append('description', name);
+            
+            try {
+                const csrfToken = await getBackupCsrfToken();
+                formData.append('csrf_token', csrfToken);
 
-            fetch(`api/backup-restore.php?action=create-backup`, {
-                method: 'POST',
-                body: formData
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        showSuccess(resultDiv, data.message);
-                        updateProgress('backupProgressFill', 100);
-                        setTimeout(() => location.reload(), 2000);
-                    } else {
-                        showError(resultDiv, data.message);
-                    }
-                })
-                .catch(err => {
-                    showError(resultDiv, 'Error: ' + err.message);
+                const res = await fetch(`api/backup-restore.php?action=create-backup`, {
+                    method: 'POST',
+                    body: formData
                 });
+
+                const data = await res.json();
+                if (data.success) {
+                    showSuccess(resultDiv, data.message);
+                    updateProgress('backupProgressFill', 100);
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    showError(resultDiv, data.message);
+                }
+            } catch (err) {
+                showError(resultDiv, 'Error: ' + err.message);
+            }
         }
 
-        function restoreBackup(filename) {
+        async function restoreBackup(filename) {
             if (!confirm('⚠️ WARNING: This will overwrite the current database!\n\nAre you absolutely sure you want to restore from this backup?\n\nFilename: ' + filename)) {
                 return;
             }
@@ -852,54 +873,60 @@ $db_pass = '';
 
             const formData = new FormData();
             formData.append('filename', filename);
+            
+            try {
+                const csrfToken = await getBackupCsrfToken();
+                formData.append('csrf_token', csrfToken);
 
-            fetch(`api/backup-restore.php?action=restore-backup`, {
-                method: 'POST',
-                body: formData
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        showSuccess(resultDiv, data.message);
-                        setTimeout(() => location.reload(), 2000);
-                    } else {
-                        showError(resultDiv, data.message);
-                    }
-                })
-                .catch(err => {
-                    showError(resultDiv, 'Error: ' + err.message);
+                const res = await fetch(`api/backup-restore.php?action=restore-backup`, {
+                    method: 'POST',
+                    body: formData
                 });
+                const data = await res.json();
+
+                if (data.success) {
+                    showSuccess(resultDiv, data.message);
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    showError(resultDiv, data.message);
+                }
+            } catch (err) {
+                showError(resultDiv, 'Error: ' + err.message);
+            }
         }
 
         function downloadBackup(filename) {
             window.open(`api/backup-restore.php?action=download-backup&filename=${filename}`, '_blank');
         }
 
-        function deleteBackup(filename) {
+        async function deleteBackup(filename) {
             if (!confirm(`Delete backup: ${filename}?`)) return;
 
             const formData = new FormData();
             formData.append('filename', filename);
+            
+            try {
+                const csrfToken = await getBackupCsrfToken();
+                formData.append('csrf_token', csrfToken);
 
-            fetch(`api/backup-restore.php?action=delete-backup`, {
-                method: 'POST',
-                body: formData
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        alert(data.message);
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.message);
-                    }
-                })
-                .catch(err => {
-                    alert('Error: ' + err.message);
+                const res = await fetch(`api/backup-restore.php?action=delete-backup`, {
+                    method: 'POST',
+                    body: formData
                 });
+                const data = await res.json();
+
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
         }
 
-        function saveSchedule() {
+        async function saveSchedule() {
             const enabled = document.getElementById('autoBackupEnabled').value;
             const frequency = document.getElementById('backupFrequency').value;
             const time = document.getElementById('backupTime').value;
@@ -912,23 +939,26 @@ $db_pass = '';
             formData.append('time', time);
             formData.append('retention', retention);
             formData.append('email', email);
+            
+            try {
+                const csrfToken = await getBackupCsrfToken();
+                formData.append('csrf_token', csrfToken);
 
-            fetch('api/backup-restore.php?action=save-auto-backup', {
-                method: 'POST',
-                body: formData
-            })
-            .then(res => res.json())
-            .then(data => {
+                const res = await fetch('api/backup-restore.php?action=save-auto-backup', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
                 const resultDiv = document.getElementById('scheduleResult');
                 if (data.success) {
                     showSuccess(resultDiv, data.message);
                 } else {
                     showError(resultDiv, data.message);
                 }
-            })
-            .catch(err => {
+            } catch (err) {
                 showError(document.getElementById('scheduleResult'), 'Error: ' + err.message);
-            });
+            }
         }
 
         function cleanOldBackups() {
@@ -989,22 +1019,26 @@ $db_pass = '';
             
             resultDiv.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i><p>Uploading and restoring...</p></div>';
 
-            fetch('api/backup-restore.php?action=restore-backup', {
-                method: 'POST',
-                body: formData
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    showSuccess(resultDiv, data.message);
-                    setTimeout(() => location.reload(), 2000);
-                } else {
-                    showError(resultDiv, data.message);
-                }
-            })
-            .catch(err => {
-                showError(resultDiv, 'Error: ' + err.message);
-            });
+            getBackupCsrfToken()
+                .then(token => {
+                    formData.append('csrf_token', token);
+                    return fetch('api/backup-restore.php?action=restore-backup', {
+                        method: 'POST',
+                        body: formData
+                    });
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showSuccess(resultDiv, data.message);
+                        setTimeout(() => location.reload(), 2000);
+                    } else {
+                        showError(resultDiv, data.message);
+                    }
+                })
+                .catch(err => {
+                    showError(resultDiv, 'Error: ' + err.message);
+                });
         });
     </script>
 </body>

@@ -714,7 +714,7 @@ async function loadAnalytics() {
     const dateTo = document.getElementById('dateTo').value;
     
     try {
-        const response = await fetch(`../footfall/api/analytics-data.php?date_from=${dateFrom}&date_to=${dateTo}`);
+        const response = await fetch(getApiPath(`../footfall/api/analytics-data.php?date_from=${dateFrom}&date_to=${dateTo}`));
         const data = await response.json();
         
         if (data.success) {
@@ -948,6 +948,104 @@ async function checkoutVisitor(memberNo) {
     }
 }
 
+function formatDateForInput(date) {
+    return date.toISOString().split('T')[0];
+}
+
+function getReportDateRange(reportType) {
+    const today = new Date();
+    const start = new Date(today);
+    const end = new Date(today);
+
+    if (reportType === 'daily') {
+        return { from: formatDateForInput(start), to: formatDateForInput(end) };
+    }
+
+    if (reportType === 'weekly') {
+        start.setDate(today.getDate() - 6);
+        return { from: formatDateForInput(start), to: formatDateForInput(end) };
+    }
+
+    if (reportType === 'monthly') {
+        start.setDate(1);
+        return { from: formatDateForInput(start), to: formatDateForInput(end) };
+    }
+
+    // Custom range uses filter dates from analytics tab.
+    return {
+        from: document.getElementById('dateFrom').value || formatDateForInput(start),
+        to: document.getElementById('dateTo').value || formatDateForInput(end)
+    };
+}
+
+function downloadCsv(filename, rows) {
+    if (!rows.length) {
+        return;
+    }
+
+    const headers = Object.keys(rows[0]);
+    const csv = [
+        headers.join(','),
+        ...rows.map(row => headers.map(h => {
+            const value = row[h] ?? '';
+            const escaped = String(value).replace(/"/g, '""');
+            return `"${escaped}"`;
+        }).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+}
+
+function openPrintableReport(title, rows, from, to) {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('Popup blocked. Please allow popups to generate PDF report.');
+        return;
+    }
+
+    const headers = rows.length ? Object.keys(rows[0]) : [];
+    const tableRows = rows.length
+        ? rows.map(row => `<tr>${headers.map(h => `<td>${escapeHtml(row[h])}</td>`).join('')}</tr>`).join('')
+        : '<tr><td colspan="5" style="text-align:center;">No records found</td></tr>';
+
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>${escapeHtml(title)}</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                h1 { color: #263c79; }
+                p { color: #555; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+                th { background: #263c79; color: #fff; }
+                tr:nth-child(even) { background: #f8f9fa; }
+            </style>
+        </head>
+        <body>
+            <h1>${escapeHtml(title)}</h1>
+            <p>Date range: ${escapeHtml(from)} to ${escapeHtml(to)}</p>
+            <p>Total records: ${rows.length}</p>
+            <table>
+                <thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.onload = function() {
+        printWindow.print();
+    };
+}
+
 // Load report stats
 async function loadReportStats() {
     try {
@@ -975,8 +1073,38 @@ async function loadReportStats() {
 async function generateReport() {
     const reportType = document.getElementById('reportType').value;
     const reportFormat = document.getElementById('reportFormat').value;
-    
-    alert('Report generation feature will be implemented based on selected type: ' + reportType + ' in format: ' + reportFormat);
+    const range = getReportDateRange(reportType);
+
+    try {
+        const response = await fetch(getApiPath(`../footfall/api/export-footfall.php?date_from=${range.from}&date_to=${range.to}&format=json`));
+        const data = await response.json();
+        const records = data.records || [];
+
+        if (!data.success || records.length === 0) {
+            alert('No data available for selected date range.');
+            return;
+        }
+
+        const fileBase = `footfall_${reportType}_report_${range.from}_to_${range.to}`;
+
+        if (reportFormat === 'excel') {
+            const ws = XLSX.utils.json_to_sheet(records);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Footfall Report');
+            XLSX.writeFile(wb, `${fileBase}.xlsx`);
+            return;
+        }
+
+        if (reportFormat === 'csv') {
+            downloadCsv(`${fileBase}.csv`, records);
+            return;
+        }
+
+        openPrintableReport('Footfall Report', records, range.from, range.to);
+    } catch (error) {
+        console.error('Report generation error:', error);
+        alert('Failed to generate report. Please try again.');
+    }
 }
 
 // Export to Excel
@@ -985,11 +1113,11 @@ async function exportToExcel() {
         const dateFrom = document.getElementById('recordsDateFrom').value;
         const dateTo = document.getElementById('recordsDateTo').value;
         
-        const response = await fetch(`../footfall/api/export-footfall.php?date_from=${dateFrom}&date_to=${dateTo}&format=json`);
+        const response = await fetch(getApiPath(`../footfall/api/export-footfall.php?date_from=${dateFrom}&date_to=${dateTo}&format=json`));
         const data = await response.json();
         
-        if (data.success && data.data.records) {
-            const ws = XLSX.utils.json_to_sheet(data.data.records);
+        if (data.success && data.records) {
+            const ws = XLSX.utils.json_to_sheet(data.records);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Footfall Data');
             XLSX.writeFile(wb, `footfall_report_${dateFrom}_to_${dateTo}.xlsx`);

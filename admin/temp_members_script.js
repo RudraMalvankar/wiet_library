@@ -1,1025 +1,4 @@
-<?php
-// Include AJAX handler FIRST (before session_start)
-require_once 'ajax-handler.php';
 
-// Session started by ajax-handler.php
-
-// Include database connection and functions
-require_once '../includes/db_connect.php';
-require_once '../includes/functions.php';
-
-$admin_id = $_SESSION['admin_id'] ?? 1;
-$admin_name = $_SESSION['admin_name'] ?? 'Admin User';
-
-// Fetch real members from database
-$stmt = $pdo->query("
-    SELECT m.*, 
-           CASE WHEN s.StudentID IS NOT NULL THEN 'Student' 
-                WHEN f.FacultyID IS NOT NULL THEN 'Faculty' 
-                ELSE m.`Group` END as MemberType
-    FROM Member m
-    LEFT JOIN Student s ON m.MemberNo = s.MemberNo
-    LEFT JOIN Faculty f ON m.MemberNo = f.MemberNo
-    ORDER BY m.MemberName
-");
-$members = $stmt->fetchAll();
-
-// Sample data for fallback (if database is empty)
-$sampleMembers = [
-    [
-        'MemberNo' => 2024001,
-        'MemberName' => 'Rahul Sharma',
-        'Group' => 'Student',
-        'Designation' => 'B.Tech Final Year',
-        'Entitlement' => 'Standard',
-        'Phone' => '9876543210',
-        'Email' => 'rahul.sharma@student.wiet.edu',
-        'FinePerDay' => 2.00,
-        'AdmissionDate' => '2021-08-15',
-        'Override' => false,
-        'BooksIssued' => 3,
-        'ClosingDate' => null,
-        'Status' => 'Active',
-        'CreatedBy' => 1
-    ],
-    [
-        'MemberNo' => 2024002,
-        'MemberName' => 'Dr. Priya Patel',
-        'Group' => 'Faculty',
-        'Designation' => 'Assistant Professor',
-        'Entitlement' => 'Faculty',
-        'Phone' => '9876543211',
-        'Email' => 'priya.patel@wiet.edu',
-        'FinePerDay' => 1.00,
-        'AdmissionDate' => '2020-06-01',
-        'Override' => true,
-        'BooksIssued' => 5,
-        'ClosingDate' => null,
-        'Status' => 'Active',
-        'CreatedBy' => 1
-    ],
-    [
-        'MemberNo' => 2024003,
-        'MemberName' => 'Amit Kumar Singh',
-        'Group' => 'Staff',
-        'Designation' => 'Lab Assistant',
-        'Entitlement' => 'Staff',
-        'Phone' => '9876543212',
-        'Email' => 'amit.singh@wiet.edu',
-        'FinePerDay' => 2.00,
-        'AdmissionDate' => '2022-01-10',
-        'Override' => false,
-        'BooksIssued' => 1,
-        'ClosingDate' => null,
-        'Status' => 'Active',
-        'CreatedBy' => 1
-    ],
-    [
-        'MemberNo' => 2024004,
-        'MemberName' => 'Sneha Gupta',
-        'Group' => 'Student',
-        'Designation' => 'M.Tech Second Year',
-        'Entitlement' => 'Standard',
-        'Phone' => '9876543213',
-        'Email' => 'sneha.gupta@student.wiet.edu',
-        'FinePerDay' => 2.00,
-        'AdmissionDate' => '2023-08-20',
-        'Override' => false,
-        'BooksIssued' => 0,
-        'ClosingDate' => '2024-05-15',
-        'Status' => 'Inactive',
-        'CreatedBy' => 1
-    ]
-];
-
-// Member entitlements configuration
-$memberEntitlements = [
-    'Standard' => ['max_books' => 3, 'issue_period' => 15, 'fine_per_day' => 2.00],
-    'Faculty' => ['max_books' => 10, 'issue_period' => 30, 'fine_per_day' => 1.00],
-    'Staff' => ['max_books' => 5, 'issue_period' => 20, 'fine_per_day' => 2.00],
-    'Guest' => ['max_books' => 2, 'issue_period' => 7, 'fine_per_day' => 5.00]
-];
-?>
-
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Members Management</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        .members-header {
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #cfac69;
-        }
-
-        .members-title {
-            color: #263c79;
-            font-size: 28px;
-            font-weight: 700;
-            margin: 0 0 15px 0;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            align-items: flex-start;
-        }
-
-        /* Desktop view */
-        @media (min-width: 768px) {
-            .members-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-            
-            .members-title {
-                margin: 0;
-            }
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-            flex-shrink: 0;
-            white-space: nowrap;
-        }
-
-        .btn-primary {
-            background-color: #263c79;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background-color: #1e2d5f;
-        }
-
-        .btn-success {
-            background-color: #28a745;
-            color: white;
-        }
-
-        .btn-success:hover {
-            background-color: #218838;
-        }
-
-        .btn-info {
-            background-color: #17a2b8;
-            color: white;
-        }
-
-        .btn-info:hover {
-            background-color: #138496;
-        }
-
-        .btn-warning {
-            background-color: #ffc107;
-            color: #212529;
-        }
-
-        .btn-warning:hover {
-            background-color: #e0a800;
-        }
-
-        .btn-secondary {
-            background-color: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background-color: #5a6268;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            border-left: 4px solid #cfac69;
-        }
-
-        .stat-card.faculty {
-            border-left-color: #28a745;
-        }
-
-        .stat-card.staff {
-            border-left-color: #17a2b8;
-        }
-
-        .stat-card.inactive {
-            border-left-color: #dc3545;
-        }
-
-        .stat-number {
-            font-size: 32px;
-            font-weight: 700;
-            color: #263c79;
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            color: #6c757d;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .tabs-container {
-            margin-bottom: 20px;
-        }
-
-        .tab-buttons {
-            display: flex;
-            border-bottom: 2px solid #e9ecef;
-            margin-bottom: 20px;
-        }
-
-        .tab-btn {
-            background: none;
-            border: none;
-            padding: 12px 20px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 500;
-            color: #6c757d;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s ease;
-        }
-
-        .tab-btn.active {
-            color: #263c79;
-            border-bottom-color: #cfac69;
-            font-weight: 600;
-        }
-
-        .tab-btn:hover {
-            color: #263c79;
-            background-color: rgba(207, 172, 105, 0.1);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .search-filters {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border: 1px solid #e9ecef;
-        }
-
-        .search-row {
-            display: flex;
-            gap: 15px;
-            align-items: end;
-            flex-wrap: wrap;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            min-width: 200px;
-        }
-
-        .form-group label {
-            font-weight: 600;
-            color: #263c79;
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-
-        .form-control {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: #cfac69;
-            box-shadow: 0 0 0 2px rgba(207, 172, 105, 0.2);
-        }
-
-        .members-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .members-table th {
-            background-color: #263c79;
-            color: white;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .members-table td {
-            padding: 12px;
-            border-bottom: 1px solid #e9ecef;
-            font-size: 14px;
-        }
-
-        .members-table tr:hover {
-            background-color: rgba(207, 172, 105, 0.1);
-        }
-
-        .action-links {
-            display: flex;
-            gap: 8px;
-        }
-
-        .action-links a,
-        .action-links button {
-            padding: 4px 8px;
-            border-radius: 3px;
-            text-decoration: none;
-            font-size: 12px;
-            font-weight: 500;
-            border: none;
-            cursor: pointer;
-        }
-
-        .btn-view {
-            background-color: #17a2b8;
-            color: white;
-        }
-
-        .btn-edit {
-            background-color: #ffc107;
-            color: #212529;
-        }
-
-        .btn-delete {
-            background-color: #dc3545;
-            color: white;
-        }
-
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .status-active {
-            background-color: #d4edda;
-            color: #155724;
-        }
-
-        .status-inactive {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-
-        .status-suspended {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-
-        .group-badge {
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .group-student {
-            background-color: rgba(38, 60, 121, 0.1);
-            color: #263c79;
-        }
-
-        .group-faculty {
-            background-color: rgba(40, 167, 69, 0.1);
-            color: #28a745;
-        }
-
-        .group-staff {
-            background-color: rgba(23, 162, 184, 0.1);
-            color: #17a2b8;
-        }
-
-        .group-guest {
-            background-color: rgba(255, 193, 7, 0.1);
-            color: #ffc107;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 0;
-            border-radius: 8px;
-            width: 95%;
-            max-width: 900px;
-            max-height: 85vh;
-            overflow-y: auto;
-            margin-top: 160px;
-            position: relative;
-            z-index: 1001;
-        }
-
-        .modal-header {
-            background-color: #263c79;
-            color: white;
-            padding: 15px 20px;
-            border-radius: 8px 8px 0 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-title {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .close {
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            cursor: pointer;
-            background: none;
-            border: none;
-        }
-
-        .close:hover {
-            opacity: 0.7;
-        }
-
-        .modal-body {
-            padding: 25px;
-        }
-
-        .form-section {
-            margin-bottom: 25px;
-            padding: 20px;
-            border: 1px solid #e9ecef;
-            border-radius: 6px;
-            background: #f8f9fa;
-        }
-
-        .section-title {
-            color: #263c79;
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 15px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #cfac69;
-        }
-
-        .form-row {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-
-        .form-group-modal {
-            flex: 1;
-            min-width: 250px;
-        }
-
-        .form-group-modal label {
-            display: block;
-            font-weight: 600;
-            color: #263c79;
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-
-        .form-group-modal input,
-        .form-group-modal select,
-        .form-group-modal textarea {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-
-        .form-group-modal textarea {
-            min-height: 80px;
-            resize: vertical;
-        }
-
-        .required {
-            color: #dc3545;
-        }
-
-        .modal-footer {
-            padding: 15px 25px;
-            border-top: 1px solid #e9ecef;
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-
-        .entitlement-info {
-            background: #e7f3ff;
-            border: 1px solid #b8daff;
-            border-radius: 6px;
-            padding: 15px;
-            margin: 15px 0;
-        }
-
-        .entitlement-details {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .entitlement-item {
-            font-size: 14px;
-        }
-
-        .entitlement-label {
-            font-weight: 600;
-            color: #495057;
-        }
-
-        .entitlement-value {
-            color: #263c79;
-            font-weight: 500;
-        }
-
-        .pagination {
-            display: flex;
-            justify-content: center;
-            gap: 5px;
-            margin-top: 20px;
-        }
-
-        .page-link {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            color: #263c79;
-            text-decoration: none;
-            border-radius: 4px;
-        }
-
-        .page-link:hover,
-        .page-link.active {
-            background-color: #263c79;
-            color: white;
-        }
-
-        @media (max-width: 768px) {
-            .search-row {
-                flex-direction: column;
-            }
-
-            .form-group {
-                min-width: 100%;
-            }
-
-            .members-table {
-                font-size: 12px;
-            }
-
-            .action-buttons {
-                flex-direction: column;
-            }
-
-            .tab-buttons {
-                overflow-x: auto;
-                white-space: nowrap;
-            }
-
-            .form-row {
-                flex-direction: column;
-            }
-
-            .form-group-modal {
-                min-width: 100%;
-            }
-
-            .modal-content {
-                margin-top: 150px;
-                width: 98%;
-                max-height: 80vh;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .modal-content {
-                margin-top: 135px;
-                width: 99%;
-                max-height: 75vh;
-            }
-        }
-    </style>
-</head>
-
-<body>
-    <div class="members-header">
-        <h1 class="members-title">
-            <i class="fas fa-users"></i>
-            Members Management
-        </h1>
-        <div class="action-buttons">
-        <!-- Inline Add Member Form will be placed below stats -->
-            <button class="btn btn-info" onclick="generateMemberCards()">
-                <i class="fas fa-id-card"></i>
-                Generate Cards
-            </button>
-            <button class="btn btn-warning" onclick="bulkOperations()">
-                <i class="fas fa-tasks"></i>
-                Bulk Operations
-            </button>
-        </div>
-    </div>
-
-    <!-- Statistics Cards -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-number" id="totalMembers">-</div>
-            <div class="stat-label">Total Members</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number" id="activeMembers">-</div>
-            <div class="stat-label">Active Members</div>
-        </div>
-        <div class="stat-card faculty">
-            <div class="stat-number" id="facultyMembers">-</div>
-            <div class="stat-label">Faculty Members</div>
-        </div>
-        <div class="stat-card staff">
-            <div class="stat-number" id="staffMembers">-</div>
-            <div class="stat-label">Staff Members</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number" id="studentMembers">-</div>
-            <div class="stat-label">Student Members</div>
-        </div>
-        <div class="stat-card inactive">
-            <div class="stat-number" id="inactiveMembers">-</div>
-            <div class="stat-label">Inactive Members</div>
-        </div>
-    </div>
-
-    <!-- Inline Add Member Form -->
-    <div class="form-section" style="margin-bottom:30px;">
-        <form id="addMemberInlineForm" onsubmit="saveMemberInline(); return false;">
-            <div class="section-title">Add New Member</div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="memberNameInline">Full Name <span class="required">*</span></label>
-                    <input type="text" id="memberNameInline" name="MemberName" required>
-                </div>
-                <div class="form-group-modal">
-                    <label for="memberGroupInline">Group <span class="required">*</span></label>
-                    <select id="memberGroupInline" name="Group" required>
-                        <option value="">Select Group</option>
-                        <option value="Student">Student</option>
-                        <option value="Faculty">Faculty</option>
-                        <option value="Staff">Staff</option>
-                        <option value="Guest">Guest</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="memberDesignationInline">Designation</label>
-                    <input type="text" id="memberDesignationInline" name="Designation" placeholder="e.g., Assistant Professor, B.Tech Final Year">
-                </div>
-                <div class="form-group-modal">
-                    <label for="memberEntitlementInline">Entitlement</label>
-                    <select id="memberEntitlementInline" name="Entitlement">
-                        <option value="Standard">Standard</option>
-                        <option value="Faculty">Faculty</option>
-                        <option value="Staff">Staff</option>
-                        <option value="Guest">Guest</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="memberPhoneInline">Phone Number</label>
-                    <input type="tel" id="memberPhoneInline" name="Phone" placeholder="10-digit mobile number">
-                </div>
-                <div class="form-group-modal">
-                    <label for="memberEmailInline">Email Address</label>
-                    <input type="email" id="memberEmailInline" name="Email" placeholder="member@example.com">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="finePerDayInline">Fine Per Day (â‚¹)</label>
-                    <input type="number" id="finePerDayInline" name="FinePerDay" min="0" step="0.50" value="2.00">
-                </div>
-                <div class="form-group-modal">
-                    <label for="admissionDateInline">Admission Date</label>
-                    <input type="date" id="admissionDateInline" name="AdmissionDate" value="<?php echo date('Y-m-d'); ?>">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="overrideInline">Override</label>
-                    <select id="overrideInline" name="Override">
-                        <option value="false">No</option>
-                        <option value="true">Yes</option>
-                    </select>
-                </div>
-                <div class="form-group-modal">
-                    <label for="closingDateInline">Closing Date</label>
-                    <input type="date" id="closingDateInline" name="ClosingDate">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group-modal">
-                    <label for="statusInline">Status <span class="required">*</span></label>
-                    <select id="statusInline" name="Status" required>
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-actions" style="justify-content:center;">
-                <button type="submit" id="memberInlineSubmitBtn" class="btn btn-success">
-                    <i class="fas fa-plus"></i>
-                    Create Member
-                </button>
-            </div>
-        </form>
-    </div>
-
-    <!-- Tabs -->
-    <div class="tabs-container">
-        <div class="tab-buttons">
-            <button class="tab-btn active" onclick="showTab('all-members')">
-                <i class="fas fa-users"></i>
-                All Members
-            </button>
-            <button class="tab-btn" onclick="showTab('entitlements')">
-                <i class="fas fa-certificate"></i>
-                Entitlements
-            </button>
-            <button class="tab-btn" onclick="showTab('member-cards')">
-                <i class="fas fa-id-card"></i>
-                Member Cards
-            </button>
-            <button class="tab-btn" onclick="showTab('reports')">
-                <i class="fas fa-chart-pie"></i>
-                Reports
-            </button>
-        </div>
-
-        <!-- All Members Tab -->
-        <div id="all-members" class="tab-content active">
-            <div class="search-filters">
-                <div class="search-row">
-                    <div class="form-group">
-                        <label for="searchName">Member Name</label>
-                        <input type="text" id="searchName" class="form-control" placeholder="Search by name...">
-                    </div>
-                    <div class="form-group">
-                        <label for="searchMemberNo">Member Number</label>
-                        <input type="text" id="searchMemberNo" class="form-control" placeholder="Search by member number...">
-                    </div>
-                    <div class="form-group">
-                        <label for="searchGroup">Group</label>
-                        <select id="searchGroup" class="form-control">
-                            <option value="">All Groups</option>
-                            <option value="Student">Student</option>
-                            <option value="Faculty">Faculty</option>
-                            <option value="Staff">Staff</option>
-                            <option value="Guest">Guest</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="searchStatus">Status</label>
-                        <select id="searchStatus" class="form-control">
-                            <option value="">All Status</option>
-                            <option value="Active">Active</option>
-                            <option value="Inactive">Inactive</option>
-                            <option value="Suspended">Suspended</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>&nbsp;</label>
-                        <button type="button" class="btn btn-primary" onclick="searchMembers()">
-                            <i class="fas fa-search"></i>
-                            Search
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="membersTableContainer">
-                <!-- Members table will be loaded here -->
-                <div style="text-align: center; padding: 40px; color: #6c757d;">
-                    <i class="fas fa-spinner fa-spin" style="font-size: 24px;"></i>
-                    <p style="margin-top: 10px;">Loading members...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Entitlements Tab -->
-        <div id="entitlements" class="tab-content">
-            <div id="entitlementsContent">
-                <div style="text-align: center; padding: 40px; color: #6c757d;">
-                    <i class="fas fa-certificate" style="font-size: 48px; margin-bottom: 15px;"></i>
-                    <h3>Member Entitlements</h3>
-                    <p>Configure member privileges and borrowing limits by group.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Member Cards Tab -->
-        <div id="member-cards" class="tab-content">
-            <div id="memberCardsContent">
-                <div style="text-align: center; padding: 40px; color: #6c757d;">
-                    <i class="fas fa-id-card" style="font-size: 48px; margin-bottom: 15px;"></i>
-                    <h3>Member ID Cards</h3>
-                    <p>Generate and print member ID cards with QR codes.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Reports Tab -->
-        <div id="reports" class="tab-content">
-            <div id="reportsContent">
-                <div style="text-align: center; padding: 40px; color: #6c757d;">
-                    <i class="fas fa-chart-pie" style="font-size: 48px; margin-bottom: 15px;"></i>
-                    <h3>Member Reports</h3>
-                    <p>Generate comprehensive reports on member data and activity.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Member Modal -->
-    <div id="addMemberModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">Add New Member</h3>
-                <button class="close" onclick="closeModal('addMemberModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="addMemberForm">
-                    <!-- Basic Information Section -->
-                    <div class="form-section">
-                        <div class="section-title">
-                            <i class="fas fa-user"></i>
-                            Basic Information
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="memberName">Full Name <span class="required">*</span></label>
-                                <input type="text" id="memberName" name="MemberName" required>
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="memberGroup">Group <span class="required">*</span></label>
-                                <select id="memberGroup" name="Group" required onchange="updateEntitlementInfo()">
-                                    <option value="">Select Group</option>
-                                    <option value="Student">Student</option>
-                                    <option value="Faculty">Faculty</option>
-                                    <option value="Staff">Staff</option>
-                                    <option value="Guest">Guest</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="memberDesignation">Designation</label>
-                                <input type="text" id="memberDesignation" name="Designation" placeholder="e.g., Assistant Professor, B.Tech Final Year">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="memberEntitlement">Entitlement</label>
-                                <select id="memberEntitlement" name="Entitlement">
-                                    <option value="Standard">Standard</option>
-                                    <option value="Faculty">Faculty</option>
-                                    <option value="Staff">Staff</option>
-                                    <option value="Guest">Guest</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Contact Information Section -->
-                    <div class="form-section">
-                        <div class="section-title">
-                            <i class="fas fa-address-book"></i>
-                            Contact Information
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="memberPhone">Phone Number</label>
-                                <input type="tel" id="memberPhone" name="Phone" placeholder="10-digit mobile number">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="memberEmail">Email Address</label>
-                                <input type="email" id="memberEmail" name="Email" placeholder="member@example.com">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Library Settings Section -->
-                    <div class="form-section">
-                        <div class="section-title">
-                            <i class="fas fa-cog"></i>
-                            Library Settings
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="finePerDay">Fine Per Day (â‚¹)</label>
-                                <input type="number" id="finePerDay" name="FinePerDay" min="0" step="0.50" value="2.00">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="admissionDate">Admission Date</label>
-                                <input type="date" id="admissionDate" name="AdmissionDate" value="<?php echo date('Y-m-d'); ?>">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label>
-                                    <input type="checkbox" id="memberOverride" name="Override" value="1">
-                                    Allow Override (Admin can bypass borrowing limits)
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Entitlement Information Display -->
-                    <div id="entitlementInfo" class="entitlement-info" style="display: none;">
-                        <h4 style="color: #263c79; margin-bottom: 10px;">
-                            <i class="fas fa-info-circle"></i>
-                            Entitlement Details
-                        </h4>
-                        <div class="entitlement-details">
-                            <div class="entitlement-item">
-                                <span class="entitlement-label">Max Books:</span>
-                                <span class="entitlement-value" id="maxBooks">-</span>
-                            </div>
-                            <div class="entitlement-item">
-                                <span class="entitlement-label">Issue Period:</span>
-                                <span class="entitlement-value" id="issuePeriod">-</span>
-                            </div>
-                            <div class="entitlement-item">
-                                <span class="entitlement-label">Default Fine:</span>
-                                <span class="entitlement-value" id="defaultFine">-</span>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('addMemberModal')">Cancel</button>
-                <button type="button" class="btn btn-success" onclick="saveMember()">
-                    <i class="fas fa-save"></i>
-                    Create Member
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <script>
         // Helper function to get correct API path (works both in direct access and when loaded via layout.php)
         function getApiPath(apiFile) {
             const currentPath = window.location.pathname;
@@ -1033,7 +12,7 @@ $memberEntitlements = [
         }
         
         // Global variables
-        const memberEntitlements = <?php echo json_encode($memberEntitlements); ?>;
+        const memberEntitlements = {"Standard":{"max_books":3,"issue_period":15,"fine_per_day":2},"Faculty":{"max_books":10,"issue_period":30,"fine_per_day":1},"Staff":{"max_books":5,"issue_period":20,"fine_per_day":2},"Guest":{"max_books":2,"issue_period":7,"fine_per_day":5}};
         let selectedMembers = [];
         let csrfToken = null;
 
@@ -1065,21 +44,6 @@ $memberEntitlements = [
                 })
             });
 
-            return response.json();
-        }
-
-        async function getMembersApi(query) {
-            const separator = query.includes('?') ? '&' : '?';
-            const url = getApiPath(`${query}${separator}_t=${Date.now()}`);
-            const response = await fetch(url, {
-                method: 'GET',
-                cache: 'no-store',
-                headers: {
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0'
-                }
-            });
             return response.json();
         }
 
@@ -1191,7 +155,8 @@ $memberEntitlements = [
                 if (searchParams.group) params.append('group', searchParams.group);
                 
                 // Fetch from API
-                const result = await getMembersApi(`api/members.php?action=list&${params.toString()}`);
+                const response = await fetch(`api/members.php?action=list&${params.toString()}`);
+                const result = await response.json();
                 
                 if (!result.success) {
                     throw new Error(result.message || 'Failed to load members');
@@ -1366,7 +331,7 @@ $memberEntitlements = [
                             </div>
                             <div style="margin-bottom: 8px;">
                                 <span style="font-weight: 600; color: #495057;">Fine Per Day:</span>
-                                <span style="color: #263c79; font-weight: 500;">â‚¹${details.fine_per_day}</span>
+                                <span style="color: #263c79; font-weight: 500;">Gé¦${details.fine_per_day}</span>
                             </div>
                         </div>
                         <button class="btn btn-primary" onclick="editEntitlement('${entitlement}')" style="width: 100%;">
@@ -1487,7 +452,7 @@ $memberEntitlements = [
                     // Show entitlement info
                     document.getElementById('maxBooks').textContent = memberEntitlements[entitlement].max_books;
                     document.getElementById('issuePeriod').textContent = memberEntitlements[entitlement].issue_period + ' days';
-                    document.getElementById('defaultFine').textContent = 'â‚¹' + memberEntitlements[entitlement].fine_per_day;
+                    document.getElementById('defaultFine').textContent = 'Gé¦' + memberEntitlements[entitlement].fine_per_day;
 
                     entitlementInfo.style.display = 'block';
                 }
@@ -1534,7 +499,8 @@ $memberEntitlements = [
         // Member actions
         async function viewMember(memberNo) {
             try {
-                const result = await getMembersApi(`api/members.php?action=get&memberNo=${memberNo}`);
+                const response = await fetch(`api/members.php?action=get&memberNo=${memberNo}`);
+                const result = await response.json();
 
                 if (result.success) {
                     const member = result.data;
@@ -1560,7 +526,8 @@ $memberEntitlements = [
 
         async function editMember(memberNo) {
             try {
-                const result = await getMembersApi(`api/members.php?action=get&memberNo=${memberNo}`);
+                const response = await fetch(`api/members.php?action=get&memberNo=${memberNo}`);
+                const result = await response.json();
 
                 if (result.success) {
                     const member = result.data;
@@ -1664,7 +631,8 @@ $memberEntitlements = [
                     break;
                 case '4':
                     {
-                        const result = await getMembersApi('api/members.php?action=list');
+                        const response = await fetch(getApiPath('api/members.php?action=list'));
+                        const result = await response.json();
                         if (!result.success) {
                             throw new Error(result.message || 'Unable to fetch members');
                         }
@@ -1690,7 +658,7 @@ $memberEntitlements = [
             const details = memberEntitlements[entitlement];
             const newMaxBooks = prompt(`Edit ${entitlement} Entitlement\n\nCurrent Max Books: ${details.max_books}\nEnter new value:`, details.max_books);
             const newPeriod = prompt(`Current Issue Period: ${details.issue_period} days\nEnter new value:`, details.issue_period);
-            const newFine = prompt(`Current Fine Per Day: â‚¹${details.fine_per_day}\nEnter new value:`, details.fine_per_day);
+            const newFine = prompt(`Current Fine Per Day: Gé¦${details.fine_per_day}\nEnter new value:`, details.fine_per_day);
             
             if (newMaxBooks && newPeriod && newFine) {
                 memberEntitlements[entitlement] = {
@@ -1737,17 +705,16 @@ $memberEntitlements = [
                 return;
             }
 
-            const result = await getMembersApi('api/members.php?action=list&status=Active');
+            const response = await fetch(getApiPath('api/members.php?action=list&status=Active'));
+            const result = await response.json();
             if (!result.success || !result.data?.length) {
                 alert('No active members found.');
                 return;
             }
 
             const printWindow = window.open('', '_blank');
-            printWindow.document.open();
-            printWindow.document.write('<!doctype html><meta charset="utf-8"><title>Member Cards</title>');
+            printWindow.document.write(`<html><head><title>Member Cards</title></head><body>${buildPrintableCards(result.data)}</body></html>`);
             printWindow.document.close();
-            printWindow.document.body.innerHTML = buildPrintableCards(result.data);
             printWindow.focus();
             printWindow.print();
         }
@@ -1762,7 +729,8 @@ $memberEntitlements = [
                 return;
             }
 
-            const result = await getMembersApi('api/members.php?action=list');
+            const response = await fetch(getApiPath('api/members.php?action=list'));
+            const result = await response.json();
             if (!result.success) {
                 alert(result.message || 'Could not load members');
                 return;
@@ -1775,10 +743,8 @@ $memberEntitlements = [
             }
 
             const printWindow = window.open('', '_blank');
-            printWindow.document.open();
-            printWindow.document.write('<!doctype html><meta charset="utf-8"><title>Selected Member Cards</title>');
+            printWindow.document.write(`<html><head><title>Selected Member Cards</title></head><body>${buildPrintableCards(members)}</body></html>`);
             printWindow.document.close();
-            printWindow.document.body.innerHTML = buildPrintableCards(members);
             printWindow.focus();
             printWindow.print();
         }
@@ -1792,7 +758,8 @@ $memberEntitlements = [
         }
 
         async function generateReport(reportType) {
-            const result = await getMembersApi('api/members.php?action=list');
+            const response = await fetch(getApiPath('api/members.php?action=list'));
+            const result = await response.json();
             if (!result.success) {
                 alert(result.message || 'Unable to generate report');
                 return;
@@ -1875,7 +842,8 @@ $memberEntitlements = [
             }
             
             try {
-                const result = await getMembersApi('api/members.php?action=list');
+                const response = await fetch(getApiPath('api/members.php?action=list'));
+                const result = await response.json();
                 
                 if (result.success) {
                     const members = result.data || [];
@@ -1916,12 +884,6 @@ $memberEntitlements = [
                 }
             } catch (error) {
                 console.error('Error loading statistics:', error);
-                document.getElementById('totalMembers').textContent = '0';
-                document.getElementById('activeMembers').textContent = '0';
-                document.getElementById('facultyMembers').textContent = '0';
-                document.getElementById('staffMembers').textContent = '0';
-                document.getElementById('studentMembers').textContent = '0';
-                document.getElementById('inactiveMembers').textContent = '0';
             }
         }
 
@@ -1949,7 +911,4 @@ $memberEntitlements = [
         } else {
             initMembersPage();
         }
-    </script>
-</body>
-
-</html>
+    

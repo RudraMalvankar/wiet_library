@@ -512,7 +512,7 @@ $is_superadmin = $current_admin['is_superadmin'];
     <aside class="sidebar" id="sidebar">
       <ul class="sidebar-menu">
         <li class="sidebar-item">
-          <a href="#dashboard.php" class="sidebar-link" data-page="dashboard">
+          <a href="#dashboard" class="sidebar-link" data-page="dashboard">
             <i class="sidebar-icon fas fa-tachometer-alt"></i>
             <span>Dashboard</span>
           </a>
@@ -552,6 +552,7 @@ $is_superadmin = $current_admin['is_superadmin'];
             <i class="sidebar-icon fas fa-users"></i>
             <span>Members</span>
           </a>
+        </li>
         <!-- </li>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="book-assignments">
@@ -711,6 +712,14 @@ $is_superadmin = $current_admin['is_superadmin'];
       // Track current page
       let currentPage = null;
 
+      function normalizePageName(page) {
+        const rawPage = (page || '').toString().replace(/^#/, '').trim();
+        if (!rawPage) {
+          return 'dashboard';
+        }
+        return rawPage.replace(/\.php$/i, '');
+      }
+
       // Sidebar navigation
       sidebarLinks.forEach(link => {
         link.addEventListener('click', function(e) {
@@ -723,12 +732,11 @@ $is_superadmin = $current_admin['is_superadmin'];
           this.classList.add('active');
 
           // Get the page data attribute
-          const page = this.getAttribute('data-page');
+          const page = normalizePageName(this.getAttribute('data-page'));
 
-          // Check if this is the same page - skip reload
-          if (currentPage === page) {
-            console.log(`Already on page: ${page}, skipping reload`);
-            return;
+          // Reload even when clicking the active page so modules can reinitialize
+          if (currentPage === page && mainContent.getAttribute('data-loaded-page') === page) {
+            console.log(`Reloading current page: ${page}`);
           }
 
           // Update URL hash to maintain state
@@ -746,6 +754,8 @@ $is_superadmin = $current_admin['is_superadmin'];
 
       // Function to load page content (you can modify this for PHP includes)
       function loadPage(page) {
+        page = normalizePageName(page);
+
         // NOTE: Page caching disabled - relying on sessionStorage cache for statistics instead
         // This ensures scripts always execute fresh and prevents stale content issues
         
@@ -811,6 +821,7 @@ $is_superadmin = $current_admin['is_superadmin'];
             
             // Insert the new content
             mainContent.innerHTML = html;
+            mainContent.setAttribute('data-loaded-page', page);
             currentPage = page;
             console.log(`✅ Page ${page} loaded successfully`);
             
@@ -833,6 +844,7 @@ $is_superadmin = $current_admin['is_superadmin'];
           })
           .catch(error => {
             console.error('Error loading page:', error);
+            mainContent.removeAttribute('data-loaded-page');
             const errorMessage = error.message || 'Unknown error occurred';
             mainContent.innerHTML = `
               <div style="text-align: center; padding: 40px; color: #d63384; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); margin: 20px;">
@@ -869,7 +881,7 @@ $is_superadmin = $current_admin['is_superadmin'];
 
       // Check if there's a hash in URL to determine current page
       if (window.location.hash) {
-        currentPage = window.location.hash.substring(1);
+        currentPage = normalizePageName(window.location.hash.substring(1));
       }
 
       // Set correct active state on page load

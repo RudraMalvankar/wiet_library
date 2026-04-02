@@ -278,6 +278,19 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             border-bottom: 2px solid #cfac69;
         }
 
+        .chart-canvas-wrapper {
+            position: relative;
+            width: 100%;
+            height: 320px;
+            max-height: 320px;
+        }
+
+        .chart-canvas-wrapper canvas {
+            width: 100% !important;
+            height: 100% !important;
+            max-height: 320px;
+        }
+
         .data-table {
             width: 100%;
             border-collapse: collapse;
@@ -530,7 +543,10 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
             // Show selected tab
             document.getElementById(tab).classList.add('active');
-            event.target.closest('.tab').classList.add('active');
+            const activeTabButton = document.querySelector(`.tab[onclick=\"switchTab('${tab}')\"]`);
+            if (activeTabButton) {
+                activeTabButton.classList.add('active');
+            }
 
             // Destroy existing charts
             currentCharts.forEach(chart => chart.destroy());
@@ -598,7 +614,9 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             const html = `
                 <div class="chart-container">
                     <h3>Daily Circulation Trend</h3>
-                    <canvas id="circTrendChart" height="80"></canvas>
+                    <div class="chart-canvas-wrapper">
+                        <canvas id="circTrendChart"></canvas>
+                    </div>
                 </div>
             `;
             document.getElementById('circ_charts').innerHTML = html;
@@ -716,7 +734,9 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             const html = `
                 <div class="chart-container">
                     <h3>Daily Collection Trend</h3>
-                    <canvas id="finTrendChart" height="80"></canvas>
+                    <div class="chart-canvas-wrapper">
+                        <canvas id="finTrendChart"></canvas>
+                    </div>
                 </div>
             `;
             document.getElementById('fin_charts').innerHTML = html;
@@ -827,7 +847,9 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             const html = `
                 <div class="chart-container">
                     <h3>Category-wise Stock</h3>
-                    <canvas id="invCategoryChart" height="80"></canvas>
+                    <div class="chart-canvas-wrapper">
+                        <canvas id="invCategoryChart"></canvas>
+                    </div>
                 </div>
             `;
             document.getElementById('inv_charts').innerHTML = html;
@@ -936,7 +958,9 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             const html = `
                 <div class="chart-container">
                     <h3>Department-wise Distribution</h3>
-                    <canvas id="memDeptChart" height="80"></canvas>
+                    <div class="chart-canvas-wrapper">
+                        <canvas id="memDeptChart"></canvas>
+                    </div>
                 </div>
             `;
             document.getElementById('mem_charts').innerHTML = html;

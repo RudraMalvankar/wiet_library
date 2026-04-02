@@ -32,6 +32,10 @@ function buildFullName($firstName, $middleName, $lastName): string {
 // Start session for authentication and CSRF
 session_start();
 
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
+    sendJson(['success' => false, 'message' => 'Authentication required'], 401);
+}
+
 // Rate limiting check
 $identifier = $_SESSION['AdminID'] ?? $_SESSION['admin_id'] ?? $_SERVER['REMOTE_ADDR'];
 if (!checkRateLimit($identifier, 100, 60)) {
@@ -40,12 +44,17 @@ if (!checkRateLimit($identifier, 100, 60)) {
 
 // Get request method and action
 $method = $_SERVER['REQUEST_METHOD'];
-$action = $_GET['action'] ?? '';
+$rawInput = file_get_contents('php://input');
+$jsonData = json_decode($rawInput, true);
+if (!is_array($jsonData)) {
+    $jsonData = [];
+}
+
+$action = $_GET['action'] ?? $_POST['action'] ?? ($jsonData['action'] ?? '');
 
 // CSRF validation for POST/PUT/DELETE requests
 if (in_array($method, ['POST', 'PUT', 'DELETE'])) {
-    $data = json_decode(file_get_contents('php://input'), true);
-    $csrfToken = $data['csrf_token'] ?? $_POST['csrf_token'] ?? '';
+    $csrfToken = $jsonData['csrf_token'] ?? $_POST['csrf_token'] ?? '';
     
     if (!validateCSRFToken($csrfToken)) {
         sendJson(['success' => false, 'message' => 'Invalid CSRF token. Please refresh the page.'], 403);
@@ -157,7 +166,7 @@ try {
                 sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
             }
             
-            $data = json_decode(file_get_contents('php://input'), true);
+            $data = $jsonData;
 
             $composedName = buildFullName(
                 $data['FirstName'] ?? '',
@@ -260,7 +269,7 @@ try {
                 sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
             }
             
-            $data = json_decode(file_get_contents('php://input'), true);
+            $data = $jsonData;
             $memberNo = $data['MemberNo'] ?? 0;
 
             $composedName = buildFullName(
@@ -301,6 +310,42 @@ try {
             
             sendJson(['success' => true, 'message' => 'Member updated successfully']);
             break;
+
+        case 'bulk_member_status':
+            if ($method !== 'POST') {
+                sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
+            }
+
+            $memberNos = $jsonData['memberNos'] ?? [];
+            $status = trim((string)($jsonData['status'] ?? ''));
+
+            if (!is_array($memberNos) || count($memberNos) === 0) {
+                sendJson(['success' => false, 'message' => 'No members selected'], 400);
+            }
+
+            if (!in_array($status, ['Active', 'Inactive', 'Suspended'], true)) {
+                sendJson(['success' => false, 'message' => 'Invalid status'], 400);
+            }
+
+            $cleanNos = array_values(array_filter(array_map('intval', $memberNos), function ($no) {
+                return $no > 0;
+            }));
+
+            if (count($cleanNos) === 0) {
+                sendJson(['success' => false, 'message' => 'No valid member numbers provided'], 400);
+            }
+
+            $placeholders = implode(',', array_fill(0, count($cleanNos), '?'));
+            $params = array_merge([$status], $cleanNos);
+            $stmt = $pdo->prepare("UPDATE Member SET Status = ? WHERE MemberNo IN ($placeholders)");
+            $stmt->execute($params);
+
+            sendJson([
+                'success' => true,
+                'message' => 'Status updated successfully',
+                'updated' => $stmt->rowCount()
+            ]);
+            break;
             
         case 'delete':
             // Delete member (only if no active circulations)
@@ -308,7 +353,7 @@ try {
                 sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
             }
             
-            $data = json_decode(file_get_contents('php://input'), true);
+            $data = $jsonData;
             $memberNo = $data['MemberNo'] ?? 0;
             
             // Check for active circulations
@@ -541,6 +586,196 @@ try {
             
             sendJson(['success' => true, 'data' => $student]);
             break;
+
+        case 'update_student':
+            if ($method !== 'POST') {
+                sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
+            }
+
+            $payload = array_merge($jsonData, $_POST);
+            $studentId = (int)($payload['StudentID'] ?? $payload['studentId'] ?? 0);
+
+            if ($studentId <= 0) {
+                sendJson(['success' => false, 'message' => 'Student ID is required'], 400);
+            }
+
+            $stmt = $pdo->prepare("\n                SELECT s.StudentID, s.MemberNo, s.Surname, s.MiddleName, s.FirstName, s.DOB, s.Gender, s.BloodGroup,\n                       s.Branch, s.CourseName, s.ValidTill, s.PRN, s.Mobile, s.Email, s.Address, s.CardColour, s.Photo,\n                       m.MemberName, m.Phone, m.Email AS MemberEmail, m.Status, m.Designation\n                FROM Student s\n                INNER JOIN Member m ON s.MemberNo = m.MemberNo\n                WHERE s.StudentID = ?\n            ");
+            $stmt->execute([$studentId]);
+            $existing = $stmt->fetch();
+
+            if (!$existing) {
+                sendJson(['success' => false, 'message' => 'Student not found'], 404);
+            }
+
+            $surname = normalizeNamePart($payload['Surname'] ?? $existing['Surname']);
+            $middleName = normalizeNamePart($payload['MiddleName'] ?? $existing['MiddleName']);
+            $firstName = normalizeNamePart($payload['FirstName'] ?? $existing['FirstName']);
+
+            if ($firstName === '') {
+                sendJson(['success' => false, 'message' => 'First name is required'], 400);
+            }
+
+            $prn = trim((string)($payload['PRN'] ?? $existing['PRN']));
+            $branch = trim((string)($payload['Branch'] ?? $existing['Branch']));
+
+            if ($prn === '' || $branch === '') {
+                sendJson(['success' => false, 'message' => 'PRN and Branch are required'], 400);
+            }
+
+            $mobile = trim((string)($payload['Mobile'] ?? $payload['Phone'] ?? $existing['Mobile'] ?? $existing['Phone']));
+            $email = trim((string)($payload['Email'] ?? $payload['StudentEmail'] ?? $existing['Email'] ?? $existing['MemberEmail']));
+            $memberName = normalizeNamePart($payload['MemberName'] ?? buildFullName($firstName, $middleName, $surname));
+            if ($memberName === '') {
+                $memberName = $existing['MemberName'];
+            }
+
+            $status = trim((string)($payload['Status'] ?? $existing['Status']));
+            $allowedStatuses = ['Active', 'Inactive', 'Suspended'];
+            if (!in_array($status, $allowedStatuses, true)) {
+                $status = $existing['Status'];
+            }
+
+            $photoData = $existing['Photo'];
+            if (isset($_FILES['Photo']) && $_FILES['Photo']['error'] === UPLOAD_ERR_OK) {
+                $photoData = file_get_contents($_FILES['Photo']['tmp_name']);
+            }
+
+            $pdo->beginTransaction();
+
+            try {
+                $stmt = $pdo->prepare("\n                    UPDATE Member\n                    SET MemberName = ?, Phone = ?, Email = ?, Status = ?, Designation = ?\n                    WHERE MemberNo = ?\n                ");
+                $stmt->execute([
+                    $memberName,
+                    $mobile !== '' ? $mobile : null,
+                    $email !== '' ? $email : null,
+                    $status,
+                    $payload['Designation'] ?? $existing['Designation'],
+                    $existing['MemberNo']
+                ]);
+
+                $stmt = $pdo->prepare("\n                    UPDATE Student\n                    SET Surname = ?, MiddleName = ?, FirstName = ?, DOB = ?, Gender = ?, BloodGroup = ?,\n                        Branch = ?, CourseName = ?, ValidTill = ?, PRN = ?, Mobile = ?, Email = ?, Address = ?,\n                        CardColour = ?, Photo = ?\n                    WHERE StudentID = ?\n                ");
+                $stmt->execute([
+                    $surname,
+                    $middleName !== '' ? $middleName : null,
+                    $firstName,
+                    $payload['DOB'] ?? $existing['DOB'],
+                    $payload['Gender'] ?? $existing['Gender'],
+                    $payload['BloodGroup'] ?? $existing['BloodGroup'],
+                    $branch,
+                    $payload['CourseName'] ?? $existing['CourseName'],
+                    $payload['ValidTill'] ?? $existing['ValidTill'],
+                    $prn,
+                    $mobile !== '' ? $mobile : null,
+                    $email !== '' ? $email : null,
+                    $payload['Address'] ?? $existing['Address'],
+                    $payload['CardColour'] ?? $existing['CardColour'],
+                    $photoData,
+                    $studentId
+                ]);
+
+                $pdo->commit();
+                sendJson(['success' => true, 'message' => 'Student updated successfully']);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+            break;
+
+        case 'bulk_student_status':
+            if ($method !== 'POST') {
+                sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
+            }
+
+            $studentIds = $jsonData['studentIds'] ?? [];
+            $status = trim((string)($jsonData['status'] ?? ''));
+
+            if (!is_array($studentIds) || count($studentIds) === 0) {
+                sendJson(['success' => false, 'message' => 'No students selected'], 400);
+            }
+
+            if (!in_array($status, ['Active', 'Inactive', 'Suspended'], true)) {
+                sendJson(['success' => false, 'message' => 'Invalid status'], 400);
+            }
+
+            $cleanIds = array_values(array_filter(array_map('intval', $studentIds), function ($id) {
+                return $id > 0;
+            }));
+
+            if (count($cleanIds) === 0) {
+                sendJson(['success' => false, 'message' => 'No valid student IDs provided'], 400);
+            }
+
+            $placeholders = implode(',', array_fill(0, count($cleanIds), '?'));
+            $stmt = $pdo->prepare("SELECT MemberNo FROM Student WHERE StudentID IN ($placeholders)");
+            $stmt->execute($cleanIds);
+            $memberNos = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            if (count($memberNos) === 0) {
+                sendJson(['success' => false, 'message' => 'No matching students found'], 404);
+            }
+
+            $memberPlaceholders = implode(',', array_fill(0, count($memberNos), '?'));
+            $updateParams = array_merge([$status], $memberNos);
+            $stmt = $pdo->prepare("UPDATE Member SET Status = ? WHERE MemberNo IN ($memberPlaceholders)");
+            $stmt->execute($updateParams);
+
+            sendJson([
+                'success' => true,
+                'message' => 'Status updated successfully',
+                'updated' => $stmt->rowCount()
+            ]);
+            break;
+
+        case 'bulk_extend_membership':
+            if ($method !== 'POST') {
+                sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
+            }
+
+            $studentIds = $jsonData['studentIds'] ?? [];
+            $months = (int)($jsonData['months'] ?? 12);
+
+            if (!is_array($studentIds) || count($studentIds) === 0) {
+                sendJson(['success' => false, 'message' => 'No students selected'], 400);
+            }
+
+            if ($months < 1 || $months > 60) {
+                sendJson(['success' => false, 'message' => 'Invalid extension period'], 400);
+            }
+
+            $cleanIds = array_values(array_filter(array_map('intval', $studentIds), function ($id) {
+                return $id > 0;
+            }));
+
+            if (count($cleanIds) === 0) {
+                sendJson(['success' => false, 'message' => 'No valid student IDs provided'], 400);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $extended = 0;
+                $updateStmt = $pdo->prepare("\n                    UPDATE Student\n                    SET ValidTill = CASE\n                        WHEN ValidTill IS NULL OR ValidTill < CURDATE() THEN DATE_ADD(CURDATE(), INTERVAL ? MONTH)\n                        ELSE DATE_ADD(ValidTill, INTERVAL ? MONTH)\n                    END\n                    WHERE StudentID = ?\n                ");
+                $statusStmt = $pdo->prepare("\n                    UPDATE Member m\n                    INNER JOIN Student s ON m.MemberNo = s.MemberNo\n                    SET m.Status = 'Active'\n                    WHERE s.StudentID = ?\n                ");
+
+                foreach ($cleanIds as $id) {
+                    $updateStmt->execute([$months, $months, $id]);
+                    if ($updateStmt->rowCount() > 0) {
+                        $extended++;
+                    }
+                    $statusStmt->execute([$id]);
+                }
+
+                $pdo->commit();
+
+                sendJson([
+                    'success' => true,
+                    'message' => 'Membership validity updated successfully',
+                    'updated' => $extended
+                ]);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+            break;
             
         case 'delete_student':
             // Delete student and associated member
@@ -548,7 +783,7 @@ try {
                 sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
             }
             
-            $data = json_decode(file_get_contents('php://input'), true);
+            $data = $jsonData;
             $studentId = $data['studentId'] ?? 0;
             
             if (!$studentId) {

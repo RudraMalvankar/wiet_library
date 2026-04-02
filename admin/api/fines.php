@@ -79,27 +79,36 @@ switch ($action) {
                     c.IssueDate,
                     c.DueDate,
                     r.ReturnDate,
-                    r.FineAmount as Fine,
-                    DATEDIFF(r.ReturnDate, c.DueDate) as DaysOverdue,
+                    CASE 
+                        WHEN r.CirculationID IS NOT NULL THEN r.FineAmount
+                        ELSE GREATEST(DATEDIFF(CURDATE(), c.DueDate), 0) * COALESCE(m.FinePerDay, 2)
+                    END as Fine,
+                    CASE 
+                        WHEN r.CirculationID IS NOT NULL THEN GREATEST(DATEDIFF(r.ReturnDate, c.DueDate), 0)
+                        ELSE GREATEST(DATEDIFF(CURDATE(), c.DueDate), 0)
+                    END as DaysOverdue,
                     m.MemberName,
                     b.Title,
                     COALESCE(SUM(fp.PaidAmount), 0) as PaidAmount
                 FROM Circulation c
-                INNER JOIN `Return` r ON c.CirculationID = r.CirculationID
                 INNER JOIN Member m ON c.MemberNo = m.MemberNo
+                LEFT JOIN `Return` r ON c.CirculationID = r.CirculationID
                 LEFT JOIN Holding h ON c.AccNo = h.AccNo
                 LEFT JOIN Books b ON h.CatNo = b.CatNo
                 LEFT JOIN FinePayments fp ON c.CirculationID = fp.CirculationID
-                WHERE r.FineAmount > 0
+                WHERE (
+                    (r.CirculationID IS NOT NULL AND r.FineAmount > 0)
+                    OR (r.CirculationID IS NULL AND c.DueDate < CURDATE())
+                )
             ";
             
             if ($search) {
                 $sql .= " AND (c.MemberNo LIKE ? OR m.MemberName LIKE ? OR c.AccNo LIKE ? OR b.Title LIKE ?)";
             }
             
-            $sql .= " GROUP BY c.CirculationID
-                     HAVING r.FineAmount > COALESCE(SUM(fp.PaidAmount), 0)
-                     ORDER BY r.ReturnDate DESC";
+            $sql .= " GROUP BY c.CirculationID, c.MemberNo, c.AccNo, c.IssueDate, c.DueDate, r.CirculationID, r.ReturnDate, r.FineAmount, m.MemberName, b.Title, m.FinePerDay
+                     HAVING Fine > COALESCE(SUM(fp.PaidAmount), 0)
+                     ORDER BY COALESCE(r.ReturnDate, CURDATE()) DESC";
             
             $stmt = $pdo->prepare($sql);
             

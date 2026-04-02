@@ -550,10 +550,10 @@ switch ($action) {
             // Book Condition Distribution
             $stmt = $pdo->query("
                 SELECT 
-                    COALESCE(Condition, 'Good') as Condition,
+                    COALESCE(h.`Condition`, 'Good') as `Condition`,
                     COUNT(*) as count
-                FROM Holding
-                GROUP BY Condition
+                FROM Holding h
+                GROUP BY h.`Condition`
             ");
             $conditions = $stmt->fetchAll(PDO::FETCH_ASSOC);
             

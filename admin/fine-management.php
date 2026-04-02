@@ -768,6 +768,23 @@ try {
 
     <script>
         let currentFineData = null;
+        let finesCsrfToken = '';
+
+        async function getFinesCsrfToken() {
+            if (finesCsrfToken) {
+                return finesCsrfToken;
+            }
+
+            const response = await fetch('api/fines.php?action=get-csrf-token');
+            const result = await response.json();
+
+            if (!result.success || !result.token) {
+                throw new Error(result.message || 'Failed to load CSRF token');
+            }
+
+            finesCsrfToken = result.token;
+            return finesCsrfToken;
+        }
 
         // Load pending fines
         async function loadPendingFines() {
@@ -797,7 +814,7 @@ try {
                                     <small>AccNo: ${fine.AccNo}</small>
                                 </td>
                                 <td>${new Date(fine.IssueDate).toLocaleDateString('en-IN')}</td>
-                                <td>${new Date(fine.ReturnDate).toLocaleDateString('en-IN')}</td>
+                                <td>${fine.ReturnDate ? new Date(fine.ReturnDate).toLocaleDateString('en-IN') : 'Not Returned'}</td>
                                 <td>${fine.DaysOverdue || 0} days</td>
                                 <td>
                                     <strong>₹${fineAmount.toFixed(2)}</strong><br>
@@ -859,7 +876,7 @@ try {
                 </div>
                 <div class="info-item">
                     <span class="info-label">Return Date</span>
-                    <span class="info-value">${new Date(fine.ReturnDate).toLocaleDateString('en-IN')}</span>
+                    <span class="info-value">${fine.ReturnDate ? new Date(fine.ReturnDate).toLocaleDateString('en-IN') : 'Not Returned'}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Days Overdue</span>
@@ -883,6 +900,8 @@ try {
             };
 
             try {
+                data.csrf_token = await getFinesCsrfToken();
+
                 const response = await fetch('api/fines.php?action=collect', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -924,6 +943,8 @@ try {
             };
 
             try {
+                data.csrf_token = await getFinesCsrfToken();
+
                 const response = await fetch('api/fines.php?action=waive', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1096,7 +1117,10 @@ try {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             
-            event.target.classList.add('active');
+            const activeButton = document.querySelector(`.tab-btn[onclick=\"showTab('${tabName}')\"]`);
+            if (activeButton) {
+                activeButton.classList.add('active');
+            }
             document.getElementById(tabName + 'Tab').classList.add('active');
 
             if (tabName === 'pending') {
