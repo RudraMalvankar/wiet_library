@@ -1,0 +1,29 @@
+{
+    "timestamp":  "2026-04-02_224202",
+    "php_total":  152,
+    "php_failed":  0,
+    "http_total":  95,
+    "http_fatal":  5,
+    "http_status_2xx":  24,
+    "http_status_3xx":  0,
+    "http_status_4xx":  35,
+    "http_status_5xx":  0,
+    "security_hits":  76,
+    "security_dangerous":  48,
+    "security_weak_hash":  11,
+    "security_sql_concat":  null,
+    "security_debug":  16,
+    "security_secret_candidates":  0,
+    "forms_total":  0,
+    "forms_without_csrf_marker":  0,
+    "mobile_tsc_exit":  0,
+    "mobile_npm_audit_exit":  0,
+    "artifacts":  {
+                      "csrf_csv":  "full_form_csrf_heuristic_2026-04-02_224202.csv",
+                      "mobile_tsc_txt":  "full_mobile_tsc_2026-04-02_224202.txt",
+                      "security_csv":  "full_security_patterns_2026-04-02_224202.csv",
+                      "mobile_npm_audit_json":  "full_mobile_npm_audit_2026-04-02_224202.json",
+                      "php_lint_csv":  "full_php_lint_2026-04-02_224202.csv",
+                      "http_matrix_csv":  "full_http_matrix_2026-04-02_224202.csv"
+                  }
+}
