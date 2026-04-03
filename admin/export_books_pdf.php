@@ -1,7 +1,7 @@
 <?php
 /**
- * Books PDF Export
- * Generates comprehensive PDF report of all books in library
+ * Books Export (Print-to-PDF)
+ * Renders a print-friendly HTML report that can be saved as PDF from browser print dialog.
  */
 
 session_start();
@@ -30,14 +30,10 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute();
 $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Set headers for PDF download
-header('Content-Type: application/pdf');
-header('Content-Disposition: attachment; filename="library_books_catalog_' . date('Y-m-d') . '.pdf"');
-
-// Generate PDF using basic HTML to PDF conversion
-// For better PDF generation, you can integrate TCPDF or FPDF library
-
-// Simple HTML template that browsers can print to PDF
+// Serve as HTML so browser can render and print/save as PDF.
+header('Content-Type: text/html; charset=UTF-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
 ?>
 <!DOCTYPE html>
 <html>
@@ -47,12 +43,12 @@ header('Content-Disposition: attachment; filename="library_books_catalog_' . dat
     <style>
         @page {
             size: A4;
-            margin: 20mm;
+            margin: 12mm;
         }
         
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
-            font-size: 10pt;
+            font-size: 9.5pt;
             line-height: 1.4;
             color: #333;
         }
@@ -67,7 +63,7 @@ header('Content-Disposition: attachment; filename="library_books_catalog_' . dat
         .header h1 {
             color: #263c79;
             margin: 0 0 5px 0;
-            font-size: 24pt;
+            font-size: 20pt;
         }
         
         .header h2 {
@@ -92,6 +88,7 @@ header('Content-Disposition: attachment; filename="library_books_catalog_' . dat
             margin-bottom: 25px;
             display: table;
             width: 100%;
+            page-break-inside: avoid;
         }
         
         .summary-stats .stat {
@@ -114,27 +111,33 @@ header('Content-Disposition: attachment; filename="library_books_catalog_' . dat
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
-            page-break-inside: avoid;
+            table-layout: fixed;
+            page-break-inside: auto;
         }
         
         thead {
             background: #263c79;
             color: white;
+            display: table-header-group;
         }
         
         th {
             padding: 8px 5px;
             text-align: left;
-            font-size: 9pt;
+            font-size: 8.5pt;
             font-weight: bold;
             border: 1px solid #1a2a5a;
+            page-break-inside: avoid;
         }
         
         td {
             padding: 6px 5px;
             border: 1px solid #ddd;
-            font-size: 9pt;
+            font-size: 8.5pt;
             vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+            page-break-inside: avoid;
         }
         
         tr:nth-child(even) {
@@ -145,9 +148,7 @@ header('Content-Disposition: attachment; filename="library_books_catalog_' . dat
             background-color: #e9ecef;
         }
         
-        .book-row {
-            page-break-inside: avoid;
-        }
+        .book-row { page-break-inside: avoid; page-break-after: auto; }
         
         .book-title {
             font-weight: bold;
@@ -179,15 +180,26 @@ header('Content-Disposition: attachment; filename="library_books_catalog_' . dat
         }
         
         @media print {
-            .page-break {
-                page-break-after: always;
+            html, body {
+                width: 210mm;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            table {
+                page-break-inside: auto;
+            }
+
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
             }
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>📚 WIET Library</h1>
+        <h1>WIET Library</h1>
         <h2>Books Catalog - Complete Collection</h2>
     </div>
     

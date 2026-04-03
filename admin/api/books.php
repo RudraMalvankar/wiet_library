@@ -81,7 +81,6 @@ function generate_qr_file($text) {
             imagestring($img, 3, 10, $size - 18, (string)$text, $black);
         }
         imagepng($img, $filename);
-        imagedestroy($img);
         return $filename;
     }
     // last resort
@@ -144,7 +143,6 @@ function generate_qr_png($text) {
         ob_start();
         imagepng($img);
         $png = ob_get_clean();
-        imagedestroy($img);
         return $png;
     }
 
@@ -322,6 +320,45 @@ try {
                 }
                 if (empty($data) && !empty($_REQUEST)) {
                     $data = $_REQUEST;
+                }
+
+                // Compatibility normalization for legacy/lowercase payloads.
+                $fieldMap = [
+                    'title' => 'Title',
+                    'subtitle' => 'SubTitle',
+                    'vartitle' => 'VarTitle',
+                    'author1' => 'Author1',
+                    'author2' => 'Author2',
+                    'author3' => 'Author3',
+                    'corpauthor' => 'CorpAuthor',
+                    'editors' => 'Editors',
+                    'publisher' => 'Publisher',
+                    'place' => 'Place',
+                    'year' => 'Year',
+                    'edition' => 'Edition',
+                    'vol' => 'Vol',
+                    'pages' => 'Pages',
+                    'isbn' => 'ISBN',
+                    'subject' => 'Subject',
+                    'keywords' => 'Keywords',
+                    'language' => 'Language',
+                    'format' => 'Format',
+                    'price' => 'ItemPrice',
+                    'itemprice' => 'ItemPrice',
+                    'itemcost' => 'ItemCost',
+                    'currency' => 'Currency',
+                    'source' => 'Source',
+                    'modeofacquisition' => 'ModeOfAcquisition',
+                    'mode_of_acquisition' => 'ModeOfAcquisition',
+                    'billno' => 'BillNo',
+                    'bill_no' => 'BillNo',
+                    'billdate' => 'BillDate',
+                    'bill_date' => 'BillDate'
+                ];
+                foreach ($fieldMap as $from => $to) {
+                    if (!isset($data[$to]) && isset($data[$from])) {
+                        $data[$to] = $data[$from];
+                    }
                 }
 
                 if (empty($data['Title'])) {

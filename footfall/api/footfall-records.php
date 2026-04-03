@@ -21,18 +21,18 @@ $offset = ($page - 1) * $limit;
 
 try {
     // Build WHERE clause
-    $whereClause = "DATE(EntryTime) BETWEEN :date_from AND :date_to";
+    $whereClause = "DATE(f.EntryTime) BETWEEN :date_from AND :date_to";
     $params = ['date_from' => $dateFrom, 'date_to' => $dateTo];
     
     if ($status) {
-        $whereClause .= " AND Status = :status";
+        $whereClause .= " AND f.Status = :status";
         $params['status'] = $status;
     }
     
     // Get total count
     $countStmt = $pdo->prepare("
         SELECT COUNT(*) as total
-        FROM footfall
+        FROM footfall f
         WHERE $whereClause
     ");
     $countStmt->execute($params);

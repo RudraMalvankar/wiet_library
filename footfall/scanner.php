@@ -817,6 +817,15 @@ async function checkIn(memberIdentifier, method) {
             
             // Clear form
             document.getElementById('memberNo').value = '';
+        } else if (data.code === 'ALREADY_ACTIVE' && data.member) {
+            console.log('ℹ️ MEMBER ALREADY ACTIVE TODAY');
+            showSuccess(`Welcome, ${data.member.name}! ${data.message || 'You are already checked in today.'}`);
+            displayMemberInfo(data.member);
+            refreshStats();
+            refreshRecentVisitors();
+
+            // Clear form
+            document.getElementById('memberNo').value = '';
         } else {
             console.error('❌ CHECK-IN FAILED:', data.message);
             showError(data.message || 'Check-in failed. Please try again.');

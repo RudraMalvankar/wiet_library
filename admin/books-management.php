@@ -122,7 +122,6 @@ if (!function_exists('generateBarcode')) {
                 imagestring($img, 4, 10, $height - 20, (string)$text, $black);
             }
             imagepng($img, $filename);
-            imagedestroy($img);
         } else {
             file_put_contents($filename . '.txt', (string)$text);
             $filename .= '.txt';
@@ -169,7 +168,6 @@ if (!function_exists('generateQR')) {
                 imagestring($img, 3, 10, $size - 18, (string)$text, $black);
             }
             imagepng($img, $filename);
-            imagedestroy($img);
         } else {
             file_put_contents($filename . '.txt', (string)$text);
             $filename .= '.txt';
@@ -660,15 +658,14 @@ if (!function_exists('generateQR')) {
 
         /* Modal Styles (improved: centered, fits viewport, accessible) */
         .modal {
-            display: none; /* shown by JS by setting display:block */
+            display: none;
             position: fixed;
             z-index: 110000;
             left: 0;
-            top: 0;
+            top: 142px;
             width: 100%;
-            height: 100%;
+            height: calc(100vh - 142px);
             background-color: rgba(0, 0, 0, 0.6);
-            display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
@@ -680,10 +677,11 @@ if (!function_exists('generateQR')) {
             background-color: white;
             padding: 0;
             border-radius: 12px;
-            width: 100%;
-            max-width: 1000px;
-            max-height: calc(100vh - 180px);
-            overflow-y: auto;
+            width: min(1000px, calc(100vw - 90px));
+            max-height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
             position: relative;
             z-index: 110001;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
@@ -736,7 +734,8 @@ if (!function_exists('generateQR')) {
 
         .modal-body {
             padding: 24px;
-            max-height: calc(100vh - 280px);
+            flex: 1 1 auto;
+            min-height: 0;
             overflow-y: auto;
         }
 
@@ -1044,12 +1043,14 @@ if (!function_exists('generateQR')) {
             }
 
             .modal {
+                top: 142px;
+                height: calc(100vh - 142px);
                 padding: 10px;
             }
 
             .modal-content {
-                max-width: 100%;
-                max-height: calc(100vh - 160px);
+                width: calc(100vw - 20px);
+                max-height: 100%;
                 border-radius: 8px;
             }
 
@@ -1063,7 +1064,6 @@ if (!function_exists('generateQR')) {
 
             .modal-body {
                 padding: 18px;
-                max-height: calc(100vh - 240px);
             }
 
             .modal-footer {
@@ -1081,11 +1081,14 @@ if (!function_exists('generateQR')) {
 
         @media (max-width: 480px) {
             .modal {
+                top: 127px;
+                height: calc(100vh - 127px);
                 padding: 5px;
             }
 
             .modal-content {
-                max-height: calc(100vh - 140px);
+                width: calc(100vw - 10px);
+                max-height: 100%;
             }
 
             .modal-header {
@@ -1098,7 +1101,6 @@ if (!function_exists('generateQR')) {
 
             .modal-body {
                 padding: 15px;
-                max-height: calc(100vh - 200px);
             }
 
             .modal-footer {
@@ -1269,9 +1271,9 @@ if (!function_exists('generateQR')) {
             <i class="fas fa-book-open"></i> Books Management
         </div>
         <div class="action-buttons">
-            <!-- <button class="btn btn-success" onclick="openAddBookModal()">
+            <button type="button" class="btn btn-success" onclick="openAddBookModal()">
                 <i class="fas fa-plus"></i> Add Book
-            </button> -->
+            </button>
             <!-- <button class="btn btn-primary" onclick="openBulkImportModal()">
                 <i class="fas fa-upload"></i> Bulk Import
             </button> -->
@@ -1307,165 +1309,7 @@ if (!function_exists('generateQR')) {
 
     <!-- Remove duplicate tabs-container and content blocks -->
 
-    <!-- duplicate Add Book modal removed (inline form is used) -->
-                    <div class="form-row">
-                        <div class="form-group-modal">
-                            <label for="bookVarTitle">Variant Title</label>
-                            <input type="text" id="bookVarTitle" name="VarTitle">
-                        </div>
-                        <div class="form-group-modal">
-                            <label for="bookFormat">Format</label>
-                            <select id="bookFormat" name="Format">
-                                <option value="Book">Book</option>
-                                <option value="Journal">Journal</option>
-                                <option value="Magazine">Magazine</option>
-                                <option value="Thesis">Thesis</option>
-                                <option value="Report">Report</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group-modal">
-                            <label for="bookAuthor1">Primary Author *</label>
-                            <input type="text" id="bookAuthor1" name="Author1" required>
-                        </div>
-                        <div class="form-group-modal">
-                            <label for="bookAuthor2">Secondary Author</label>
-                            <input type="text" id="bookAuthor2" name="Author2">
-                        </div>
-                        <div class="form-group-modal">
-                            <label for="bookAuthor3">Third Author</label>
-                            <input type="text" id="bookAuthor3" name="Author3">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group-modal">
-                            <label for="bookCorpAuthor">Corporate Author</label>
-                            <input type="text" id="bookCorpAuthor" name="CorpAuthor">
-                        </div>
-                        <div class="form-group-modal">
-                            <label for="bookEditors">Editors</label>
-                            <input type="text" id="bookEditors" name="Editors">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group-modal">
-                            <label for="bookISBN">ISBN</label>
-                            <input type="text" id="bookISBN" name="ISBN" placeholder="978-0-123456-78-9">
-                        </div>
-                        <div class="form-group-modal">
-                            <label for="bookLanguage">Language</label>
-                            <select id="bookLanguage" name="Language">
-                                <option value="English">English</option>
-                                <option value="Hindi">Hindi</option>
-                                <option value="Marathi">Marathi</option>
-                                <option value="Sanskrit">Sanskrit</option>
-                                <option value="French">French</option>
-                                <option value="German">German</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group-modal">
-                            <label for="bookPublisher">Publisher</label>
-                            <input type="text" id="bookPublisher" name="Publisher">
-                        </div>
-                        <div class="form-group-modal">
-                            <label for="bookPlace">Place of Publication</label>
-                            <input type="text" id="bookPlace" name="Place">
-                        </div>
-                        <div class="form-group-modal">
-                            <label for="bookYear">Publication Year</label>
-                            <input type="number" id="bookYear" name="Year" min="1900" max="2030">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group-modal">
-                            <label for="bookSubject">Subject</label>
-                            <input type="text" id="bookSubject" name="Subject">
-                        </div>
-                        <div class="form-group-modal">
-                            <label for="bookEdition">Edition</label>
-                            <input type="text" id="bookEdition" name="Edition">
-                        </div>
-                        <div class="form-group-modal">
-                            <label for="bookVol">Volume</label>
-                            <input type="text" id="bookVol" name="Vol">
-                        </div>
-                        <div class="form-group-modal">
-                            <label for="bookPages">Pages</label>
-                            <input type="number" id="bookPages" name="Pages" min="1">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group-modal">
-                            <label for="numCopies">Number of Copies</label>
-                            <input type="number" id="numCopies" name="numCopies" min="1" value="1" onchange="renderHoldingsSection()">
-                        </div>
-                    </div>
-
-                    <div id="holdingsSection"></div>
-
-                    <div class="form-row">
-                        <button type="button" class="btn btn-link" onclick="toggleAcquisitionSection()">Acquisition Details</button>
-                    </div>
-                    <div id="acquisitionSection" style="display:none; border:1px solid #eee; padding:15px; margin-bottom:10px; border-radius:6px; background:#faf9f6;">
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="acqSupplier">Supplier</label>
-                                <input type="text" id="acqSupplier" name="Supplier">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="acqInvoiceNo">Invoice No</label>
-                                <input type="text" id="acqInvoiceNo" name="InvoiceNo">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="acqInvoiceDate">Invoice Date</label>
-                                <input type="date" id="acqInvoiceDate" name="InvoiceDate">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="acqOrderNo">Order No</label>
-                                <input type="text" id="acqOrderNo" name="OrderNo">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="acqOrderDate">Order Date</label>
-                                <input type="date" id="acqOrderDate" name="OrderDate">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="acqReceivedDate">Received Date</label>
-                                <input type="date" id="acqReceivedDate" name="ReceivedDate">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-modal">
-                                <label for="acqQuantity">Quantity</label>
-                                <input type="number" id="acqQuantity" name="Quantity" min="1">
-                            </div>
-                            <div class="form-group-modal">
-                                <label for="acqTotalCost">Total Cost</label>
-                                <input type="number" id="acqTotalCost" name="TotalCost" min="0" step="0.01">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-actions" style="justify-content:flex-start;">
-                        <button type="submit" class="btn btn-success">
-                            <i class="fas fa-paper-plane"></i>
-                            Add New Book
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+    <!-- Add Book is provided via the modal below -->
 
     <!-- Tabs -->
     <div class="tabs-container">
@@ -1801,8 +1645,8 @@ if (!function_exists('generateQR')) {
     </div>  
 
     <!-- Book Details/Edit Modal -->
-            <div id="bookDetailsModal" class="modal" style="display:none; align-items:center; justify-content:center; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1000; background:rgba(0,0,0,0.5);">
-                <div class="modal-content book-modal-scrollable" style="max-height:90vh; overflow-y:auto; display:flex; flex-direction:column; margin:auto;">
+            <div id="bookDetailsModal" class="modal" style="display:none;">
+                <div class="modal-content book-modal-scrollable">
                 <div class="modal-header">
                     <h3 class="modal-title" id="bookDetailsModalTitle">Book Details</h3>
                     <button class="close" onclick="closeModal('bookDetailsModal')">&times;</button>
@@ -1821,19 +1665,19 @@ if (!function_exists('generateQR')) {
             </div>
         </div>
         <!-- /* Make book details modal scrollable and fit viewport */ -->
-       <style> .book-modal-scrollable {
-            max-height: 90vh;
+      <style> .book-modal-scrollable {
+          max-height: 100%;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
             margin: auto;
         }
-        .modal-body {
+        .book-modal-scrollable .modal-body {
             flex: 1 1 auto;
             min-height: 0;
             overflow-y: auto;
         }
-        .modal-footer {
+        .book-modal-scrollable .modal-footer {
             flex: 0 0 auto;
             background: #fff;
         }
@@ -2265,25 +2109,20 @@ if (!function_exists('generateQR')) {
         }
 
         // Modal / UI functions
-        // The Add Book form exists inline on the page; don't open a modal for adding.
         function openAddBookModal() {
-            // Scroll to the inline Add Book form and focus the first input
-            const inlineForm = document.getElementById('addBookForm');
-            if (inlineForm) {
-                inlineForm.scrollIntoView({behavior:'smooth', block:'center'});
-                const firstInput = inlineForm.querySelector('input, select, textarea, button');
-                if (firstInput) firstInput.focus();
-                // Render holdings section when form opens
-                renderHoldingsSection();
-            } else {
-                // fallback to modal if inline not present
-                const m = document.getElementById('addBookModal');
-                if (m) {
-                    m.style.display = 'flex';
-                    // Render holdings section when modal opens
-                    setTimeout(() => renderHoldingsSection(), 100);
-                }
+            const m = document.getElementById('addBookModal');
+            if (!m) {
+                alert('Add Book form is not available right now.');
+                return;
             }
+
+            m.style.display = 'flex';
+            setTimeout(() => {
+                renderHoldingsSection();
+                const form = document.getElementById('addBookForm');
+                const firstInput = form ? form.querySelector('input, select, textarea, button') : null;
+                if (firstInput) firstInput.focus();
+            }, 50);
         }
 
         // Toggle acquisition details for the inline form
@@ -2524,34 +2363,64 @@ if (!function_exists('generateQR')) {
         }
 
         function saveBook() {
-            // Collect form data
+            // Collect form data from visible fields first (fallback to form selectors when present)
             const form = document.getElementById('addBookForm');
-            // Build FormData with backend-friendly keys (lowercase underscore style)
+            const valById = (id) => {
+                const el = document.getElementById(id);
+                return el && typeof el.value !== 'undefined' ? String(el.value).trim() : '';
+            };
+            const valByName = (name) => {
+                const el = form ? form.querySelector(`[name="${name}"]`) : null;
+                return el && typeof el.value !== 'undefined' ? String(el.value).trim() : '';
+            };
+            const pick = (id, name) => valById(id) || valByName(name);
+
             const fd = new FormData();
-            // map main fields (form uses PascalCase names)
-            fd.append('title', form.querySelector('[name="Title"]')?.value || '');
-            fd.append('subtitle', form.querySelector('[name="SubTitle"]')?.value || '');
-            fd.append('author1', form.querySelector('[name="Author1"]')?.value || '');
-            fd.append('author2', form.querySelector('[name="Author2"]')?.value || '');
-            fd.append('author3', form.querySelector('[name="Author3"]')?.value || '');
-            fd.append('publisher', form.querySelector('[name="Publisher"]')?.value || '');
-            fd.append('year', form.querySelector('[name="Year"]')?.value || '');
-            fd.append('isbn', form.querySelector('[name="ISBN"]')?.value || '');
-            fd.append('edition', form.querySelector('[name="Edition"]')?.value || '');
-            fd.append('language', form.querySelector('[name="Language"]')?.value || '');
-            fd.append('subject', form.querySelector('[name="Subject"]')?.value || '');
-            fd.append('keywords', form.querySelector('[name="Keywords"]')?.value || '');
-            fd.append('pages', form.querySelector('[name="Pages"]')?.value || '');
-            fd.append('price', form.querySelector('[name="Price"]')?.value || '');
+            // Send canonical keys expected by api/books.php?action=add
+            const resolvedTitle = pick('bookTitle', 'Title') || pick('bookVarTitle', 'VarTitle');
+            fd.append('Title', resolvedTitle);
+            fd.append('SubTitle', pick('bookSubTitle', 'SubTitle'));
+            fd.append('VarTitle', pick('bookVarTitle', 'VarTitle'));
+            fd.append('Author1', pick('bookAuthor1', 'Author1'));
+            fd.append('Author2', pick('bookAuthor2', 'Author2'));
+            fd.append('Author3', pick('bookAuthor3', 'Author3'));
+            fd.append('CorpAuthor', pick('bookCorpAuthor', 'CorpAuthor'));
+            fd.append('Editors', pick('bookEditors', 'Editors'));
+            fd.append('Publisher', pick('bookPublisher', 'Publisher'));
+            fd.append('Place', pick('bookPlace', 'Place'));
+            fd.append('Year', pick('bookYear', 'Year'));
+            fd.append('Edition', pick('bookEdition', 'Edition'));
+            fd.append('Vol', pick('bookVol', 'Vol'));
+            fd.append('Pages', pick('bookPages', 'Pages'));
+            fd.append('ISBN', pick('bookISBN', 'ISBN'));
+            fd.append('Subject', pick('bookSubject', 'Subject'));
+            fd.append('Keywords', pick('bookKeywords', 'Keywords'));
+            fd.append('Language', pick('bookLanguage', 'Language') || 'English');
+            fd.append('Format', pick('bookFormat', 'Format') || 'Book');
+            fd.append('ItemPrice', pick('bookPrice', 'Price'));
             // normalized copies field name expected by backend
-            const numCopies = parseInt(form.querySelector('[name="numCopies"]')?.value || '1', 10) || 1;
+            const numCopies = parseInt(pick('numCopies', 'numCopies') || '1', 10) || 1;
             fd.append('num_copies', numCopies);
+
+            if (!fd.get('Title')) {
+                alert('Please enter Book Title (or Variant Title) before saving.');
+                return;
+            }
+            if (!fd.get('Author1')) {
+                alert('Please enter Primary Author before saving.');
+                return;
+            }
 
             // Collect holdings data for ALL copies
             const holdingsData = [];
             for (let i = 1; i <= numCopies; i++) {
+                const accNoValue = document.getElementById('holdingAccNo_' + i)?.value || '';
+                if (!String(accNoValue).trim()) {
+                    alert(`Please enter Accession Number (AccNo) for Copy ${i}.`);
+                    return;
+                }
                 const holding = {
-                    accNo: document.getElementById('holdingAccNo_' + i)?.value || '',
+                    accNo: accNoValue,
                     bookNo: document.getElementById('holdingBookNo_' + i)?.value || '',
                     accDate: document.getElementById('holdingAccDate_' + i)?.value || '',
                     classNo: document.getElementById('holdingClassNo_' + i)?.value || '',
@@ -2578,7 +2447,7 @@ if (!function_exists('generateQR')) {
             fd.append('total_cost', document.getElementById('acqTotalCost')?.value || '');
 
             // Submit as form POST so PHP populates $_POST
-            fetch('api/books.php?action=add', {
+            fetch(getApiPath('api/books.php?action=add'), {
                 method: 'POST',
                 body: fd
             })
@@ -2721,11 +2590,11 @@ if (!function_exists('generateQR')) {
                                 if (result && result.message) msg += ' ' + result.message;
                                 document.getElementById('bookDetailsModalBody').innerHTML = `<div style=\"color:#dc3545; text-align:center; padding:30px;\"><i class=\"fas fa-exclamation-triangle\"></i> ${msg}</div>`;
                             }
-                            document.getElementById('bookDetailsModalFooter').style.display = 'block';
+                            document.getElementById('bookDetailsModalFooter').style.display = 'flex';
                         })
                         .catch(err => {
                             document.getElementById('bookDetailsModalBody').innerHTML = `<div style=\"color:#dc3545; text-align:center; padding:30px;\"><i class=\"fas fa-exclamation-triangle\"></i> Error loading book details: ${err.message}</div>`;
-                            document.getElementById('bookDetailsModalFooter').style.display = 'block';
+                            document.getElementById('bookDetailsModalFooter').style.display = 'flex';
                         });
                     // Store CatNo for save
                     document.getElementById('bookDetailsModal').setAttribute('data-catno', catNo);

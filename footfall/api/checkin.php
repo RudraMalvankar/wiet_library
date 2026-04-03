@@ -82,8 +82,17 @@ try {
     if ($existing) {
         $entryTime = date('h:i A', strtotime($existing['EntryTime']));
         echo json_encode([
-            'success' => false, 
-            'message' => "Already checked in today at {$entryTime}. Please check out first."
+            'success' => false,
+            'code' => 'ALREADY_ACTIVE',
+            'message' => "Already checked in today at {$entryTime}.",
+            'member' => [
+                'member_no' => 'M' . str_pad($memberNo, 7, '0', STR_PAD_LEFT),
+                'name' => $member['MemberName'],
+                'branch' => $member['Branch'] ?? 'N/A',
+                'course' => $member['CourseName'] ?? 'N/A',
+                'photo' => $member['Photo'] ?? null
+            ],
+            'entry_time' => $existing['EntryTime']
         ]);
         exit;
     }

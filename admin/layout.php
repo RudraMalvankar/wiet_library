@@ -320,12 +320,13 @@ $is_superadmin = $current_admin['is_superadmin'];
     margin-top: 142px;
     /* Space for banner and navbar */
     min-height: calc(100vh - 142px);
-    padding: 5px 20px 20px;
+    padding: 10px 16px 20px;
     background-color: #f8f9fa;
     position: relative;
     z-index: 1;
     /* Ensure content is above watermark */
     transition: margin-left 0.3s ease;
+    overflow-x: hidden;
   }
 
   /* Main content when sidebar is collapsed */
@@ -398,6 +399,7 @@ $is_superadmin = $current_admin['is_superadmin'];
       margin-top: 142px;
       /* Same as sidebar top */
       min-height: calc(100vh - 142px);
+      padding: 10px 10px 18px;
     }
 
     .watermark {
@@ -452,6 +454,7 @@ $is_superadmin = $current_admin['is_superadmin'];
       margin-top: 127px;
       /* Same as sidebar top */
       min-height: calc(100vh - 127px);
+      padding: 8px;
     }
 
     .watermark {

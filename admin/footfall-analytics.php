@@ -861,7 +861,7 @@ async function loadAllRecords() {
         const response = await fetch(getApiPath(`../footfall/api/footfall-records.php?date_from=${dateFrom}&date_to=${dateTo}&limit=100`));
         const data = await response.json();
         
-        if (data.success && data.data.records) {
+        if (data.success && data.data && data.data.records) {
             let html = '';
             
             if (data.data.records.length === 0) {
@@ -882,6 +882,10 @@ async function loadAllRecords() {
             }
             
             document.getElementById('allRecordsTable').innerHTML = html;
+        } else {
+            const msg = (data && data.message) ? data.message : 'Unable to load records';
+            document.getElementById('allRecordsTable').innerHTML =
+                `<tr><td colspan="6" style="text-align: center; padding: 20px; color: #dc3545;">${escapeHtml(msg)}</td></tr>`;
         }
     } catch (error) {
         console.error('Error loading records:', error);
@@ -896,7 +900,7 @@ async function loadActiveVisitors() {
         const response = await fetch(getApiPath('../footfall/api/footfall-records.php?status=Active&limit=50'));
         const data = await response.json();
         
-        if (data.success && data.data.records) {
+        if (data.success && data.data && data.data.records) {
             let html = '';
             
             if (data.data.records.length === 0) {
@@ -917,9 +921,15 @@ async function loadActiveVisitors() {
             }
             
             document.getElementById('activeVisitorsTable').innerHTML = html;
+        } else {
+            const msg = (data && data.message) ? data.message : 'Unable to load active visitors';
+            document.getElementById('activeVisitorsTable').innerHTML =
+                `<tr><td colspan="6" style="text-align: center; padding: 20px; color: #dc3545;">${escapeHtml(msg)}</td></tr>`;
         }
     } catch (error) {
         console.error('Error loading active visitors:', error);
+        document.getElementById('activeVisitorsTable').innerHTML =
+            '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Error loading active visitors</td></tr>';
     }
 }
 
