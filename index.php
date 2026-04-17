@@ -9,7 +9,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WIET College Library - Digital Library Management System</title>
+    <title>WIET Library - Digital Library Management System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -459,6 +459,10 @@
         height: 100%;
         object-fit: cover;
         transition: transform 0.5s ease;
+    }
+
+    .facility-image--journal img {
+        object-position: center top;
     }
 
     .facility-image:hover img {
@@ -953,7 +957,7 @@
     <!-- Banner Section -->
     <section class="banner">
         <div class="banner-content">
-            <h1>LIBRARY</h1>
+            <h1>WIET Library</h1>
             <p>Your Gateway to Knowledge and Academic Excellence</p>
             <a href="#about" class="banner-cta">Explore Our Resources</a>
         </div>
@@ -978,7 +982,7 @@
     <section id="about" class="section about">
         <div class="container">
             <div class="section-header fade-in">
-                <h2 class="section-title">About Our Library</h2>
+                <h2 class="section-title">About WIET Library</h2>
                 <p class="section-subtitle">
                     Discover a world-class library facility designed to support your academic journey
                     with extensive resources, modern technology, and dedicated services.
@@ -1011,7 +1015,7 @@
                             <span class="stat-label">Members</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-number">50+</span>
+                            <span class="stat-number">150+</span>
                             <span class="stat-label">Study Seats</span>
                         </div>
                     </div>
@@ -1073,7 +1077,7 @@
             </div>
 
             <div class="facility-item fade-in">
-                <div class="facility-image">
+                <div class="facility-image facility-image--journal">
                     <img src="./images/journal.jpeg" alt="Research Resources">
                 </div>
                 <div class="facility-text">
@@ -1198,7 +1202,7 @@
             </div>
 
             <div class="footer-bottom">
-                <p>&copy; 2025 WIET College Library | Developed and Managed by <a href="developer.php" style="color: var(--yellow); text-decoration: none; font-weight: 600; transition: all 0.3s ease;">WIET Library Team</a></p>
+                <p>&copy; 2025 WIET Library | Developed and Managed by <a href="developer.php" style="color: var(--yellow); text-decoration: none; font-weight: 600; transition: all 0.3s ease;">WIET Library Team</a></p>
             </div>
             
         </div>
