@@ -1,6 +1,6 @@
 <?php
 session_start();
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['student_id'])) {
     header('Location: student_login.php');
     exit();
 }
@@ -126,3 +126,4 @@ $completed= array_values(array_filter($events, fn($ev)=>($ev['Status']??'')==='C
   }));
 })();
 </script>
+

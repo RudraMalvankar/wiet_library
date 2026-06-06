@@ -19,6 +19,14 @@ $page = max(1, (int)($_GET['page'] ?? 1));
 $limit = min(100, (int)($_GET['limit'] ?? 20));
 $offset = ($page - 1) * $limit;
 
+function normalizeBranchName($branch) {
+    $name = trim((string)$branch);
+    if (strcasecmp($name, 'Computer') === 0) {
+        return 'Computer Engineering';
+    }
+    return $name;
+}
+
 try {
     // Build WHERE clause
     $whereClause = "DATE(f.EntryTime) BETWEEN :date_from AND :date_to";
@@ -74,12 +82,21 @@ try {
             $hours = floor($r['Duration'] / 60);
             $minutes = $r['Duration'] % 60;
             $duration = sprintf('%dh %dm', $hours, $minutes);
+        } elseif ($r['Status'] === 'Active' && !empty($r['EntryTime'])) {
+            $entry = strtotime($r['EntryTime']);
+            $now = time();
+            if ($entry !== false && $now >= $entry) {
+                $elapsedMinutes = (int)floor(($now - $entry) / 60);
+                $hours = floor($elapsedMinutes / 60);
+                $minutes = $elapsedMinutes % 60;
+                $duration = sprintf('Ongoing (%dh %dm)', $hours, $minutes);
+            }
         }
         
         return [
             'member_no' => 'M' . str_pad($r['MemberNo'], 7, '0', STR_PAD_LEFT),
             'name' => $r['name'],
-            'branch' => $r['Branch'] ?? 'N/A',
+            'branch' => normalizeBranchName($r['Branch'] ?? 'N/A'),
             'entry_time' => date('M j, Y g:i A', strtotime($r['EntryTime'])),
             'exit_time' => $r['ExitTime'] ? date('g:i A', strtotime($r['ExitTime'])) : null,
             'duration' => $duration,

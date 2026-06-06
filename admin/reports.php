@@ -528,7 +528,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
         let currentCharts = [];
 
@@ -623,6 +623,10 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
             const ctx = document.getElementById('circTrendChart');
             if (ctx && charts.trend && charts.trend.labels.length > 0) {
+                if (typeof Chart === 'undefined') {
+                    console.error('Chart.js library not loaded');
+                    return;
+                }
                 const chart = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -743,6 +747,10 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
             const ctx = document.getElementById('finTrendChart');
             if (ctx && charts.trend && charts.trend.labels.length > 0) {
+                if (typeof Chart === 'undefined') {
+                    console.error('Chart.js library not loaded');
+                    return;
+                }
                 const chart = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -856,6 +864,10 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
             const ctx = document.getElementById('invCategoryChart');
             if (ctx && charts.category && charts.category.labels.length > 0) {
+                if (typeof Chart === 'undefined') {
+                    console.error('Chart.js library not loaded');
+                    return;
+                }
                 const chart = new Chart(ctx, {
                     type: 'bar',
                     data: {
@@ -967,6 +979,10 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
             const ctx = document.getElementById('memDeptChart');
             if (ctx && charts.department && charts.department.labels.length > 0) {
+                if (typeof Chart === 'undefined') {
+                    console.error('Chart.js library not loaded');
+                    return;
+                }
                 const chart = new Chart(ctx, {
                     type: 'doughnut',
                     data: {
@@ -1046,7 +1062,20 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
         // Auto-load first report
         document.addEventListener('DOMContentLoaded', function() {
-            loadCirculationReport();
+            // Wait for Chart.js to load
+            if (typeof Chart === 'undefined') {
+                // Poll for Chart library
+                const checkChart = setInterval(() => {
+                    if (typeof Chart !== 'undefined') {
+                        clearInterval(checkChart);
+                        loadCirculationReport();
+                    }
+                }, 100);
+                // Timeout after 5 seconds
+                setTimeout(() => clearInterval(checkChart), 5000);
+            } else {
+                loadCirculationReport();
+            }
         });
     </script>
 </body>

@@ -1274,6 +1274,12 @@ if (!function_exists('generateQR')) {
             <button type="button" class="btn btn-success" onclick="openAddBookModal()">
                 <i class="fas fa-plus"></i> Add Book
             </button>
+            <button type="button" class="btn btn-secondary" onclick="generateTodayIssuedPdf()">
+                <i class="fas fa-file-pdf"></i> Today Issued PDF
+            </button>
+            <button type="button" class="btn btn-primary" onclick="showAvailabilityNotifications()">
+                <i class="fas fa-bell"></i> Unavailable Alerts
+            </button>
             <!-- <button class="btn btn-primary" onclick="openBulkImportModal()">
                 <i class="fas fa-upload"></i> Bulk Import
             </button> -->
@@ -1301,6 +1307,22 @@ if (!function_exists('generateQR')) {
         <div class="stat-card">
             <div class="stat-number" id="issuedCopies">-</div>
             <div class="stat-label">Issued Copies</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="overdueBooks">-</div>
+            <div class="stat-label">Overdue Books</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="unavailableCopies">-</div>
+            <div class="stat-label">Unavailable / Dead Stock</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="dailyIssuedBooks">-</div>
+            <div class="stat-label">Daily Issued Books</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="totalIssuedBooks">-</div>
+            <div class="stat-label">Currently Issued Books</div>
         </div>
     </div>
 
@@ -1748,6 +1770,13 @@ if (!function_exists('generateQR')) {
             
             // Load database-wide statistics
             loadStatistics();
+
+            // Keep dashboard counters near real-time.
+            if (!window.booksStatsAutoRefreshInterval) {
+                window.booksStatsAutoRefreshInterval = setInterval(() => {
+                    loadStatistics();
+                }, 15000);
+            }
             
             if (!booksTableLoaded) {
                 booksTableLoaded = true;
@@ -1790,7 +1819,7 @@ if (!function_exists('generateQR')) {
         // Function to load database-wide statistics
         async function loadStatistics() {
             // Try to load from cache first for instant display
-            const cachedStats = sessionStorage.getItem('books_stats');
+            const cachedStats = sessionStorage.getItem('books_stats_v2');
             if (cachedStats) {
                 try {
                     const stats = JSON.parse(cachedStats);
@@ -1802,11 +1831,19 @@ if (!function_exists('generateQR')) {
                         const totalCopiesElem = document.getElementById('totalCopies');
                         const availableCopiesElem = document.getElementById('availableCopies');
                         const issuedCopiesElem = document.getElementById('issuedCopies');
+                        const overdueBooksElem = document.getElementById('overdueBooks');
+                        const unavailableCopiesElem = document.getElementById('unavailableCopies');
+                        const dailyIssuedBooksElem = document.getElementById('dailyIssuedBooks');
+                        const totalIssuedBooksElem = document.getElementById('totalIssuedBooks');
                         
                         if (totalBooksElem) totalBooksElem.textContent = stats.data.totalBooks;
                         if (totalCopiesElem) totalCopiesElem.textContent = stats.data.totalCopies;
                         if (availableCopiesElem) availableCopiesElem.textContent = stats.data.availableCopies;
                         if (issuedCopiesElem) issuedCopiesElem.textContent = stats.data.issuedCopies;
+                        if (overdueBooksElem) overdueBooksElem.textContent = stats.data.overdueBooks ?? 0;
+                        if (unavailableCopiesElem) unavailableCopiesElem.textContent = (stats.data.unavailableCopies ?? 0) + (stats.data.deadStockCopies ?? 0);
+                        if (dailyIssuedBooksElem) dailyIssuedBooksElem.textContent = stats.data.dailyIssuedBooks ?? 0;
+                        if (totalIssuedBooksElem) totalIssuedBooksElem.textContent = stats.data.totalIssuedBooks ?? 0;
                     }
                 } catch (e) {
                     console.warn('Failed to parse cached stats:', e);
@@ -1823,14 +1860,22 @@ if (!function_exists('generateQR')) {
                     const totalCopiesElem = document.getElementById('totalCopies');
                     const availableCopiesElem = document.getElementById('availableCopies');
                     const issuedCopiesElem = document.getElementById('issuedCopies');
+                    const overdueBooksElem = document.getElementById('overdueBooks');
+                    const unavailableCopiesElem = document.getElementById('unavailableCopies');
+                    const dailyIssuedBooksElem = document.getElementById('dailyIssuedBooks');
+                    const totalIssuedBooksElem = document.getElementById('totalIssuedBooks');
                     
                     if (totalBooksElem) totalBooksElem.textContent = result.stats.totalBooks;
                     if (totalCopiesElem) totalCopiesElem.textContent = result.stats.totalCopies;
                     if (availableCopiesElem) availableCopiesElem.textContent = result.stats.availableCopies;
                     if (issuedCopiesElem) issuedCopiesElem.textContent = result.stats.issuedCopies;
+                    if (overdueBooksElem) overdueBooksElem.textContent = result.stats.overdueBooks ?? 0;
+                    if (unavailableCopiesElem) unavailableCopiesElem.textContent = (result.stats.unavailableCopies ?? 0) + (result.stats.deadStockCopies ?? 0);
+                    if (dailyIssuedBooksElem) dailyIssuedBooksElem.textContent = result.stats.dailyIssuedBooks ?? 0;
+                    if (totalIssuedBooksElem) totalIssuedBooksElem.textContent = result.stats.totalIssuedBooks ?? 0;
                     
                     // Cache the results
-                    sessionStorage.setItem('books_stats', JSON.stringify({
+                    sessionStorage.setItem('books_stats_v2', JSON.stringify({
                         data: result.stats,
                         timestamp: Date.now()
                     }));
@@ -1953,9 +1998,17 @@ if (!function_exists('generateQR')) {
                 const totalCopiesElem = document.getElementById('totalCopies');
                 const availableCopiesElem = document.getElementById('availableCopies');
                 const issuedCopiesElem = document.getElementById('issuedCopies');
+                const overdueBooksElem = document.getElementById('overdueBooks');
+                const unavailableCopiesElem = document.getElementById('unavailableCopies');
+                const dailyIssuedBooksElem = document.getElementById('dailyIssuedBooks');
+                const totalIssuedBooksElem = document.getElementById('totalIssuedBooks');
                 if (totalCopiesElem) totalCopiesElem.textContent = '-';
                 if (availableCopiesElem) availableCopiesElem.textContent = '-';
                 if (issuedCopiesElem) issuedCopiesElem.textContent = '-';
+                if (overdueBooksElem) overdueBooksElem.textContent = '-';
+                if (unavailableCopiesElem) unavailableCopiesElem.textContent = '-';
+                if (dailyIssuedBooksElem) dailyIssuedBooksElem.textContent = '-';
+                if (totalIssuedBooksElem) totalIssuedBooksElem.textContent = '-';
             }
         }
 
@@ -2106,6 +2159,23 @@ if (!function_exists('generateQR')) {
             `;
 
             document.getElementById('reportsContent').innerHTML = reportsHTML;
+        }
+
+        function generateTodayIssuedPdf() {
+            const today = new Date().toISOString().split('T')[0];
+            const reportUrl = `today-issued-report.php?from=${encodeURIComponent(today)}&to=${encodeURIComponent(today)}`;
+            const win = window.open(reportUrl, '_blank', 'noopener,noreferrer');
+            if (!win) {
+                alert('Please allow pop-ups to open the report.');
+            }
+        }
+
+        function showAvailabilityNotifications() {
+            const reportUrl = 'unavailable-books-report.php';
+            const win = window.open(reportUrl, '_blank', 'noopener,noreferrer');
+            if (!win) {
+                alert('Please allow pop-ups to open the report.');
+            }
         }
 
         // Modal / UI functions
@@ -2530,7 +2600,7 @@ if (!function_exists('generateQR')) {
                                         </form>`;
 
                                         // Holdings table with inline edit
-                                        let holdingsHtml = `<div style='margin-top:14px;'><h4>Holdings <button type='button' class='btn btn-sm btn-success' onclick='addNewHolding(${book.CatNo})' style='float:right;'><i class='fas fa-plus'></i> Add Copy</button></h4><table style='width:100%; border-collapse:collapse;'><thead><tr><th style='text-align:left; padding:6px;'>AccNo</th><th style='text-align:left; padding:6px;'>Status</th><th style='text-align:left; padding:6px;'>Location</th><th style='text-align:left; padding:6px;'>Section</th><th style='text-align:left; padding:6px;'>QR</th><th style='text-align:left; padding:6px;'>Actions</th></tr></thead><tbody>`;
+                                        let holdingsHtml = `<div style='margin-top:14px;'><h4>Holdings <button type='button' class='btn btn-sm btn-success' onclick='addNewHolding(${book.CatNo})' style='float:right;'><i class='fas fa-plus'></i> Add Copy</button></h4><table style='width:100%; border-collapse:collapse;'><thead><tr><th style='text-align:left; padding:6px;'>AccNo</th><th style='text-align:left; padding:6px;'>Status</th><th style='text-align:left; padding:6px;'>Location</th><th style='text-align:left; padding:6px;'>Section</th><th style='text-align:left; padding:6px;'>Available On</th><th style='text-align:left; padding:6px;'>Note</th><th style='text-align:left; padding:6px;'>QR</th><th style='text-align:left; padding:6px;'>Actions</th></tr></thead><tbody>`;
                                         if (Array.isArray(book.holdings) && book.holdings.length) {
                                             book.holdings.forEach(function(h, idx) {
                                                     const safeAcc = escapeHtml(h.AccNo || '');
@@ -2546,17 +2616,22 @@ if (!function_exists('generateQR')) {
                                                             <small style='color:#6c757d; font-size:10px;'>Original: ${safeAcc}</small>
                                                         </td>
                                                         <td style='padding:6px;'>
-                                                            <select class='holding-status-select' data-accno='${safeAcc}' style='padding:4px 8px; border:1px solid #ddd; border-radius:4px;'>
+                                                            <select class='holding-status-select' data-accno='${safeAcc}' style='padding:4px 8px; border:1px solid #ddd; border-radius:4px;' title='Status: Available=Ready to borrow | Issued=Currently borrowed | Reserved=On hold | Damaged=Needs repair | Lost=Temporarily missing (can be found) | Permanently Lost=Cannot be recovered | Repair=Being fixed | Unavailable=Temporarily out of service | Dead Stock=Discarded/Written off'>
                                                                 <option value='Available' ${h.Status === 'Available' ? 'selected' : ''}>Available</option>
                                                                 <option value='Issued' ${h.Status === 'Issued' ? 'selected' : ''}>Issued</option>
                                                                 <option value='Reserved' ${h.Status === 'Reserved' ? 'selected' : ''}>Reserved</option>
                                                                 <option value='Damaged' ${h.Status === 'Damaged' ? 'selected' : ''}>Damaged</option>
-                                                                <option value='Lost' ${h.Status === 'Lost' ? 'selected' : ''}>Lost</option>
+                                                                <option value='Lost' ${h.Status === 'Lost' ? 'selected' : ''}>Lost (Temporarily)</option>
+                                                                <option value='Permanently Lost' ${h.Status === 'Permanently Lost' ? 'selected' : ''}>Permanently Lost</option>
                                                                 <option value='Repair' ${h.Status === 'Repair' ? 'selected' : ''}>Repair</option>
+                                                                <option value='Unavailable' ${h.Status === 'Unavailable' ? 'selected' : ''}>Unavailable</option>
+                                                                <option value='Dead Stock' ${h.Status === 'Dead Stock' ? 'selected' : ''}>Dead Stock</option>
                                                             </select>
                                                         </td>
                                                         <td style='padding:6px;'><input type='text' class='holding-location-input' data-accno='${safeAcc}' value='${escapeHtml(h.Location || '')}' style='width:100%; padding:4px 8px; border:1px solid #ddd; border-radius:4px;'></td>
                                                         <td style='padding:6px;'><input type='text' class='holding-section-input' data-accno='${safeAcc}' value='${escapeHtml(h.Section || '')}' style='width:100%; padding:4px 8px; border:1px solid #ddd; border-radius:4px;'></td>
+                                                        <td style='padding:6px;'><input type='date' class='holding-expected-date-input' data-accno='${safeAcc}' value='${escapeHtml(h.ExpectedAvailableDate || '')}' style='width:100%; padding:4px 8px; border:1px solid #ddd; border-radius:4px;'></td>
+                                                        <td style='padding:6px;'><input type='text' class='holding-note-input' data-accno='${safeAcc}' value='${escapeHtml(h.AvailabilityNote || '')}' placeholder='Reason / note' style='width:100%; padding:4px 8px; border:1px solid #ddd; border-radius:4px;'></td>
                                                         <td style='padding:6px;'>`;
                                                     if (qrBase64) {
                                                         const dataUri = 'data:image/png;base64,' + qrBase64;
@@ -2577,7 +2652,7 @@ if (!function_exists('generateQR')) {
                                                     </tr>`;
                                                 });
                                         } else {
-                                            holdingsHtml += `<tr><td colspan='6' style='padding:6px;color:#666;'>No holdings found.</td></tr>`;
+                                            holdingsHtml += `<tr><td colspan='8' style='padding:6px;color:#666;'>No holdings found.</td></tr>`;
                                         }
                                         holdingsHtml += `</tbody></table></div>`;
                                         document.getElementById('bookDetailsModalBody').innerHTML = html + holdingsHtml;
@@ -2766,6 +2841,8 @@ if (!function_exists('generateQR')) {
         const status = row.querySelector('.holding-status-select').value;
         const location = row.querySelector('.holding-location-input').value;
         const section = row.querySelector('.holding-section-input').value;
+        const expectedAvailableDate = row.querySelector('.holding-expected-date-input').value;
+        const availabilityNote = row.querySelector('.holding-note-input').value;
 
         if (!newAccNo) {
             alert('AccNo cannot be empty!');
@@ -2782,7 +2859,9 @@ if (!function_exists('generateQR')) {
             newAccNo: newAccNo,
             status: status,
             location: location,
-            section: section
+            section: section,
+            expectedAvailableDate: expectedAvailableDate,
+            availabilityNote: availabilityNote
         };
 
         // Update holding via API

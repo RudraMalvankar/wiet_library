@@ -492,7 +492,7 @@ $is_superadmin = $current_admin['is_superadmin'];
         <button class="sidebar-toggle" id="sidebarToggle">
           <i class="fas fa-bars"></i>
         </button>
-        <h1 class="navbar-title">WIET College Library</h1>
+        <h1 class="navbar-title">WIET LIBRARY</h1>
       </div>
       <div class="navbar-right">
         <p class="welcome-text">Welcome, <?php 
@@ -802,7 +802,7 @@ $is_superadmin = $current_admin['is_superadmin'];
             `;
           });
         // Update page title
-        document.title = `${page.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} - WIET College Library`;
+        document.title = `${page.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} - WIET LIBRARY`;
       }
 
       // Initialize - check URL or set default active state

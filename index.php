@@ -1,5 +1,5 @@
 <?php
-// Landing page for WIET College Library Management System
+// Landing page for WIET LIBRARY Management System
 ?>
 
 <!DOCTYPE html>
@@ -46,7 +46,7 @@
     }
 
     /* Header Styles */
-    .college-header {
+    .library-header {
         width: 100%;
         height: 120px;
         overflow: hidden;
@@ -54,7 +54,7 @@
         box-shadow: 0 2px 10px var(--shadow);
     }
 
-    .college-header img {
+    .library-header img {
         width: 100%;
         height: 100%;
         object-fit: cover;
@@ -776,7 +776,7 @@
             height: 120px;
         }
 
-        .college-header {
+        .library-header {
             height: 80px;
         }
     }
@@ -825,7 +825,7 @@
             font-size: 18px;
         }
 
-        .college-header {
+        .library-header {
             height: 60px;
         }
 
@@ -895,7 +895,7 @@
             font-size: 0.9rem;
         }
 
-        .college-header {
+        .library-header {
             height: 70px;
         }
 
@@ -930,9 +930,9 @@
 </style>
 
 <body>
-    <!-- College Header -->
-    <header class="college-header">
-        <img src="./images/Colg_banner.png" alt="WIET College Header Banner">
+    <!-- Library Header -->
+    <header class="library-header">
+        <img src="./images/library_banner.png" alt="WIET LIBRARY Header Banner">
     </header>
 
     <!-- Navigation -->
@@ -991,12 +991,12 @@
 
             <div class="about-content">
                 <div class="about-image fade-in">
-                    <img src="./images/entry2.jpg" alt="WIET College Library Interior">
+                    <img src="./images/entry2.jpg" alt="WIET LIBRARY Interior">
                 </div>
                 <div class="about-text fade-in">
-                    <h3>Welcome to WIET College Library</h3>
+                    <h3>Welcome to WIET LIBRARY</h3>
                     <p>
-                        Our state-of-the-art library serves as the intellectual heart of WIET College,
+                        Our state-of-the-art library serves as the intellectual heart of WIET LIBRARY,
                         providing students, faculty, and researchers with access to an extensive collection
                         of books, journals, digital resources, and cutting-edge technology.
                     </p>
@@ -1037,7 +1037,7 @@
 
             <div class="facility-item fade-in">
                 <div class="facility-image">
-                    <img src="./images/brown.jpeg" alt="Digital Learning Center">
+                    <img src="./images/wiet_digital_learing_sys.jpeg" alt="Digital Learning Center">
                 </div>
                 <div class="facility-text">
                     <h4>Digital Learning Center</h4>
@@ -1058,7 +1058,7 @@
 
             <div class="facility-item fade-in">
                 <div class="facility-image">
-                    <img src="./images/bench2.jpg" alt="Study Spaces">
+                    <img src="./images/IMG_0575.jpg" alt="Spacious Study Area">
                 </div>
                 <div class="facility-text">
                     <h4>Spacious Study Area</h4>
@@ -1104,45 +1104,30 @@
             <div class="section-header fade-in">
                 <h2 class="section-title">Administration / Staff</h2>
                 <p class="section-subtitle">
-                    Meet our dedicated team of library professionals committed to providing
-                    exceptional service and support to our academic community.
+                    Meet our dedicated library team supporting daily operations and member services.
                 </p>
             </div>
 
             <div class="staff-grid">
                 <div class="staff-card fade-in">
                     <div class="staff-image">
-                        <img src="./images/placeholder.jpg" alt="Chief Librarian">
+                        <img src="./images/Lib_Mam.png" alt="Librarian">
                     </div>
-                    <h4 class="staff-name">Dr. Rajesh Kumar</h4>
-                    <p class="staff-role">Chief Librarian</p>
+                    <h4 class="staff-name">Vrushali D. Hawaldar</h4>
+                    <p class="staff-role">Librarian</p>
                     <p class="staff-description">
-                        Leading our library with over 15 years of experience in academic library management,
-                        digital resource development, and information systems.
+                        Leads day-to-day library administration and supports all core library services.
                     </p>
                 </div>
 
                 <div class="staff-card fade-in">
                     <div class="staff-image">
-                        <img src="./images/placeholder.jpg" alt="Assistant Librarian">
+                        <img src="./images/Lib_Sir.jpeg" alt="Assistant Librarian">
                     </div>
-                    <h4 class="staff-name">Ms. Priya Patel</h4>
+                    <h4 class="staff-name">Vishwas B. Taralekar</h4>
                     <p class="staff-role">Assistant Librarian</p>
                     <p class="staff-description">
-                        Specializing in circulation services, member support, and digital cataloging
-                        to ensure seamless access to library resources.
-                    </p>
-                </div>
-
-                <div class="staff-card fade-in">
-                    <div class="staff-image">
-                        <img src="./images/placeholder.jpg" alt="Systems Administrator">
-                    </div>
-                    <h4 class="staff-name">Mr. Amit Sharma</h4>
-                    <p class="staff-role">Systems Administrator</p>
-                    <p class="staff-description">
-                        Managing our digital infrastructure, database systems, and ensuring
-                        optimal performance of our library management system.
+                        Supports the librarian in circulation, coordination, and member-facing tasks.
                     </p>
                 </div>
             </div>
@@ -1166,10 +1151,8 @@
                 <div class="footer-column">
                     <h3>TIMING</h3>
                     <div class="contact-item">
-                        Monday - Friday<br>
-                        9:00 AM - 6:00 PM<br><br>
-                        Saturday<br>
-                        9:00 AM - 5:00 PM<br>
+                        Monday - Saturday<br>
+                        9:30 AM - 5:30 PM<br>
                     </div>
                 </div>
 

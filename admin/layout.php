@@ -31,6 +31,9 @@ $is_superadmin = $current_admin['is_superadmin'];
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap" rel="stylesheet">
+  <!-- Required libraries for admin pages -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
 <style>
@@ -495,7 +498,7 @@ $is_superadmin = $current_admin['is_superadmin'];
         <button class="sidebar-toggle" id="sidebarToggle">
           <i class="fas fa-bars"></i>
         </button>
-        <h1 class="navbar-title">WIET College Library</h1>
+        <h1 class="navbar-title">WIET LIBRARY</h1>
       </div>
       <div class="navbar-right">
         <p class="welcome-text">Welcome, <?php 
@@ -587,7 +590,7 @@ $is_superadmin = $current_admin['is_superadmin'];
             <span>Stock Verification</span>
           </a>
         </li>
-        <li class="sidebar-item">
+        <!-- <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="library-events">
             <i class="sidebar-icon fas fa-calendar-alt"></i>
             <span>Library Events</span>
@@ -598,7 +601,7 @@ $is_superadmin = $current_admin['is_superadmin'];
             <i class="sidebar-icon fas fa-upload"></i>
             <span>Bulk Import</span>
           </a>
-        </li>
+        </li> -->
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="qr-generator">
             <i class="sidebar-icon fas fa-qrcode"></i>
@@ -612,12 +615,12 @@ $is_superadmin = $current_admin['is_superadmin'];
           </a>
         </li>
         <?php if ($is_superadmin): ?>
-        <li class="sidebar-item">
+        <!-- <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="manage-admins">
             <i class="sidebar-icon fas fa-user-shield"></i>
             <span>Admin Management</span>
           </a>
-        </li>
+        </li> -->
         <?php endif; ?>
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="notifications">
@@ -876,7 +879,7 @@ $is_superadmin = $current_admin['is_superadmin'];
             `;
           });
         // Update page title
-        document.title = `${page.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} - WIET College Library`;
+        document.title = `${page.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} - WIET LIBRARY`;
       }
 
       // Initialize - check URL or set default active state

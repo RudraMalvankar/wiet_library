@@ -26,13 +26,31 @@ try {
     $stats = $statsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
     $fineStmt = $pdo->prepare(
-        "SELECT COALESCE(SUM(COALESCE(r.FineAmount, 0) - COALESCE(r.FinePaid, 0)), 0) AS pending_fines
-         FROM `Return` r
-         WHERE r.MemberNo = :member_no
-         AND COALESCE(r.FineAmount, 0) > COALESCE(r.FinePaid, 0)"
+        "SELECT
+            c.CirculationID,
+            CASE
+                WHEN r.CirculationID IS NOT NULL THEN r.FineAmount
+                ELSE GREATEST(DATEDIFF(CURDATE(), c.DueDate), 0) * COALESCE(m.FinePerDay, 2)
+            END AS CalculatedFine,
+            COALESCE(SUM(fp.PaidAmount), 0) AS PaidAmount
+         FROM Circulation c
+         INNER JOIN Member m ON c.MemberNo = m.MemberNo
+         LEFT JOIN `Return` r ON c.CirculationID = r.CirculationID
+         LEFT JOIN FinePayments fp ON c.CirculationID = fp.CirculationID
+         WHERE c.MemberNo = :member_no
+         AND (
+            (r.CirculationID IS NOT NULL AND r.FineAmount > 0)
+            OR (r.CirculationID IS NULL AND c.DueDate < CURDATE())
+         )
+         GROUP BY c.CirculationID, m.FinePerDay, r.CirculationID, r.FineAmount
+         HAVING CalculatedFine > PaidAmount"
     );
     $fineStmt->execute(['member_no' => $memberNo]);
-    $fineData = $fineStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $fineRows = $fineStmt->fetchAll(PDO::FETCH_ASSOC);
+    $pendingFines = 0.0;
+    foreach ($fineRows as $row) {
+        $pendingFines += ((float)$row['CalculatedFine'] - (float)$row['PaidAmount']);
+    }
 
     $recStmt = $pdo->prepare(
         "SELECT COUNT(DISTINCT b.CatNo) AS recommendations
@@ -98,7 +116,7 @@ try {
         'quick_stats' => [
             'books_issued' => (int)($stats['books_issued'] ?? 0),
             'books_due' => (int)($stats['books_due'] ?? 0),
-            'pending_fines' => (float)($fineData['pending_fines'] ?? 0),
+            'pending_fines' => (float)$pendingFines,
             'recommendations' => min((int)($recData['recommendations'] ?? 0), 99),
         ],
         'upcoming_due' => $upcomingDue,

@@ -12,7 +12,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
 // Sample system settings data
 $system_settings = [
-    'library_name' => 'WIET College Library',
+    'library_name' => 'WIET LIBRARY',
     'library_code' => 'WIET-LIB',
     'library_address' => 'Watumull Institute of Electronic Engineering & Computer Technology, Mumbai',
     'library_phone' => '+91-22-12345678',

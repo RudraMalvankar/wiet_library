@@ -554,6 +554,20 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             </div>
 
             <div class="condition-selector">
+                <h4 style="margin-bottom: 15px; color: #263c79;">📊 Update Status (Optional):</h4>
+                <select id="statusSelect" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 6px; margin-bottom: 15px; font-size: 14px;">
+                    <option value="" selected>-- Keep Current Status --</option>
+                    <option value="Available">Available (Ready to borrow)</option>
+                    <option value="Issued">Issued (With member)</option>
+                    <option value="Reserved">Reserved (Member waiting)</option>
+                    <option value="Lost">Lost (Temporarily - may be found)</option>
+                    <option value="Permanently Lost">Permanently Lost (Cannot recover)</option>
+                    <option value="Damaged">Damaged (Needs repair)</option>
+                    <option value="Repair">Repair (Being fixed)</option>
+                    <option value="Unavailable">Unavailable (Temporarily out)</option>
+                    <option value="Dead Stock">Dead Stock (Discarded)</option>
+                </select>
+
                 <h4 style="margin-bottom: 15px; color: #263c79;">Select Condition:</h4>
                 <div class="condition-buttons">
                     <button class="condition-btn good" onclick="selectCondition('Good')">
@@ -593,6 +607,9 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
         <div class="action-buttons">
             <button class="btn btn-success" onclick="generateReport()" id="reportBtn" style="display: none;">
                 <i class="fas fa-file-pdf"></i> Generate Report
+            </button>
+            <button class="btn btn-primary" onclick="saveAllToDatabase()" id="saveDbBtn" style="display: none;">
+                <i class="fas fa-database"></i> 💾 Save All to Database
             </button>
             <button class="btn btn-secondary" onclick="clearSession()">
                 <i class="fas fa-trash"></i> Clear All
@@ -806,7 +823,23 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             document.querySelectorAll('.condition-btn').forEach(btn => {
                 btn.classList.remove('selected');
             });
-            event.target.closest('.condition-btn').classList.add('selected');
+
+            const clicked = document.querySelector(`.condition-btn.${condition.toLowerCase()}`);
+            if (clicked) {
+                clicked.classList.add('selected');
+            }
+        }
+
+        function normalizeStatus(status) {
+            const trimmed = (status || '').trim();
+            if (trimmed === 'Lost (Temporarily)') return 'Lost';
+            return trimmed;
+        }
+
+        function deriveStatusFromCondition(condition) {
+            if (condition === 'Lost') return 'Lost';
+            if (condition === 'Damaged') return 'Damaged';
+            return '';
         }
 
         function saveVerification() {
@@ -821,12 +854,34 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             }
 
             const remarks = document.getElementById('remarksInput').value.trim();
+            const manualStatus = normalizeStatus(document.getElementById('statusSelect').value);
+            const conditionStatus = deriveStatusFromCondition(selectedCondition);
+            const newStatus = manualStatus || conditionStatus;
+
+            console.log('📝 Verification Details:', {
+                accNo: currentBook.AccNo,
+                title: currentBook.Title,
+                condition: selectedCondition,
+                newStatus: newStatus || 'No change',
+                remarks: remarks
+            });
+
+            // Save status immediately when we have either manual status or condition-derived status
+            if (newStatus) {
+                console.log('🔄 Attempting to save status: ' + newStatus);
+                saveStatusToDatabase(currentBook.AccNo, newStatus);
+            } else {
+                console.log('⏭️ No status selected, skipping DB update');
+            }
 
             // Add to verified list
             const verifiedBook = {
                 accNo: currentBook.AccNo,
                 title: currentBook.Title,
                 author: currentBook.Author1,
+                location: currentBook.Location || '',
+                section: currentBook.Section || '',
+                status: newStatus || 'Not Changed',
                 condition: selectedCondition,
                 remarks: remarks,
                 timestamp: new Date().toISOString()
@@ -843,7 +898,8 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             saveSessionData();
 
             // Show success message
-            showScanResult(`✓ Book ${currentBook.AccNo} verified as ${selectedCondition}`, 'success');
+            const statusMsg = newStatus ? ` | Status: ${newStatus}` : '';
+            showScanResult(`✓ Book ${currentBook.AccNo} verified as ${selectedCondition}${statusMsg}`, 'success');
 
             // Reset form
             currentBook = null;
@@ -851,14 +907,52 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             document.getElementById('bookInfoCard').classList.remove('show');
             document.getElementById('accNoInput').value = '';
             document.getElementById('remarksInput').value = '';
+            document.getElementById('statusSelect').value = '';
 
-            // Show report button
+            // Show report and save buttons
             document.getElementById('reportBtn').style.display = 'inline-block';
+            document.getElementById('saveDbBtn').style.display = 'inline-block';
 
             // Auto-start camera for next scan
             setTimeout(() => {
                 startCamera();
             }, 1000);
+        }
+
+        async function saveStatusToDatabase(accNo, newStatus) {
+            try {
+                const payload = {
+                    originalAccNo: accNo,
+                    newAccNo: accNo,
+                    status: newStatus,
+                    location: currentBook.Location || '',
+                    section: currentBook.Section || '',
+                    availabilityNote: `Updated during stock verification on ${new Date().toLocaleDateString()}`
+                };
+                
+                console.log('🔵 Saving status to DB:', payload);
+                
+                const response = await fetch('api/books.php?action=update-holding', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',  // ✅ IMPORTANT: Include session cookies
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                console.log('🟢 Database response:', result);
+                
+                if (result.success) {
+                    console.log(`✅ Status saved to DB: ${accNo} → ${newStatus}`);
+                    showScanResult(`✅ Database saved: ${accNo} is now "${newStatus}"`, 'success');
+                } else {
+                    console.error('❌ Failed to save status:', result.message);
+                    showScanResult(`❌ Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('❌ Error saving status to database:', error);
+                showScanResult(`❌ Error: ${error.message}`, 'error');
+            }
         }
 
         function addToVerifiedList(book) {
@@ -874,6 +968,7 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
                     <div class="verified-item-accno">${book.accNo}</div>
                     <div class="verified-item-title">${book.title}</div>
                     <span class="verified-item-condition ${book.condition.toLowerCase()}">${book.condition}</span>
+                    ${book.status && book.status !== 'Not Changed' ? `<span style="background: #263c79; color: white; padding: 4px 12px; border-radius: 4px; font-size: 12px; margin-left: 8px;"><i class="fas fa-info-circle"></i> Status: ${book.status}</span>` : ''}
                     ${book.remarks ? `<div style="margin-top: 5px; font-size: 13px; color: #666;"><i class="fas fa-comment"></i> ${book.remarks}</div>` : ''}
                 </div>
                 <div>
@@ -910,6 +1005,7 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             if (verifiedBooks.length === 0) {
                 document.getElementById('verifiedListSection').style.display = 'none';
                 document.getElementById('reportBtn').style.display = 'none';
+                document.getElementById('saveDbBtn').style.display = 'none';
             } else {
                 verifiedBooks.forEach(book => addToVerifiedList(book));
             }
@@ -934,6 +1030,85 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
             }, 5000);
         }
 
+        async function saveAllToDatabase() {
+            if (verifiedBooks.length === 0) {
+                alert('No books to save!');
+                return;
+            }
+
+            const saveBtn = document.getElementById('saveDbBtn');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+            const booksToSave = verifiedBooks.filter(book => book.status && book.status !== 'Not Changed');
+            if (booksToSave.length === 0) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-database"></i> 💾 Save All to Database';
+                alert('No status updates to save. Choose a status or use Damaged/Lost condition to update Holding status.');
+                return;
+            }
+
+            let successCount = 0;
+            let failCount = 0;
+            const errors = [];
+
+            console.log('🟦 Starting batch save to database for', booksToSave.length, 'books...');
+
+            for (const book of booksToSave) {
+                try {
+                    const response = await fetch('api/books.php?action=update-holding', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            originalAccNo: book.accNo,
+                            newAccNo: book.accNo,
+                            status: normalizeStatus(book.status),
+                            location: book.location || '',
+                            section: book.section || '',
+                            availabilityNote: `Stock verification update: ${book.status}. ${book.remarks || ''}`
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log(`✅ Saved: ${book.accNo} → ${book.status}`);
+                        successCount++;
+                    } else {
+                        console.error(`❌ Failed: ${book.accNo} - ${result.message}`);
+                        errors.push(`${book.accNo}: ${result.message}`);
+                        failCount++;
+                    }
+                } catch (error) {
+                    console.error(`❌ Error: ${book.accNo}`, error);
+                    errors.push(`${book.accNo}: ${error.message}`);
+                    failCount++;
+                }
+            }
+
+            // Show results
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-database"></i> 💾 Save All to Database';
+
+            let message = `✅ Saved: ${successCount} books`;
+            if (failCount > 0) {
+                message += ` | ❌ Failed: ${failCount} books`;
+            }
+
+            console.log('🟩 Batch save complete!', message);
+            console.log('Details:', errors);
+
+            if (failCount === 0) {
+                alert(`🎉 SUCCESS!\n\n✅ All ${successCount} books saved to database!\n\nYou can now check the Unavailable Books Report to see the updated statuses.`);
+                // Clear after successful save
+                setTimeout(() => {
+                    clearSession();
+                }, 1000);
+            } else {
+                alert(`⚠️ Partial Save\n\n✅ Saved: ${successCount}\n❌ Failed: ${failCount}\n\nErrors:\n${errors.join('\n')}`);
+            }
+        }
+
         function saveSessionData() {
             localStorage.setItem('stockVerification', JSON.stringify({
                 verifiedBooks: verifiedBooks,
@@ -954,6 +1129,7 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
                 
                 if (verifiedBooks.length > 0) {
                     document.getElementById('reportBtn').style.display = 'inline-block';
+                document.getElementById('saveDbBtn').style.display = 'inline-block';
                 }
             }
         }
@@ -1050,6 +1226,7 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
                                 <th>Accession No</th>
                                 <th>Title</th>
                                 <th>Author</th>
+                                <th>Status (if changed)</th>
                                 <th>Condition</th>
                                 <th>Remarks</th>
                             </tr>
@@ -1061,6 +1238,7 @@ $admin_name = $current_admin['name'] ?? 'Admin User';
                                     <td><strong>${book.accNo}</strong></td>
                                     <td>${book.title}</td>
                                     <td>${book.author || 'N/A'}</td>
+                                    <td>${book.status && book.status !== 'Not Changed' ? `<strong style="color: #263c79;">${book.status}</strong>` : '-'}</td>
                                     <td><span class="condition ${book.condition.toLowerCase()}">${book.condition}</span></td>
                                     <td>${book.remarks || '-'}</td>
                                 </tr>

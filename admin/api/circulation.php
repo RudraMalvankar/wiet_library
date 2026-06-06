@@ -47,18 +47,35 @@ try {
             $data = json_decode(file_get_contents('php://input'), true);
             $memberNo = $data['memberNo'] ?? 0;
             $accNo = $data['accNo'] ?? '';
+            $issueDate = $data['issueDate'] ?? date('Y-m-d');
+            $scannedAccNo = trim((string)($data['scannedAccNo'] ?? ''));
             $adminId = $_SESSION['AdminID'] ?? null;
             
             if (!$memberNo || !$accNo) {
                 sendJson(['success' => false, 'message' => 'Member number and accession number are required'], 400);
             }
+
+            if ($scannedAccNo !== '' && strcasecmp($scannedAccNo, $accNo) !== 0) {
+                sendJson([
+                    'success' => false,
+                    'message' => 'QR mismatch detected. Scanned QR does not match selected accession number. Issue blocked.'
+                ], 400);
+            }
+
+            $member = getMemberByNo($pdo, $memberNo);
+            if (!$member) {
+                sendJson(['success' => false, 'message' => 'Member not found'], 404);
+            }
+            if (($member['Status'] ?? '') !== 'Active') {
+                sendJson(['success' => false, 'message' => 'Inactive member cannot issue books'], 400);
+            }
             
             // Use the issueBook function from functions.php
-            $result = issueBook($pdo, $memberNo, $accNo, $adminId);
+            $result = issueBook($pdo, $memberNo, $accNo, $adminId, $issueDate);
             
             if ($result['success']) {
                 // Log activity
-                logActivity($pdo, $adminId, 'BOOK_ISSUE', "Issued book {$accNo} to member {$memberNo}");
+                logActivity($pdo, $adminId, 'BOOK_ISSUE', "Issued book {$accNo} to member {$memberNo} | IssueDate: {$issueDate}");
             }
             
             sendJson($result);
@@ -74,18 +91,35 @@ try {
             $circulationId = $data['circulationId'] ?? 0;
             $condition = $data['condition'] ?? 'Good';
             $remarks = $data['remarks'] ?? '';
+            $returnDate = $data['returnDate'] ?? date('Y-m-d');
+            $finePayment = $data['finePayment'] ?? [];
             $adminId = $_SESSION['AdminID'] ?? null;
             
             if (!$circulationId) {
                 sendJson(['success' => false, 'message' => 'Circulation ID is required'], 400);
             }
+
+            if (!is_array($finePayment)) {
+                $finePayment = [];
+            }
+
+            $options = [
+                'returnDate' => $returnDate,
+                'collectedBy' => $adminId,
+                'finePaid' => !empty($finePayment['isPaid']),
+                'finePaidAmount' => (float)($finePayment['amount'] ?? 0),
+                'fineReceiptNo' => $finePayment['receiptNo'] ?? '',
+                'finePaymentDate' => $finePayment['paymentDate'] ?? '',
+                'finePaymentQr' => $finePayment['qrRef'] ?? '',
+                'finePaymentRemarks' => $finePayment['remarks'] ?? ''
+            ];
             
             // Use the returnBook function from functions.php
-            $result = returnBook($pdo, $circulationId, $condition, $remarks);
+            $result = returnBook($pdo, $circulationId, $condition, $remarks, $options);
             
             if ($result['success']) {
                 // Log activity
-                logActivity($pdo, $adminId, 'BOOK_RETURN', "Returned book for circulation ID {$circulationId}");
+                logActivity($pdo, $adminId, 'BOOK_RETURN', "Returned book for circulation ID {$circulationId} | FinePaid: " . ($result['finePaid'] ?? 0));
             }
             
             sendJson($result);

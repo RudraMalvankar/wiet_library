@@ -1,5 +1,5 @@
 <?php
-// Developer page for WIET College Library Management System
+// Developer page for WIET LIBRARY Management System
 ?>
 
 <!DOCTYPE html>
@@ -720,7 +720,7 @@
             </div>
 
             <div class="footer-bottom">
-                <p>&copy; 2025 WIET College Library | Developed and Managed by <span style="color: var(--yellow); font-weight: 600;">WIET Library Team</span></p>
+                <p>&copy; 2025 WIET LIBRARY | Developed and Managed by <span style="color: var(--yellow); font-weight: 600;">WIET Library Team</span></p>
             </div>
         </div>
     </footer>

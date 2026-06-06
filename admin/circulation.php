@@ -920,11 +920,11 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                     <div class="form-row">
                         <div class="form-group">
                             <label for="issueDate">Issue Date</label>
-                            <input type="date" id="issueDate" class="form-control" value="<?php echo date('Y-m-d'); ?>">
+                            <input type="date" id="issueDate" class="form-control" value="<?php echo date('Y-m-d'); ?>" onchange="syncDueDateFromIssue()">
                         </div>
                         <div class="form-group">
                             <label for="dueDate">Due Date</label>
-                            <input type="date" id="dueDate" class="form-control" value="<?php echo date('Y-m-d', strtotime('+15 days')); ?>">
+                            <input type="date" id="dueDate" class="form-control" value="<?php echo date('Y-m-d', strtotime('+15 days')); ?>" readonly>
                         </div>
                         <div class="form-group">
                             <label for="remarks">Remarks (Optional)</label>
@@ -1053,14 +1053,46 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                         </div>
                     </div>
 
+                    <div id="finePaymentSection" class="fine-calculator" style="display: none; margin-top: 15px;">
+                        <h4 style="color: #0b4f8c; margin-bottom: 10px;">
+                            <i class="fas fa-money-check-alt"></i>
+                            Fine Payment Details (Required Before Return)
+                        </h4>
+                        <div class="form-row" style="margin-bottom: 10px;">
+                            <div class="form-group" style="min-width: 100%;">
+                                <label style="display:flex; align-items:center; gap:8px; margin:0;">
+                                    <input type="checkbox" id="finePaidConfirm">
+                                    I confirm fine payment has been collected.
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="fineReceiptNo">Receipt No.</label>
+                                <input type="text" id="fineReceiptNo" class="form-control" placeholder="Enter receipt number">
+                            </div>
+                            <div class="form-group">
+                                <label for="finePaymentDate">Payment Date</label>
+                                <input type="date" id="finePaymentDate" class="form-control" value="<?php echo date('Y-m-d'); ?>">
+                            </div>
+                            <div class="form-group">
+                                <label for="finePaidAmount">Amount (INR)</label>
+                                <input type="number" id="finePaidAmount" class="form-control" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label for="finePaymentQr">QR Reference / UTR</label>
+                                <input type="text" id="finePaymentQr" class="form-control" placeholder="Scan or enter QR transaction reference">
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="returnCondition">Book Condition</label>
                             <select id="returnCondition" class="form-control">
                                 <option value="Good">Good Condition</option>
                                 <option value="Fair">Fair Condition</option>
-                                <option value="Damaged">Damaged</option>
-                                <option value="Lost">Lost</option>
+                                <option value="Repair">Needs Repair</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -1277,6 +1309,62 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
     let selectedBook = null;
     let returnBookData = null;
     let csrfToken = null;
+    let lastBookScannedAccNo = null;
+    let bookSelectedFromScan = false;
+
+        function updateReturnButtonState() {
+            const returnBtn = document.getElementById('returnBtn');
+            const finePaymentSection = document.getElementById('finePaymentSection');
+            const fineTotal = parseFloat(document.getElementById('totalFine')?.textContent || '0');
+
+            if (!returnBtn) {
+                return;
+            }
+
+            if (fineTotal <= 0) {
+                returnBtn.disabled = !returnBookData;
+                return;
+            }
+
+            const isPaidChecked = document.getElementById('finePaidConfirm')?.checked;
+            const fineReceiptNo = document.getElementById('fineReceiptNo')?.value.trim();
+            const finePaymentDate = document.getElementById('finePaymentDate')?.value;
+            const finePaidAmount = parseFloat(document.getElementById('finePaidAmount')?.value || '0');
+            const finePaymentQr = document.getElementById('finePaymentQr')?.value.trim();
+
+            const hasValidFinePayment = Boolean(
+                isPaidChecked &&
+                fineReceiptNo &&
+                finePaymentDate &&
+                finePaymentQr &&
+                !Number.isNaN(finePaidAmount) &&
+                finePaidAmount >= fineTotal
+            );
+
+            if (finePaymentSection && finePaymentSection.style.display !== 'none') {
+                returnBtn.disabled = !hasValidFinePayment;
+            } else {
+                returnBtn.disabled = true;
+            }
+        }
+
+        function syncDueDateFromIssue() {
+            const issueDateInput = document.getElementById('issueDate');
+            const dueDateInput = document.getElementById('dueDate');
+            if (!issueDateInput || !dueDateInput || !issueDateInput.value) {
+                return;
+            }
+
+            const parts = issueDateInput.value.split('-').map(Number);
+            if (parts.length !== 3 || parts.some(Number.isNaN)) {
+                return;
+            }
+
+            const date = new Date(parts[0], parts[1] - 1, parts[2]);
+            date.setDate(date.getDate() + 15);
+            const dueDate = date.toISOString().split('T')[0];
+            dueDateInput.value = dueDate;
+        }
 
         // Fetch CSRF token on page load
         async function fetchCSRFToken() {
@@ -1446,11 +1534,16 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             }
         }
 
-        async function searchBook() {
+        async function searchBook(source = 'manual') {
             let accNo = document.getElementById('accNo').value.trim();
             // Strip QR prefix if present (e.g. 'BOOK:BE8986' -> 'BE8986')
             if (accNo.toUpperCase().startsWith('BOOK:')) { accNo = accNo.substring(5).trim(); }
             document.getElementById('accNo').value = accNo;
+
+            if (source !== 'scan') {
+                bookSelectedFromScan = false;
+                lastBookScannedAccNo = null;
+            }
 
             if (!accNo) {
                 showScanError('bookScanError', 'Please enter an Accession Number');
@@ -1514,6 +1607,10 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                     
                     document.getElementById('bookInfo').classList.add('show');
                     showScanResult('bookScanResult', `✓ Book available: ${book.Title}`);
+                    if (source === 'scan') {
+                        bookSelectedFromScan = true;
+                        lastBookScannedAccNo = (book.AccNo || accNo);
+                    }
                     checkIssueFormComplete();
                 } else {
                     showScanError('bookScanError', `Book with AccNo ${accNo} not found in database!`);
@@ -1542,6 +1639,8 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 return;
             }
 
+            syncDueDateFromIssue();
+
             const issueDate = document.getElementById('issueDate').value;
             const dueDate = document.getElementById('dueDate').value;
             const remarks = document.getElementById('remarks').value;
@@ -1569,6 +1668,11 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 return;
             }
 
+            if (bookSelectedFromScan && lastBookScannedAccNo && String(lastBookScannedAccNo).toUpperCase() !== String(selectedBook.AccNo).toUpperCase()) {
+                showNotification('QR mismatch detected: scanned QR does not match selected accession number. Please rescan the correct book.', 'error');
+                return;
+            }
+
             // Disable button to prevent double submission
             const issueBtn = document.getElementById('issueBtn');
             const originalText = issueBtn.innerHTML;
@@ -1583,6 +1687,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                         csrf_token: csrfToken,
                         memberNo: selectedMember.MemberNo,
                         accNo: selectedBook.AccNo,
+                        scannedAccNo: bookSelectedFromScan ? lastBookScannedAccNo : '',
                         issueDate: issueDate,
                         dueDate: dueDate,
                         remarks: remarks
@@ -1625,13 +1730,15 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             // Clear variables
             selectedMember = null;
             selectedBook = null;
+            lastBookScannedAccNo = null;
+            bookSelectedFromScan = false;
             
             // Clear form fields
             document.getElementById('memberNo').value = '';
             document.getElementById('accNo').value = '';
             document.getElementById('remarks').value = '';
             document.getElementById('issueDate').value = '<?php echo date('Y-m-d'); ?>';
-            document.getElementById('dueDate').value = '<?php echo date('Y-m-d', strtotime('+15 days')); ?>';
+            syncDueDateFromIssue();
             
             // Hide info panels
             document.getElementById('memberInfo').classList.remove('show');
@@ -1710,20 +1817,29 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                             document.getElementById('fineOverdueDays').textContent = overdueDays;
                             document.getElementById('totalFine').textContent = totalFine.toFixed(2);
                             document.getElementById('fineCalculator').classList.add('show');
+                            document.getElementById('finePaymentSection').style.display = 'block';
+                            document.getElementById('finePaidConfirm').checked = false;
+                            document.getElementById('fineReceiptNo').value = '';
+                            document.getElementById('finePaymentDate').value = new Date().toISOString().split('T')[0];
+                            document.getElementById('finePaidAmount').value = totalFine.toFixed(2);
+                            document.getElementById('finePaymentQr').value = '';
+                            document.getElementById('returnBtn').disabled = true;
                             
                             showScanError('returnScanError', `⚠️ Book is overdue by ${overdueDays} days. Fine: ₹${totalFine.toFixed(2)}`);
                         } else {
                             document.getElementById('fineCalculator').classList.remove('show');
+                            document.getElementById('finePaymentSection').style.display = 'none';
                             document.getElementById('totalFine').textContent = '0.00';
                             showScanResult('returnScanResult', `✓ Circulation found: ${circulation.Title} (On time)`);
+                            document.getElementById('returnBtn').disabled = false;
                         }
-
-                        document.getElementById('returnBtn').disabled = false;
+                        updateReturnButtonState();
                     } else {
                         showScanError('returnScanError', `No active circulation found for AccNo: ${accNo}. Book may not be issued or already returned.`);
                         returnBookData = null;
                         document.getElementById('returnBookInfo').classList.remove('show');
                         document.getElementById('fineCalculator').classList.remove('show');
+                        document.getElementById('finePaymentSection').style.display = 'none';
                         document.getElementById('returnBtn').disabled = true;
                     }
                 } else {
@@ -1731,6 +1847,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                     returnBookData = null;
                     document.getElementById('returnBookInfo').classList.remove('show');
                     document.getElementById('fineCalculator').classList.remove('show');
+                    document.getElementById('finePaymentSection').style.display = 'none';
                     document.getElementById('returnBtn').disabled = true;
                 }
             } catch (error) {
@@ -1738,6 +1855,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 showScanError('returnScanError', 'Error searching for book circulation. Please check your connection and try again.');
                 document.getElementById('returnBookInfo').classList.remove('show');
                 document.getElementById('fineCalculator').classList.remove('show');
+                document.getElementById('finePaymentSection').style.display = 'none';
                 document.getElementById('returnBtn').disabled = true;
             }
         }
@@ -1748,38 +1866,60 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 return;
             }
 
+            const returnBtn = document.getElementById('returnBtn');
+            const originalText = returnBtn.innerHTML;
+
             const condition = document.getElementById('returnCondition').value;
             const remarks = document.getElementById('returnRemarks').value;
             const fineAmount = parseFloat(document.getElementById('totalFine').textContent || '0');
             const returnDate = new Date().toISOString().split('T')[0];
+            let finePaymentPayload = {
+                isPaid: false,
+                amount: 0,
+                receiptNo: '',
+                paymentDate: '',
+                qrRef: '',
+                remarks: ''
+            };
 
-            // Confirm return if there's a fine
+            // For overdue books, fine payment details are mandatory before return.
             if (fineAmount > 0) {
-                const proceed = await new Promise(resolve => {
-                    showNotification(
-                        `Overdue fine: <b>₹${fineAmount.toFixed(2)}</b><br><br>` +
-                        `<span style="font-size:15px;font-weight:400">Click the backdrop to cancel, or this will proceed in 6 seconds.</span>`,
-                        'warning'
-                    );
-                    // Let user cancel via backdrop, else auto-proceed
-                    const backdrop = document.getElementById('ntf-backdrop');
-                    let resolved = false;
-                    if (backdrop) {
-                        const prev = backdrop.onclick;
-                        backdrop.onclick = () => { if (!resolved) { resolved=true; resolve(false); } backdrop.onclick=prev; };
-                    }
-                    setTimeout(() => { if (!resolved) { resolved=true; resolve(true); } }, 6000);
-                });
-                if (!proceed) {
+                const isPaidChecked = document.getElementById('finePaidConfirm').checked;
+                const fineReceiptNo = document.getElementById('fineReceiptNo').value.trim();
+                const finePaymentDate = document.getElementById('finePaymentDate').value;
+                const finePaidAmount = parseFloat(document.getElementById('finePaidAmount').value || '0');
+                const finePaymentQr = document.getElementById('finePaymentQr').value.trim();
+
+                if (!isPaidChecked) {
+                    showNotification('Fine payment confirmation is required before returning overdue books.', 'error');
+                    return;
+                }
+                if (!fineReceiptNo || !finePaymentDate || !finePaymentQr) {
+                    showNotification('Receipt no., payment date and QR reference are required for fine payment.', 'error');
+                    return;
+                }
+                if (Number.isNaN(finePaidAmount) || finePaidAmount <= 0) {
+                    showNotification('Enter a valid fine amount.', 'error');
+                    return;
+                }
+                if (finePaidAmount < fineAmount) {
+                    showNotification(`Fine amount is short. Required: ₹${fineAmount.toFixed(2)}`, 'error');
                     returnBtn.disabled = false;
                     returnBtn.innerHTML = originalText;
                     return;
                 }
+
+                finePaymentPayload = {
+                    isPaid: true,
+                    amount: finePaidAmount,
+                    receiptNo: fineReceiptNo,
+                    paymentDate: finePaymentDate,
+                    qrRef: finePaymentQr,
+                    remarks: 'Collected during return workflow'
+                };
             }
 
             // Disable button to prevent double submission
-            const returnBtn = document.getElementById('returnBtn');
-            const originalText = returnBtn.innerHTML;
             returnBtn.disabled = true;
             returnBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
@@ -1793,7 +1933,8 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                         returnDate: returnDate,
                         condition: condition,
                         remarks: remarks,
-                        fineAmount: fineAmount
+                        fineAmount: fineAmount,
+                        finePayment: finePaymentPayload
                     })
                 });
 
@@ -1801,7 +1942,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
                 if (result.success) {
                     const fineMsg = fineAmount > 0
-                        ? `<br><b>Fine Collected:</b> ₹${fineAmount.toFixed(2)}`
+                        ? `<br><b>Fine Collected:</b> ₹${finePaymentPayload.amount.toFixed(2)}<br><b>Receipt:</b> ${finePaymentPayload.receiptNo}`
                         : '<br>Returned on time — No fine';
                     showNotification(
                         `Book Returned Successfully!<br><br>` +
@@ -1843,6 +1984,14 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             // Hide info panels
             document.getElementById('returnBookInfo').classList.remove('show');
             document.getElementById('fineCalculator').classList.remove('show');
+            document.getElementById('finePaymentSection').style.display = 'none';
+
+            // Clear fine payment fields
+            document.getElementById('finePaidConfirm').checked = false;
+            document.getElementById('fineReceiptNo').value = '';
+            document.getElementById('finePaymentDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('finePaidAmount').value = '';
+            document.getElementById('finePaymentQr').value = '';
             
             // Clear scan results
             document.getElementById('returnScanResult').textContent = '';
@@ -1855,6 +2004,14 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             
             console.log('Return form reset complete');
         }
+
+        ['finePaidConfirm', 'fineReceiptNo', 'finePaymentDate', 'finePaidAmount', 'finePaymentQr'].forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.addEventListener('input', updateReturnButtonState);
+                field.addEventListener('change', updateReturnButtonState);
+            }
+        });
 
         // Renew Book Function
         async function renewBook(circulationId) {
@@ -1986,19 +2143,6 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                 console.error('Error loading return history:', error);
                 document.getElementById('returnHistoryTable').innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #dc3545;">Error loading data</td></tr>';
             }
-        }
-
-        // Action Functions
-        function renewBook(circulationId) {
-            console.log('Renewing book for circulation:', circulationId);
-            showNotification('Book renewed successfully!<br><small style="font-weight:400">New due date: ' + new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toLocaleDateString() + '</small>', 'success');
-            loadActiveCirculations();
-        }
-
-        function processReturn(accNo) {
-            showTab('return');
-            document.getElementById('returnAccNo').value = accNo;
-            searchReturnBook();
         }
 
         function searchCirculations() {
@@ -2297,7 +2441,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             document.getElementById('accNo').value = accNo;
             const camContainer = document.getElementById('bookVideo').closest('.camera-container');
             if (camContainer) showScanBanner(camContainer, accNo);
-            searchBook();
+            searchBook('scan');
             stopBookScan();
         }
 
@@ -2551,6 +2695,9 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             
             // Fetch CSRF token first
             fetchCSRFToken();
+
+            // Keep due date auto-generated from issue date.
+            syncDueDateFromIssue();
             
             // Initialize code readers
             initializeCodeReaders();
@@ -2609,6 +2756,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
         window.stopReturnScan = stopReturnScan;
         window.searchMember = searchMember;
         window.searchBook = searchBook;
+        window.syncDueDateFromIssue = syncDueDateFromIssue;
         window.issueBook = issueBook;
         window.searchReturnBook = searchReturnBook;
         window.returnBook = returnBook;

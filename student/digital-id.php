@@ -6,7 +6,7 @@
 session_start();
 
 // Redirect to login if not authenticated
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['student_id'])) {
     header('Location: student_login.php');
     exit();
 }
@@ -191,11 +191,20 @@ $card_features = [
         margin-bottom: 25px;
     }
 
-    .student-name {
+    .digital-card .student-name {
         font-size: 24px;
         font-weight: 700;
         margin-bottom: 8px;
-        color: white;
+        color: #ffffff;
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.45);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+        line-height: 1.2;
+        max-width: 100%;
+        word-break: break-word;
     }
 
     .student-details {
@@ -506,7 +515,7 @@ $card_features = [
     <div class="digital-card">
         <div class="card-header">
             <div class="college-info">
-                <div class="college-name">WIET College Library</div>
+                <div class="college-name">WIET LIBRARY</div>
                 <div class="card-type">Student Membership Card</div>
             </div>
             <div class="status-badge"><?php echo $digital_card['status']; ?></div>
@@ -565,16 +574,6 @@ $card_features = [
             </div>
         </div>
 
-        <div class="download-actions">
-            <button class="download-btn" onclick="downloadCard()">
-                <i class="fas fa-download"></i>
-                Download Card (PNG)
-            </button>
-            <button class="download-btn secondary" onclick="printCard()">
-                <i class="fas fa-print"></i>
-                Print Card
-            </button>
-        </div>
     </div>
 </div>
 
@@ -799,4 +798,5 @@ $card_features = [
         printWindow.document.close();
     }
 </script>
+
 

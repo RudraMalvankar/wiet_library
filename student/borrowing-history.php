@@ -6,7 +6,7 @@
 session_start();
 
 // Redirect to login if not authenticated
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['student_id'])) {
     header('Location: student_login.php');
     exit();
 }
@@ -831,3 +831,4 @@ try {
         // Here you would typically open a modal or navigate to a details page
     }
 </script>
+

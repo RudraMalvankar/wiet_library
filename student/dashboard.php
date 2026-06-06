@@ -6,7 +6,7 @@
 session_start();
 
 // Redirect to login if not authenticated
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['student_id'])) {
     header('Location: student_login.php');
     exit();
 }
@@ -19,6 +19,7 @@ require_once '../includes/functions.php';
 $student_name = $_SESSION['student_name'] ?? 'Student';
 $student_id = $_SESSION['student_id'] ?? null;
 $member_no = $_SESSION['member_no'] ?? null;
+$student_branch = $_SESSION['student_branch'] ?? '';
 
 // ============================================================
 // DATA SOURCE: 100% LIVE DATABASE
@@ -39,34 +40,47 @@ try {
             COUNT(DISTINCT CASE WHEN DATEDIFF(c.DueDate, CURDATE()) <= 7 AND DATEDIFF(c.DueDate, CURDATE()) >= 0 THEN c.CirculationID END) as books_due
         FROM Circulation c
         WHERE c.MemberNo = :member_no 
-        AND c.ReturnDate IS NULL
+        AND c.Status = 'Active'
     ";
     $stmt = $pdo->prepare($quick_stats_query);
     $stmt->execute(['member_no' => $member_no]);
     $quick_stats = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // Calculate pending fines from Return table (fines not yet paid)
+    // Calculate pending fines (returned fines + overdue unreturned books - payments made)
     $fines_query = "
-        SELECT COALESCE(SUM(r.Fine - COALESCE(fp.AmountPaid, 0)), 0) as pending_fines
-        FROM `Return` r
-        LEFT JOIN (
-            SELECT TransactionID, SUM(AmountPaid) as AmountPaid
-            FROM FinePayments
-            GROUP BY TransactionID
-        ) fp ON r.ReturnID = fp.TransactionID
-        WHERE r.MemberNo = :member_no
-        AND r.Fine > COALESCE(fp.AmountPaid, 0)
+        SELECT
+            c.CirculationID,
+            CASE
+                WHEN r.CirculationID IS NOT NULL THEN r.FineAmount
+                ELSE GREATEST(DATEDIFF(CURDATE(), c.DueDate), 0) * COALESCE(m.FinePerDay, 2)
+            END AS CalculatedFine,
+            COALESCE(SUM(fp.PaidAmount), 0) AS PaidAmount
+        FROM Circulation c
+        INNER JOIN Member m ON c.MemberNo = m.MemberNo
+        LEFT JOIN `Return` r ON c.CirculationID = r.CirculationID
+        LEFT JOIN FinePayments fp ON c.CirculationID = fp.CirculationID
+        WHERE c.MemberNo = :member_no
+        AND (
+            (r.CirculationID IS NOT NULL AND r.FineAmount > 0)
+            OR (r.CirculationID IS NULL AND c.DueDate < CURDATE())
+        )
+        GROUP BY c.CirculationID, m.FinePerDay, r.CirculationID, r.FineAmount
+        HAVING CalculatedFine > PaidAmount
     ";
     $stmt = $pdo->prepare($fines_query);
     $stmt->execute(['member_no' => $member_no]);
-    $fines_result = $stmt->fetch(PDO::FETCH_ASSOC);
-    $quick_stats['pending_fines'] = (int)$fines_result['pending_fines'];
+    $fines_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $pending_fines_total = 0;
+    foreach ($fines_rows as $fine_row) {
+        $pending_fines_total += ((float)$fine_row['CalculatedFine'] - (float)$fine_row['PaidAmount']);
+    }
+    $quick_stats['pending_fines'] = (int)round($pending_fines_total);
     
     // Count available recommendations in student's branch
     $recommendations_query = "
-        SELECT COUNT(DISTINCT b.CallNo) as recommendations
+        SELECT COUNT(DISTINCT b.CatNo) as recommendations
         FROM Books b
-        INNER JOIN Holding h ON b.CallNo = h.CallNo
+        INNER JOIN Holding h ON b.CatNo = h.CatNo
         WHERE b.Subject LIKE CONCAT('%', :branch, '%')
         AND h.Status = 'Available'
         LIMIT 100
@@ -87,7 +101,7 @@ try {
         INNER JOIN Holding h ON c.AccNo = h.AccNo
         INNER JOIN Books b ON h.CallNo = b.CallNo
         WHERE c.MemberNo = :member_no 
-        AND c.ReturnDate IS NULL
+        AND c.Status = 'Active'
         AND DATEDIFF(c.DueDate, CURDATE()) <= 7
         AND DATEDIFF(c.DueDate, CURDATE()) >= 0
         ORDER BY c.DueDate ASC
@@ -98,13 +112,13 @@ try {
     $upcoming_due = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
 } catch (Exception $e) {
-    // Fallback to session data if database error
-    $quick_stats = [
-        'books_issued' => isset($_SESSION['books_issued']) ? $_SESSION['books_issued'] : 0,
+    // Preserve already computed values if part of the block succeeded.
+    $quick_stats = array_merge([
+        'books_issued' => isset($_SESSION['books_issued']) ? (int)$_SESSION['books_issued'] : 0,
         'books_due' => 0,
         'pending_fines' => 0,
         'recommendations' => 0
-    ];
+    ], is_array($quick_stats ?? null) ? $quick_stats : []);
     $upcoming_due = [];
 }
 
@@ -170,7 +184,7 @@ try {
         SELECT COUNT(*) as overdue_count
         FROM Circulation c
         WHERE c.MemberNo = :member_no 
-        AND c.ReturnDate IS NULL
+        AND c.Status = 'Active'
         AND c.DueDate < CURDATE()
     ";
     $stmt = $pdo->prepare($overdue_query);
@@ -195,7 +209,7 @@ try {
         INNER JOIN Holding h ON c.AccNo = h.AccNo
         INNER JOIN Books b ON h.CallNo = b.CallNo
         WHERE c.MemberNo = :member_no 
-        AND c.ReturnDate IS NULL
+        AND c.Status = 'Active'
         AND DATEDIFF(c.DueDate, CURDATE()) BETWEEN 0 AND 3
         ORDER BY c.DueDate ASC
         LIMIT 2
@@ -711,3 +725,4 @@ try {
         });
     });
 </script>
+

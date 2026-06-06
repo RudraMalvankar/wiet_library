@@ -531,7 +531,7 @@ try {
         <button class="sidebar-toggle" id="sidebarToggle">
           <i class="fas fa-bars"></i>
         </button>
-        <h1 class="navbar-title">WIET College Library</h1>
+        <h1 class="navbar-title">WIET LIBRARY</h1>
       </div>
       <div class="navbar-right">
         <p class="welcome-text">Welcome, <?php echo htmlspecialchars($student_name); ?></p>
@@ -569,12 +569,12 @@ try {
             <span>Search Books</span>
           </a>
         </li>
-        <li class="sidebar-item">
+        <!-- <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="e-resources">
             <i class="sidebar-icon fas fa-laptop"></i>
             <span>E-Resources</span>
           </a>
-        </li>
+        </li> -->
         <li class="sidebar-item">
           <a href="#" class="sidebar-link" data-page="my-footfall">
             <i class="sidebar-icon fas fa-chart-line"></i>
@@ -763,7 +763,7 @@ try {
           });
 
         // Update page title
-        document.title = `${page.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} - WIET College Library`;
+        document.title = `${page.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} - WIET LIBRARY`;
       }
 
       // Make loadPage available globally

@@ -15,7 +15,7 @@
 session_start();
 
 // Redirect to login if not authenticated
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['student_id'])) {
     header('Location: student_login.php');
     exit();
 }
@@ -949,3 +949,4 @@ $show_notifications_debug = isset($_GET['debug_notifications']) && $_GET['debug_
         // In real implementation, make AJAX call to fetch new notifications
     }, 300000); // 5 minutes
 </script>
+

@@ -253,9 +253,20 @@ function searchBooks($pdo, $query, $limit = 50) {
 /**
  * Issue a book to a member
  */
-function issueBook($pdo, $memberNo, $accNo, $adminId = null) {
+function issueBook($pdo, $memberNo, $accNo, $adminId = null, $issueDate = null) {
     try {
         $pdo->beginTransaction();
+
+        $issueDate = $issueDate ?: date('Y-m-d');
+        $validatedIssueDate = validateDate($issueDate);
+        if (!$validatedIssueDate) {
+            throw new Exception("Invalid issue date");
+        }
+
+        $today = date('Y-m-d');
+        if ($validatedIssueDate > $today) {
+            throw new Exception("Issue date cannot be in the future");
+        }
         
         // Check if book is available
         if (!isBookAvailable($pdo, $accNo)) {
@@ -267,16 +278,15 @@ function issueBook($pdo, $memberNo, $accNo, $adminId = null) {
             throw new Exception("Member has reached borrowing limit or is inactive");
         }
         
-        // Calculate due date (15 days from now)
-        $issueDate = date('Y-m-d');
-        $dueDate = date('Y-m-d', strtotime('+15 days'));
+        // Due date is always 15 days from entered issue date
+        $dueDate = date('Y-m-d', strtotime($validatedIssueDate . ' +15 days'));
         
         // Insert circulation record
         $stmt = $pdo->prepare("
             INSERT INTO Circulation (MemberNo, AccNo, IssueDate, IssueTime, DueDate, Status, CreatedBy)
             VALUES (?, ?, ?, ?, ?, 'Active', ?)
         ");
-        $stmt->execute([$memberNo, $accNo, $issueDate, date('H:i:s'), $dueDate, $adminId]);
+        $stmt->execute([$memberNo, $accNo, $validatedIssueDate, date('H:i:s'), $dueDate, $adminId]);
         
         // Update holding status
         $stmt = $pdo->prepare("UPDATE Holding SET Status = 'Issued' WHERE AccNo = ?");
@@ -298,7 +308,7 @@ function issueBook($pdo, $memberNo, $accNo, $adminId = null) {
 /**
  * Return a book
  */
-function returnBook($pdo, $circulationId, $condition = 'Good', $remarks = '') {
+function returnBook($pdo, $circulationId, $condition = 'Good', $remarks = '', $options = []) {
     try {
         $pdo->beginTransaction();
         
@@ -310,32 +320,122 @@ function returnBook($pdo, $circulationId, $condition = 'Good', $remarks = '') {
         if (!$circulation) {
             throw new Exception("Invalid circulation record");
         }
+
+        // Lost/damaged/dead-stock books cannot be processed through normal return flow.
+        $holdingStmt = $pdo->prepare("SELECT Status FROM Holding WHERE AccNo = ? LIMIT 1");
+        $holdingStmt->execute([$circulation['AccNo']]);
+        $holding = $holdingStmt->fetch(PDO::FETCH_ASSOC);
+        $holdingStatus = $holding['Status'] ?? '';
+        if (in_array($holdingStatus, ['Lost', 'Damaged', 'Dead Stock'], true)) {
+            throw new Exception("Book is marked as {$holdingStatus} and cannot be returned in Return Books workflow");
+        }
+
+        if (in_array($condition, ['Lost', 'Damaged'], true)) {
+            throw new Exception("Lost/Damaged books should be handled via stock verification, not normal return processing");
+        }
         
-        $returnDate = date('Y-m-d');
+        $returnDate = $options['returnDate'] ?? date('Y-m-d');
+        $validatedReturnDate = validateDate($returnDate);
+        if (!$validatedReturnDate) {
+            throw new Exception("Invalid return date");
+        }
+
+        $issueDate = $circulation['IssueDate'];
+        if ($validatedReturnDate < $issueDate) {
+            throw new Exception("Return date cannot be before issue date");
+        }
+
         $returnTime = date('H:i:s');
         
         // Calculate fine if overdue
         $fine = 0;
-        if ($returnDate > $circulation['DueDate']) {
+        if ($validatedReturnDate > $circulation['DueDate']) {
             $member = getMemberByNo($pdo, $circulation['MemberNo']);
             $finePerDay = $member['FinePerDay'] ?? 2.00;
             
-            $daysOverdue = (strtotime($returnDate) - strtotime($circulation['DueDate'])) / (60 * 60 * 24);
+            $daysOverdue = (strtotime($validatedReturnDate) - strtotime($circulation['DueDate'])) / (60 * 60 * 24);
             $fine = $daysOverdue * $finePerDay;
+        }
+
+        $finePaid = 0.0;
+        if ($fine > 0) {
+            $isFinePaid = !empty($options['finePaid']);
+            if (!$isFinePaid) {
+                throw new Exception("Fine must be paid before returning an overdue book");
+            }
+
+            $finePaid = (float)($options['finePaidAmount'] ?? 0);
+            if ($finePaid < $fine) {
+                throw new Exception("Fine payment is insufficient. Please collect full fine before return");
+            }
+
+            $receiptNo = trim((string)($options['fineReceiptNo'] ?? ''));
+            $paymentDate = trim((string)($options['finePaymentDate'] ?? ''));
+            $paymentQr = trim((string)($options['finePaymentQr'] ?? ''));
+            if ($receiptNo === '' || $paymentDate === '' || $paymentQr === '') {
+                throw new Exception("Receipt number, payment date, amount and QR reference are required for fine payment");
+            }
+
+            if (!validateDate($paymentDate)) {
+                throw new Exception("Invalid fine payment date");
+            }
+            if ($paymentDate > $validatedReturnDate) {
+                throw new Exception("Fine payment date cannot be after return date");
+            }
+
+            $columnsStmt = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'FinePayments'");
+            $columnsStmt->execute();
+            $paymentColumns = array_map('strtolower', array_column($columnsStmt->fetchAll(PDO::FETCH_ASSOC), 'COLUMN_NAME'));
+
+            $hasModernFinePayments = in_array('circulationid', $paymentColumns, true)
+                && in_array('memberno', $paymentColumns, true)
+                && in_array('fineamount', $paymentColumns, true)
+                && in_array('paidamount', $paymentColumns, true)
+                && in_array('paymentdate', $paymentColumns, true)
+                && in_array('receiptno', $paymentColumns, true);
+
+            if ($hasModernFinePayments) {
+                $paymentMethod = 'QR';
+                $collectedBy = $options['collectedBy'] ?? null;
+                $paymentRemarks = trim((string)($options['finePaymentRemarks'] ?? ''));
+                if ($paymentRemarks !== '') {
+                    $paymentRemarks .= ' | ';
+                }
+                $paymentRemarks .= 'QR Ref: ' . $paymentQr;
+
+                $insertPayment = $pdo->prepare("INSERT INTO FinePayments (CirculationID, MemberNo, FineAmount, PaidAmount, PaymentDate, PaymentMethod, ReceiptNo, CollectedBy, Remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $insertPayment->execute([
+                    $circulationId,
+                    $circulation['MemberNo'],
+                    $fine,
+                    $finePaid,
+                    $paymentDate . ' ' . $returnTime,
+                    $paymentMethod,
+                    $receiptNo,
+                    $collectedBy,
+                    $paymentRemarks
+                ]);
+            }
+
+            if ($remarks !== '') {
+                $remarks .= ' | ';
+            }
+            $remarks .= 'Fine payment: Receipt ' . $receiptNo . ', Date ' . $paymentDate . ', Amount ' . number_format($finePaid, 2, '.', '') . ', QR ' . $paymentQr;
         }
         
         // Insert return record
         $stmt = $pdo->prepare("
-            INSERT INTO `Return` (CirculationID, MemberNo, AccNo, ReturnDate, ReturnTime, FineAmount, `Condition`, Remarks)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ");
+        INSERT INTO `Return` (CirculationID, MemberNo, AccNo, ReturnDate, ReturnTime, FineAmount, FinePaid, `Condition`, Remarks)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
         $stmt->execute([
             $circulationId, 
             $circulation['MemberNo'], 
             $circulation['AccNo'], 
-            $returnDate, 
+            $validatedReturnDate, 
             $returnTime, 
             $fine, 
+            $finePaid,
             $condition, 
             $remarks
         ]);
@@ -349,11 +449,16 @@ function returnBook($pdo, $circulationId, $condition = 'Good', $remarks = '') {
         $stmt->execute([$circulation['AccNo']]);
         
         // Decrement member's books issued count
-        $stmt = $pdo->prepare("UPDATE Member SET BooksIssued = BooksIssued - 1 WHERE MemberNo = ?");
+        $stmt = $pdo->prepare("UPDATE Member SET BooksIssued = GREATEST(BooksIssued - 1, 0) WHERE MemberNo = ?");
         $stmt->execute([$circulation['MemberNo']]);
         
         $pdo->commit();
-        return ['success' => true, 'message' => 'Book returned successfully', 'fine' => $fine];
+        return [
+            'success' => true,
+            'message' => 'Book returned successfully',
+            'fine' => $fine,
+            'finePaid' => $finePaid
+        ];
         
     } catch (Exception $e) {
         $pdo->rollBack();

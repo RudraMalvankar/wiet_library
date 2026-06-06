@@ -17,15 +17,32 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
 // Fetch fine statistics
 try {
-    // Total pending fines
+    // Total pending fines - improved query
     $stmt = $pdo->query("
-        SELECT SUM(r.FineAmount) as total 
-        FROM `Return` r 
-        INNER JOIN Circulation c ON r.CirculationID = c.CirculationID
-        WHERE r.FineAmount > 0 
-        AND r.FineAmount > COALESCE((SELECT SUM(PaidAmount) FROM FinePayments WHERE FinePayments.CirculationID = r.CirculationID), 0)
+        SELECT 
+            c.CirculationID,
+            CASE 
+                WHEN r.CirculationID IS NOT NULL THEN r.FineAmount
+                ELSE GREATEST(DATEDIFF(CURDATE(), c.DueDate), 0) * COALESCE(m.FinePerDay, 2)
+            END as CalculatedFine,
+            COALESCE(SUM(fp.PaidAmount), 0) as PaidAmount
+        FROM Circulation c
+        INNER JOIN Member m ON c.MemberNo = m.MemberNo
+        LEFT JOIN \`Return\` r ON c.CirculationID = r.CirculationID
+        LEFT JOIN FinePayments fp ON c.CirculationID = fp.CirculationID
+        WHERE (
+            (r.CirculationID IS NOT NULL AND r.FineAmount > 0)
+            OR (r.CirculationID IS NULL AND c.DueDate < CURDATE())
+        )
+        GROUP BY c.CirculationID, m.FinePerDay, r.CirculationID, r.FineAmount
+        HAVING CalculatedFine > PaidAmount
     ");
-    $pending_fines = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    $fineRecords = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $pending_fines = 0;
+    foreach ($fineRecords as $record) {
+        $pending_fines += ($record['CalculatedFine'] - $record['PaidAmount']);
+    }
     
     // Total collected today
     $stmt = $pdo->query("
@@ -53,15 +70,32 @@ try {
     ");
     $waived_total = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
     
-    // Members with pending fines
+    
+    // Members with pending fines - SQL-mode safe count (works with ONLY_FULL_GROUP_BY)
     $stmt = $pdo->query("
-        SELECT COUNT(DISTINCT c.MemberNo) as count 
-        FROM `Return` r 
-        INNER JOIN Circulation c ON r.CirculationID = c.CirculationID
-        WHERE r.FineAmount > 0 
-        AND r.FineAmount > COALESCE((SELECT SUM(PaidAmount) FROM FinePayments WHERE FinePayments.CirculationID = r.CirculationID), 0)
+        SELECT COUNT(DISTINCT pending.MemberNo) as total
+        FROM (
+            SELECT 
+                c.CirculationID,
+                c.MemberNo,
+                CASE 
+                    WHEN r.CirculationID IS NOT NULL THEN r.FineAmount
+                    ELSE GREATEST(DATEDIFF(CURDATE(), c.DueDate), 0) * COALESCE(m.FinePerDay, 2)
+                END as CalculatedFine,
+                COALESCE(SUM(fp.PaidAmount), 0) as PaidAmount
+            FROM Circulation c
+            INNER JOIN Member m ON c.MemberNo = m.MemberNo
+            LEFT JOIN \`Return\` r ON c.CirculationID = r.CirculationID
+            LEFT JOIN FinePayments fp ON c.CirculationID = fp.CirculationID
+            WHERE (
+                (r.CirculationID IS NOT NULL AND r.FineAmount > 0)
+                OR (r.CirculationID IS NULL AND c.DueDate < CURDATE())
+            )
+            GROUP BY c.CirculationID, c.MemberNo, m.FinePerDay, r.CirculationID, r.FineAmount
+            HAVING CalculatedFine > PaidAmount
+        ) pending
     ");
-    $members_with_fines = $stmt->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
+    $members_with_fines = (int)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
     
 } catch (PDOException $e) {
     error_log("Fine stats error: " . $e->getMessage());
@@ -334,8 +368,10 @@ try {
             height: 100%;
             background: rgba(0,0,0,0.5);
             z-index: 1000;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
+            overflow-y: auto;
+            padding: 120px 16px 20px;
         }
 
         .modal.show {
@@ -348,8 +384,21 @@ try {
             padding: 30px;
             max-width: 600px;
             width: 90%;
-            max-height: 90vh;
+            max-height: calc(100vh - 140px);
             overflow-y: auto;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 768px) {
+            .modal {
+                padding: 95px 10px 16px;
+            }
+
+            .modal-content {
+                width: 100%;
+                max-height: calc(100vh - 115px);
+                padding: 20px;
+            }
         }
 
         .modal-header {
@@ -1051,7 +1100,7 @@ try {
         function displayReceipt(data) {
             const receiptHTML = `
                 <div class="receipt-header">
-                    <h2>WIET College Library</h2>
+                    <h2>WIET LIBRARY</h2>
                     <p>Fine Payment Receipt</p>
                     <p><strong>Receipt No: ${data.ReceiptNo}</strong></p>
                     <p>Date: ${new Date(data.PaymentDate).toLocaleString('en-IN')}</p>

@@ -833,7 +833,7 @@ async function checkIn(memberIdentifier, method) {
     } catch (error) {
         console.error('❌ CHECK-IN ERROR:', error);
         console.error('Error details:', error.message, error.stack);
-        showError('Network error. Please check your connection.');
+        // showError('Network error. Please check your connection.');
     }
     console.log('🏁 ===== CHECK-IN ENDED =====');
 }

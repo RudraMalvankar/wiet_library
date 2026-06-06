@@ -27,6 +27,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $input = json_decode(file_get_contents('php://input'), true);
 $memberIdentifier = $input['member_identifier'] ?? '';
+
+function normalizeBranchName($branch) {
+    $name = trim((string)$branch);
+    if (strcasecmp($name, 'Computer') === 0) {
+        return 'Computer Engineering';
+    }
+    return $name;
+}
 $entryMethod = $input['entry_method'] ?? 'Manual';
 $purpose = $input['purpose'] ?? 'Library Visit';
 
@@ -88,8 +96,7 @@ try {
             'member' => [
                 'member_no' => 'M' . str_pad($memberNo, 7, '0', STR_PAD_LEFT),
                 'name' => $member['MemberName'],
-                'branch' => $member['Branch'] ?? 'N/A',
-                'course' => $member['CourseName'] ?? 'N/A',
+                'branch' => normalizeBranchName($member['Branch'] ?? 'N/A'),
                 'photo' => $member['Photo'] ?? null
             ],
             'entry_time' => $existing['EntryTime']
@@ -118,8 +125,7 @@ try {
         'member' => [
             'member_no' => 'M' . str_pad($memberNo, 7, '0', STR_PAD_LEFT),
             'name' => $member['MemberName'],
-            'branch' => $member['Branch'] ?? 'N/A',
-            'course' => $member['CourseName'] ?? 'N/A',
+            'branch' => normalizeBranchName($member['Branch'] ?? 'N/A'),
             'photo' => $member['Photo'] ?? null
         ],
         'entry_time' => date('Y-m-d H:i:s'),

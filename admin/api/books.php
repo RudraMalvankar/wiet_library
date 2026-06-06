@@ -29,6 +29,32 @@ if (!$hasAdminSession && !$isPublicOpacSearch) {
     sendJson(['success' => false, 'message' => 'Unauthorized. Please login.'], 401);
 }
 
+function ensureHoldingAvailabilityColumns($pdo) {
+    static $initialized = false;
+    if ($initialized) {
+        return;
+    }
+
+    $initialized = true;
+
+    try {
+        $stmt = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Holding'");
+        $stmt->execute();
+        $columns = array_map('strtolower', array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'COLUMN_NAME'));
+
+        if (!in_array('expectedavailabledate', $columns, true)) {
+            $pdo->exec("ALTER TABLE Holding ADD COLUMN ExpectedAvailableDate DATE NULL AFTER Status");
+        }
+        if (!in_array('availabilitynote', $columns, true)) {
+            $pdo->exec("ALTER TABLE Holding ADD COLUMN AvailabilityNote VARCHAR(255) NULL AFTER ExpectedAvailableDate");
+        }
+    } catch (Exception $e) {
+        error_log('Holding availability column init failed: ' . $e->getMessage());
+    }
+}
+
+ensureHoldingAvailabilityColumns($pdo);
+
 // Helper: generate QR file and return filename; uses phpqrcode if available
 function generate_qr_file($text) {
     $baseDir = realpath(__DIR__ . '/../../storage');
@@ -834,14 +860,21 @@ try {
             $accNo = $data['accNo'] ?? '';
             $status = $data['status'] ?? '';
             
-            $validStatuses = ['Available', 'Issued', 'Damaged', 'Lost', 'Repair', 'Reserved'];
+            $expectedAvailableDate = !empty($data['expectedAvailableDate']) ? $data['expectedAvailableDate'] : null;
+            $availabilityNote = trim((string)($data['availabilityNote'] ?? ''));
+
+            $validStatuses = ['Available', 'Issued', 'Damaged', 'Lost', 'Permanently Lost', 'Repair', 'Reserved', 'Unavailable', 'Dead Stock'];
             
             if (!in_array($status, $validStatuses)) {
                 sendJson(['success' => false, 'message' => 'Invalid status'], 400);
             }
             
-            $stmt = $pdo->prepare("UPDATE Holding SET Status = ? WHERE AccNo = ?");
-            $stmt->execute([$status, $accNo]);
+            if (!in_array($status, ['Unavailable', 'Repair', 'Reserved'], true)) {
+                $expectedAvailableDate = null;
+            }
+
+            $stmt = $pdo->prepare("UPDATE Holding SET Status = ?, ExpectedAvailableDate = ?, AvailabilityNote = ? WHERE AccNo = ?");
+            $stmt->execute([$status, $expectedAvailableDate, ($availabilityNote !== '' ? $availabilityNote : null), $accNo]);
 
             $adminId = $_SESSION['AdminID'] ?? null;
             logAudit($pdo, $adminId, 'HOLDING_STATUS_UPDATE', 'Holding', $accNo, [
@@ -863,12 +896,14 @@ try {
             $status = $data['status'] ?? '';
             $location = $data['location'] ?? '';
             $section = $data['section'] ?? '';
+            $expectedAvailableDate = !empty($data['expectedAvailableDate']) ? $data['expectedAvailableDate'] : null;
+            $availabilityNote = trim((string)($data['availabilityNote'] ?? ''));
             
             if (!$originalAccNo || !$newAccNo) {
                 sendJson(['success' => false, 'message' => 'AccNo is required'], 400);
             }
 
-            $validStatuses = ['Available', 'Issued', 'Damaged', 'Lost', 'Repair', 'Reserved'];
+            $validStatuses = ['Available', 'Issued', 'Damaged', 'Lost', 'Permanently Lost', 'Repair', 'Reserved', 'Unavailable', 'Dead Stock'];
             if ($status && !in_array($status, $validStatuses)) {
                 sendJson(['success' => false, 'message' => 'Invalid status'], 400);
             }
@@ -885,9 +920,21 @@ try {
                     }
                 }
 
+                if (!in_array($status, ['Unavailable', 'Repair', 'Reserved'], true)) {
+                    $expectedAvailableDate = null;
+                }
+
                 // Update holding
-                $stmt = $pdo->prepare("UPDATE Holding SET AccNo = ?, Status = ?, Location = ?, Section = ? WHERE AccNo = ?");
-                $stmt->execute([$newAccNo, $status, $location, $section, $originalAccNo]);
+                $stmt = $pdo->prepare("UPDATE Holding SET AccNo = ?, Status = ?, Location = ?, Section = ?, ExpectedAvailableDate = ?, AvailabilityNote = ? WHERE AccNo = ?");
+                $stmt->execute([
+                    $newAccNo,
+                    $status,
+                    $location,
+                    $section,
+                    $expectedAvailableDate,
+                    ($availabilityNote !== '' ? $availabilityNote : null),
+                    $originalAccNo
+                ]);
 
                 $pdo->commit();
 
@@ -897,7 +944,8 @@ try {
                     'newAccNo' => $newAccNo,
                     'status' => $status,
                     'location' => $location,
-                    'section' => $section
+                    'section' => $section,
+                    'expectedAvailableDate' => $expectedAvailableDate
                 ]);
 
                 sendJson(['success' => true, 'message' => 'Holding updated successfully']);
@@ -951,6 +999,26 @@ try {
             // Issued copies
             $issuedCopiesStmt = $pdo->query("SELECT COUNT(*) as total FROM Holding WHERE Status = 'Issued'");
             $issuedCopies = (int)$issuedCopiesStmt->fetchColumn();
+
+            // Unavailable/dead stock copies physically not in library
+            $unavailableCopiesStmt = $pdo->query("SELECT COUNT(*) as total FROM Holding WHERE Status IN ('Unavailable', 'Repair', 'Reserved')");
+            $unavailableCopies = (int)$unavailableCopiesStmt->fetchColumn();
+
+            $deadStockCopiesStmt = $pdo->query("SELECT COUNT(*) as total FROM Holding WHERE Status IN ('Lost', 'Damaged', 'Dead Stock')");
+            $deadStockCopies = (int)$deadStockCopiesStmt->fetchColumn();
+
+            // Overdue from active circulation
+            $overdueStmt = $pdo->query("SELECT COUNT(*) as total FROM Circulation WHERE Status = 'Active' AND DueDate < CURDATE()");
+            $overdueBooks = (int)$overdueStmt->fetchColumn();
+
+            // Issued stats for dashboard cards
+            // dailyIssuedBooks: all issue transactions created today
+            $dailyIssuedStmt = $pdo->query("SELECT COUNT(*) as total FROM Circulation WHERE IssueDate = CURDATE()");
+            $dailyIssuedBooks = (int)$dailyIssuedStmt->fetchColumn();
+
+            // totalIssuedBooks: currently issued (active) transactions only
+            $totalIssuedStmt = $pdo->query("SELECT COUNT(*) as total FROM Circulation WHERE Status = 'Active'");
+            $totalIssuedBooks = (int)$totalIssuedStmt->fetchColumn();
             
             sendJson([
                 'success' => true,
@@ -958,7 +1026,69 @@ try {
                     'totalBooks' => $totalBooks,
                     'totalCopies' => $totalCopies,
                     'availableCopies' => $availableCopies,
-                    'issuedCopies' => $issuedCopies
+                    'issuedCopies' => $issuedCopies,
+                    'unavailableCopies' => $unavailableCopies,
+                    'deadStockCopies' => $deadStockCopies,
+                    'overdueBooks' => $overdueBooks,
+                    'dailyIssuedBooks' => $dailyIssuedBooks,
+                    'totalIssuedBooks' => $totalIssuedBooks
+                ]
+            ]);
+            break;
+
+        case 'availability-notifications':
+            // Books currently unavailable and expected return/availability dates
+            $stmt = $pdo->query("\n                SELECT h.AccNo, b.Title, h.Status, h.ExpectedAvailableDate, h.AvailabilityNote\n                FROM Holding h\n                INNER JOIN Books b ON h.CatNo = b.CatNo\n                WHERE h.Status IN ('Unavailable', 'Repair', 'Reserved')\n                ORDER BY h.ExpectedAvailableDate IS NULL, h.ExpectedAvailableDate ASC, b.Title ASC\n                LIMIT 200\n            ");
+            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            sendJson(['success' => true, 'data' => $items]);
+            break;
+
+        case 'issued-report':
+            // Daily & total issued books report and stats
+            $from = $_GET['from'] ?? date('Y-m-01');
+            $to = $_GET['to'] ?? date('Y-m-d');
+            $format = strtolower(trim((string)($_GET['format'] ?? 'json')));
+
+            $dailyStmt = $pdo->prepare("\n                SELECT IssueDate, COUNT(*) AS IssuedCount\n                FROM Circulation\n                WHERE IssueDate BETWEEN ? AND ?\n                GROUP BY IssueDate\n                ORDER BY IssueDate ASC\n            ");
+            $dailyStmt->execute([$from, $to]);
+            $dailyRows = $dailyStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $summaryStmt = $pdo->prepare("\n                SELECT\n                    COUNT(*) AS TotalIssuedInRange,\n                    SUM(CASE WHEN IssueDate = CURDATE() THEN 1 ELSE 0 END) AS TodayIssued,\n                    (SELECT COUNT(*) FROM Circulation) AS GrandTotalIssued\n                FROM Circulation\n                WHERE IssueDate BETWEEN ? AND ?\n            ");
+            $summaryStmt->execute([$from, $to]);
+            $summary = $summaryStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($format === 'csv') {
+                header('Content-Type: text/csv');
+                header('Content-Disposition: attachment; filename="issued_report_' . $from . '_to_' . $to . '.csv"');
+                $out = fopen('php://output', 'w');
+                fputcsv($out, ['IssueDate', 'IssuedCount']);
+                foreach ($dailyRows as $row) {
+                    fputcsv($out, [$row['IssueDate'], $row['IssuedCount']]);
+                }
+                fputcsv($out, []);
+                fputcsv($out, ['TodayIssued', $summary['TodayIssued'] ?? 0]);
+                fputcsv($out, ['TotalIssuedInRange', $summary['TotalIssuedInRange'] ?? 0]);
+                fputcsv($out, ['GrandTotalIssued', $summary['GrandTotalIssued'] ?? 0]);
+                fclose($out);
+                exit;
+            }
+
+            sendJson([
+                'success' => true,
+                'data' => [
+                    'from' => $from,
+                    'to' => $to,
+                    'summary' => [
+                        'todayIssued' => (int)($summary['TodayIssued'] ?? 0),
+                        'totalIssuedInRange' => (int)($summary['TotalIssuedInRange'] ?? 0),
+                        'grandTotalIssued' => (int)($summary['GrandTotalIssued'] ?? 0)
+                    ],
+                    'daily' => array_map(function ($row) {
+                        return [
+                            'issueDate' => $row['IssueDate'],
+                            'issuedCount' => (int)$row['IssuedCount']
+                        ];
+                    }, $dailyRows)
                 ]
             ]);
             break;

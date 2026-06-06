@@ -248,9 +248,10 @@ body {
 
 .charts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 25px;
     margin-bottom: 30px;
+    width: 100%;
 }
 
 .chart-card {
@@ -258,6 +259,7 @@ body {
     padding: 25px;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    min-width: 0;
 }
 
 .chart-card h3 {
@@ -265,6 +267,11 @@ body {
     font-size: 18px;
     font-weight: 600;
     margin-bottom: 20px;
+}
+
+.chart-card canvas {
+    max-width: 100%;
+    height: auto;
 }
 
 .table-container {
@@ -347,6 +354,88 @@ body {
     
     .circulation-table {
         font-size: 12px;
+    }
+    
+    .page-container {
+        padding: 15px;
+    }
+}
+
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 10mm;
+    }
+
+    body {
+        background: #fff !important;
+    }
+
+    /* Hide parent admin layout chrome while printing this module */
+    .web-banner,
+    .horizontal-navbar,
+    .sidebar,
+    .watermark,
+    #sidebar,
+    #watermark,
+    #sidebarToggle {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    .main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+        min-height: auto !important;
+        background: #fff !important;
+    }
+
+    .page-container {
+        max-width: none !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        min-height: auto !important;
+        box-shadow: none !important;
+        background: #fff !important;
+    }
+
+    .header-actions,
+    .search-filters,
+    .tab-buttons {
+        display: none !important;
+    }
+
+    .tab-content {
+        display: none !important;
+    }
+
+    .tab-content.active {
+        display: block !important;
+    }
+
+    .stats-grid,
+    .charts-grid,
+    .table-container,
+    .chart-card,
+    .stat-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .charts-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    .chart-card {
+        padding: 12px !important;
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+    }
+
+    .chart-card canvas {
+        max-height: 260px !important;
     }
 }
 </style>
@@ -670,6 +759,7 @@ function showTab(tabName) {
 
 // Load statistics
 async function loadStatistics() {
+    console.log('📈 loadStatistics() called');
     // Try to load from cache first for instant display
     const cachedStats = sessionStorage.getItem('footfall_stats');
     if (cachedStats) {
@@ -679,6 +769,7 @@ async function loadStatistics() {
             
             // If cache is less than 2 minutes old, use it immediately
             if (age < 120000) {
+                console.log('   Using cached stats (age:', age + 'ms)');
                 document.getElementById('totalVisits').textContent = stats.data.today_visits || 0;
                 document.getElementById('uniqueVisitors').textContent = stats.data.week_visits || 0;
                 document.getElementById('activeNow').textContent = stats.data.active_visitors || 0;
@@ -689,10 +780,13 @@ async function loadStatistics() {
     }
     
     try {
+        console.log('   Fetching fresh stats from API...');
         const response = await fetch(getApiPath('../footfall/api/footfall-stats.php'));
+        console.log('   Stats API response status:', response.status);
         const data = await response.json();
         
         if (data.success) {
+            console.log('   ✅ Stats loaded:', data.data);
             document.getElementById('totalVisits').textContent = data.data.today_visits || 0;
             document.getElementById('uniqueVisitors').textContent = data.data.week_visits || 0;
             document.getElementById('activeNow').textContent = data.data.active_visitors || 0;
@@ -702,41 +796,81 @@ async function loadStatistics() {
                 data: data.data,
                 timestamp: Date.now()
             }));
+        } else {
+            console.error('❌ Stats API error:', data);
         }
     } catch (error) {
-        console.error('Error loading statistics:', error);
+        console.error('❌ Error loading statistics:', error);
     }
 }
 
 // Load analytics and charts
 async function loadAnalytics() {
+    console.log('📊 loadAnalytics() called');
     const dateFrom = document.getElementById('dateFrom').value;
     const dateTo = document.getElementById('dateTo').value;
+    console.log('   Date range:', { dateFrom, dateTo });
     
     try {
-        const response = await fetch(getApiPath(`../footfall/api/analytics-data.php?date_from=${dateFrom}&date_to=${dateTo}`));
-        const data = await response.json();
+        const apiUrl = getApiPath(`../footfall/api/analytics-data.php?date_from=${dateFrom}&date_to=${dateTo}`);
+        console.log('   Fetching from:', apiUrl);
+        const response = await fetch(apiUrl);
+        console.log('   Response status:', response.status);
         
-        if (data.success) {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('   API response:', data);
+        
+        if (data.success && data.data) {
+            console.log('   ✅ Data received, rendering charts...');
             renderDailyChart(data.data.daily);
             renderHourlyChart(data.data.hourly);
             renderPurposeChart(data.data.purpose);
             renderBranchChart(data.data.branch);
+            console.log('   ✅ Charts rendered successfully');
+        } else {
+            console.error('   ❌ API error or no data:', data);
+            document.querySelector('.charts-grid').innerHTML = `
+                <div style="grid-column: 1/-1; padding: 20px; background: #fff3cd; border-radius: 8px; color: #856404;">
+                    <strong>⚠️ No data to display</strong>: ${data.message || 'Unable to load analytics data'}
+                </div>
+            `;
         }
     } catch (error) {
-        console.error('Error loading analytics:', error);
+        console.error('❌ Error loading analytics:', error);
+        document.querySelector('.charts-grid').innerHTML = `
+            <div style="grid-column: 1/-1; padding: 20px; background: #f8d7da; border-radius: 8px; color: #721c24;">
+                <strong>Error loading charts:</strong> ${error.message}
+            </div>
+        `;
     }
 }
 
 // Render Daily Chart
 function renderDailyChart(data) {
-    const ctx = document.getElementById('dailyChart').getContext('2d');
+    // Wait for Chart.js to be available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded yet, retrying...');
+        setTimeout(() => renderDailyChart(data), 500);
+        return;
+    }
+    
+    const ctx = document.getElementById('dailyChart');
+    if (!ctx) {
+        console.error('dailyChart canvas not found');
+        return;
+    }
+    
+    const canvasCtx = ctx.getContext('2d');
     
     if (dailyChart) {
         dailyChart.destroy();
     }
     
-    dailyChart = new Chart(ctx, {
+    dailyChart = new Chart(canvasCtx, {
         type: 'line',
         data: {
             labels: data.labels,
@@ -763,13 +897,26 @@ function renderDailyChart(data) {
 
 // Render Hourly Chart
 function renderHourlyChart(data) {
-    const ctx = document.getElementById('hourlyChart').getContext('2d');
+    // Wait for Chart.js to be available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded yet, retrying...');
+        setTimeout(() => renderHourlyChart(data), 500);
+        return;
+    }
+    
+    const ctx = document.getElementById('hourlyChart');
+    if (!ctx) {
+        console.error('hourlyChart canvas not found');
+        return;
+    }
+    
+    const canvasCtx = ctx.getContext('2d');
     
     if (hourlyChart) {
         hourlyChart.destroy();
     }
     
-    hourlyChart = new Chart(ctx, {
+    hourlyChart = new Chart(canvasCtx, {
         type: 'bar',
         data: {
             labels: data.labels,
@@ -793,13 +940,26 @@ function renderHourlyChart(data) {
 
 // Render Purpose Chart
 function renderPurposeChart(data) {
-    const ctx = document.getElementById('purposeChart').getContext('2d');
+    // Wait for Chart.js to be available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded yet, retrying...');
+        setTimeout(() => renderPurposeChart(data), 500);
+        return;
+    }
+    
+    const ctx = document.getElementById('purposeChart');
+    if (!ctx) {
+        console.error('purposeChart canvas not found');
+        return;
+    }
+    
+    const canvasCtx = ctx.getContext('2d');
     
     if (purposeChart) {
         purposeChart.destroy();
     }
     
-    purposeChart = new Chart(ctx, {
+    purposeChart = new Chart(canvasCtx, {
         type: 'doughnut',
         data: {
             labels: data.labels,
@@ -824,13 +984,26 @@ function renderPurposeChart(data) {
 
 // Render Branch Chart
 function renderBranchChart(data) {
-    const ctx = document.getElementById('branchChart').getContext('2d');
+    // Wait for Chart.js to be available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded yet, retrying...');
+        setTimeout(() => renderBranchChart(data), 500);
+        return;
+    }
+    
+    const ctx = document.getElementById('branchChart');
+    if (!ctx) {
+        console.error('branchChart canvas not found');
+        return;
+    }
+    
+    const canvasCtx = ctx.getContext('2d');
     
     if (branchChart) {
         branchChart.destroy();
     }
     
-    branchChart = new Chart(ctx, {
+    branchChart = new Chart(canvasCtx, {
         type: 'pie',
         data: {
             labels: data.labels,
@@ -1142,8 +1315,10 @@ async function exportToExcel() {
 
 // Reset filters
 function resetFilters() {
-    document.getElementById('dateFrom').value = '<?php echo date('Y-m-01'); ?>';
-    document.getElementById('dateTo').value = '<?php echo date('Y-m-d'); ?>';
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    document.getElementById('dateFrom').value = formatDateForInput(firstDay);
+    document.getElementById('dateTo').value = formatDateForInput(today);
     document.getElementById('branchFilter').value = 'all';
     document.getElementById('purposeFilter').value = 'all';
     loadAnalytics();
@@ -1159,6 +1334,29 @@ function escapeHtml(text) {
 // Initialize function
 function initFootfallAnalytics() {
     console.log('Footfall Analytics initialized');
+    
+    // Set default date values if empty (for AJAX loading where PHP doesn't execute)
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const defaultFromDate = formatDateForInput(firstDay);
+    const defaultToDate = formatDateForInput(today);
+    
+    const dateFromInput = document.getElementById('dateFrom');
+    const dateToInput = document.getElementById('dateTo');
+    const recordsDateFromInput = document.getElementById('recordsDateFrom');
+    const recordsDateToInput = document.getElementById('recordsDateTo');
+    
+    // If inputs are empty or contain invalid PHP, set defaults
+    if (!dateFromInput.value || dateFromInput.value.length < 8) dateFromInput.value = defaultFromDate;
+    if (!dateToInput.value || dateToInput.value.length < 8) dateToInput.value = defaultToDate;
+    if (!recordsDateFromInput.value || recordsDateFromInput.value.length < 8) recordsDateFromInput.value = defaultFromDate;
+    if (!recordsDateToInput.value || recordsDateToInput.value.length < 8) recordsDateToInput.value = defaultToDate;
+    
+    console.log('📅 Date filters initialized:', {
+        dateFrom: dateFromInput.value,
+        dateTo: dateToInput.value
+    });
+    
     loadStatistics();
     loadAnalytics();
     

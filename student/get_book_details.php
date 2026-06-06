@@ -3,7 +3,7 @@
 session_start();
 
 // Check authentication
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['student_id'])) {
     echo json_encode(['success' => false, 'message' => 'Not authenticated']);
     exit();
 }
@@ -128,4 +128,5 @@ try {
     ]);
 }
 ?>
+
 

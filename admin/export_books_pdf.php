@@ -12,18 +12,25 @@ if (!isset($_SESSION['admin_id']) && !isset($_SESSION['AdminID'])) {
     die('Unauthorized access');
 }
 
-// Fetch all books with holding information
+// Fetch each physical copy as its own row using accession number
 $sql = "
     SELECT 
-        b.*,
-        COUNT(h.HoldID) as TotalCopies,
-        SUM(CASE WHEN h.Status = 'Available' THEN 1 ELSE 0 END) as AvailableCopies,
-        SUM(CASE WHEN h.Status = 'Issued' THEN 1 ELSE 0 END) as IssuedCopies,
-        GROUP_CONCAT(DISTINCT h.AccNo ORDER BY h.AccNo SEPARATOR ', ') as AccessionNumbers
+        b.CatNo,
+        b.Title,
+        b.SubTitle,
+        b.Author1,
+        b.Author2,
+        b.Author3,
+        b.Publisher,
+        b.Year,
+        b.Place,
+        b.Subject,
+        b.Edition,
+        h.AccNo,
+        h.Status
     FROM Books b
     LEFT JOIN Holding h ON b.CatNo = h.CatNo
-    GROUP BY b.CatNo
-    ORDER BY b.Title
+    ORDER BY b.Title, h.AccNo
 ";
 
 $stmt = $pdo->prepare($sql);
@@ -210,27 +217,42 @@ header('Pragma: no-cache');
     
     <div class="summary-stats">
         <div class="stat">
-            <span class="stat-label">Total Books:</span>
-            <span class="stat-value"><?php echo count($books); ?></span>
+            <span class="stat-label">Total Titles:</span>
+            <span class="stat-value"><?php echo count(array_unique(array_column($books, 'CatNo'))); ?></span>
         </div>
         <div class="stat">
             <span class="stat-label">Total Copies:</span>
             <span class="stat-value"><?php 
-                $totalCopies = array_sum(array_column($books, 'TotalCopies'));
+                $totalCopies = 0;
+                foreach ($books as $book) {
+                    if (!empty($book['AccNo'])) {
+                        $totalCopies++;
+                    }
+                }
                 echo $totalCopies;
             ?></span>
         </div>
         <div class="stat">
             <span class="stat-label">Available:</span>
             <span class="stat-value"><?php 
-                $availableCopies = array_sum(array_column($books, 'AvailableCopies'));
+                $availableCopies = 0;
+                foreach ($books as $book) {
+                    if (($book['Status'] ?? '') === 'Available') {
+                        $availableCopies++;
+                    }
+                }
                 echo $availableCopies;
             ?></span>
         </div>
         <div class="stat">
             <span class="stat-label">Issued:</span>
             <span class="stat-value"><?php 
-                $issuedCopies = array_sum(array_column($books, 'IssuedCopies'));
+                $issuedCopies = 0;
+                foreach ($books as $book) {
+                    if (($book['Status'] ?? '') === 'Issued') {
+                        $issuedCopies++;
+                    }
+                }
                 echo $issuedCopies;
             ?></span>
         </div>
@@ -239,35 +261,28 @@ header('Pragma: no-cache');
     <table>
         <thead>
             <tr>
+                <th style="width: 8%;">Acc No.</th>
                 <th style="width: 7%;">Cat No.</th>
-                <th style="width: 28%;">Title & Author</th>
-                <th style="width: 15%;">Publisher & Year</th>
-                <th style="width: 12%;">ISBN</th>
-                <th style="width: 12%;">Subject</th>
+                <th style="width: 27%;">Title & Author</th>
+                <th style="width: 16%;">Publisher & Year</th>
+                <th style="width: 13%;">Subject</th>
                 <th style="width: 8%;">Edition</th>
-                <th style="width: 10%;">Copies</th>
-                <th style="width: 8%;">Status</th>
+                <th style="width: 10%;">Copy Status</th>
             </tr>
         </thead>
         <tbody>
             <?php foreach ($books as $book): 
-                $availability = 0;
-                if ($book['TotalCopies'] > 0) {
-                    $availability = ($book['AvailableCopies'] / $book['TotalCopies']) * 100;
-                }
-                
-                if ($availability >= 70) {
+                $copyStatus = $book['Status'] ?? 'N/A';
+                if ($copyStatus === 'Available') {
                     $statusClass = 'availability-good';
-                    $statusText = '✓ Good';
-                } elseif ($availability >= 40) {
+                } elseif ($copyStatus === 'Issued') {
                     $statusClass = 'availability-warning';
-                    $statusText = '⚠ Low';
                 } else {
                     $statusClass = 'availability-danger';
-                    $statusText = '✗ Critical';
                 }
             ?>
             <tr class="book-row">
+                <td><?php echo htmlspecialchars($book['AccNo'] ?? 'N/A'); ?></td>
                 <td><?php echo htmlspecialchars($book['CatNo']); ?></td>
                 <td>
                     <div class="book-title"><?php echo htmlspecialchars($book['Title']); ?></div>
@@ -294,16 +309,10 @@ header('Pragma: no-cache');
                         <?php endif; ?>
                     </small>
                 </td>
-                <td><small><?php echo htmlspecialchars($book['ISBN'] ?? 'N/A'); ?></small></td>
                 <td><?php echo htmlspecialchars($book['Subject'] ?? 'General'); ?></td>
                 <td><?php echo htmlspecialchars($book['Edition'] ?? 'N/A'); ?></td>
-                <td style="text-align: center;">
-                    <strong><?php echo $book['TotalCopies'] ?? 0; ?></strong><br>
-                    <small style="color: #28a745;">Avail: <?php echo $book['AvailableCopies'] ?? 0; ?></small><br>
-                    <small style="color: #dc3545;">Issued: <?php echo $book['IssuedCopies'] ?? 0; ?></small>
-                </td>
                 <td class="<?php echo $statusClass; ?>" style="text-align: center;">
-                    <?php echo $statusText; ?>
+                    <?php echo htmlspecialchars($copyStatus); ?>
                 </td>
             </tr>
             <?php endforeach; ?>

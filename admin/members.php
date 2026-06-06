@@ -664,14 +664,14 @@ $memberEntitlements = [
         </h1>
         <div class="action-buttons">
         <!-- Inline Add Member Form will be placed below stats -->
-            <button class="btn btn-info" onclick="generateMemberCards()">
+            <!-- <button class="btn btn-info" onclick="generateMemberCards()">
                 <i class="fas fa-id-card"></i>
                 Generate Cards
             </button>
             <button class="btn btn-warning" onclick="bulkOperations()">
                 <i class="fas fa-tasks"></i>
                 Bulk Operations
-            </button>
+            </button> -->
         </div>
     </div>
 
