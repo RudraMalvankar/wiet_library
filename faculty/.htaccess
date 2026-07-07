@@ -1,0 +1,8 @@
+# Deny direct access to PHP files without proper session
+<Files "*.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+# Deny directory listing
+Options -Indexes

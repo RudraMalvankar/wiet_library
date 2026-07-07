@@ -388,6 +388,9 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             <button class="tab" onclick="switchTab('inventory')">
                 <i class="fas fa-boxes"></i> Inventory Reports
             </button>
+            <button class="tab" onclick="switchTab('yearly-purchases')">
+                <i class="fas fa-shopping-cart"></i> Yearly Purchases
+            </button>
             <button class="tab" onclick="switchTab('members')">
                 <i class="fas fa-users"></i> Member Reports
             </button>
@@ -489,6 +492,22 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             <div id="inv_table"></div>
         </div>
 
+        <!-- Yearly Purchases Tab -->
+        <div id="yearly-purchases" class="tab-content">
+            <div class="controls">
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="loadYearlyPurchases()">
+                        <i class="fas fa-sync"></i> Load Report
+                    </button>
+                    <button class="btn btn-info" onclick="exportYearlyPurchases()">
+                        <i class="fas fa-file-excel"></i> Export CSV
+                    </button>
+                </div>
+            </div>
+            <div id="yp_stats" class="stats-grid"></div>
+            <div id="yp_tables"></div>
+        </div>
+
         <!-- Member Reports Tab -->
         <div id="members" class="tab-content">
             <div class="controls">
@@ -556,6 +575,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             if (tab === 'circulation') loadCirculationReport();
             if (tab === 'financial') loadFinancialReport();
             if (tab === 'inventory') loadInventoryReport();
+            if (tab === 'yearly-purchases') loadYearlyPurchases();
             if (tab === 'members') loadMemberReport();
         }
 
@@ -1026,6 +1046,140 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             
             html += '</div>';
             document.getElementById('mem_table').innerHTML = html;
+        }
+
+        // Yearly Purchases Report
+        function loadYearlyPurchases() {
+            showLoading('yp_stats');
+            showLoading('yp_tables');
+
+            fetch('api/books.php?action=yearly_purchases')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        displayYpStats(data.data, data.totals);
+                        displayYpDetails(data.data);
+                    } else {
+                        showError('yp_stats', data.message);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    showError('yp_stats', 'Failed to load report: ' + err.message);
+                });
+        }
+
+        function displayYpStats(years, totals) {
+            const html = `
+                <div class="stat-card blue">
+                    <div class="stat-number">${totals.totalBooks || 0}</div>
+                    <div class="stat-label">Total Purchases</div>
+                </div>
+                <div class="stat-card green">
+                    <div class="stat-number">₹${parseFloat(totals.totalCost || 0).toFixed(2)}</div>
+                    <div class="stat-label">Total Cost</div>
+                </div>
+                <div class="stat-card purple">
+                    <div class="stat-number">${years.length}</div>
+                    <div class="stat-label">Years</div>
+                </div>
+                <div class="stat-card red">
+                    <div class="stat-number">${Math.round(totals.totalBooks ? totals.totalCost / totals.totalBooks : 0)}</div>
+                    <div class="stat-label">Avg Cost/Book</div>
+                </div>
+            `;
+            document.getElementById('yp_stats').innerHTML = html;
+        }
+
+        function displayYpDetails(years) {
+            if (!years || years.length === 0) {
+                document.getElementById('yp_tables').innerHTML = '<p class="no-data">No purchase records found</p>';
+                return;
+            }
+
+            let html = '';
+            years.forEach(yr => {
+                html += `
+                    <div class="chart-container">
+                        <h3>${yr.PurchaseYear} <small style="font-weight:normal;color:#666;">(${yr.TotalBooks} books, ₹${parseFloat(yr.TotalCost).toFixed(2)} total)</small>
+                            <button class="btn btn-sm btn-info" style="float:right;" onclick="loadYearDetail(${yr.PurchaseYear})">
+                                <i class="fas fa-list"></i> View Details
+                            </button>
+                            <span style="float:right;margin-right:10px;font-size:12px;color:#666;">
+                                <i class="fas fa-file-invoice"></i> Bills: ${yr.BillsScanned}/${yr.TotalBooks}
+                            </span>
+                        </h3>
+                        <div id="yp_detail_${yr.PurchaseYear}"></div>
+                    </div>
+                `;
+            });
+            document.getElementById('yp_tables').innerHTML = html;
+        }
+
+        function loadYearDetail(year) {
+            const container = document.getElementById(`yp_detail_${year}`);
+            container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Loading...</div>';
+
+            fetch(`api/books.php?action=yearly_purchase_detail&year=${year}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success || !data.data || data.data.length === 0) {
+                        container.innerHTML = '<p class="no-data">No details found</p>';
+                        return;
+                    }
+
+                    let html = '<table class="data-table"><thead><tr>' +
+                        '<th>Title</th><th>Author</th><th>Bill No</th><th>Bill Date</th><th>Cost</th><th>Price</th><th>Source</th><th>Bill Scan</th>' +
+                        '</tr></thead><tbody>';
+
+                    data.data.forEach(book => {
+                        html += `<tr>
+                            <td>${book.Title}</td>
+                            <td>${book.Author1 || '-'}</td>
+                            <td>${book.BillNo || '-'}</td>
+                            <td>${book.BillDate ? formatDate(book.BillDate) : '-'}</td>
+                            <td>₹${parseFloat(book.ItemCost || 0).toFixed(2)}</td>
+                            <td>₹${parseFloat(book.ItemPrice || 0).toFixed(2)}</td>
+                            <td>${book.Source || '-'}</td>
+                            <td>${book.HasBillScan ? '<a href="#" onclick="viewBillScan(' + book.CatNo + '); return false;"><i class="fas fa-file-image" style="color:#28a745;"></i> View</a>' : '<span style="color:#999;">N/A</span>'}</td>
+                        </tr>`;
+                    });
+
+                    html += '</tbody></table>';
+                    container.innerHTML = html;
+                })
+                .catch(err => {
+                    container.innerHTML = `<span style="color:#dc3545;">Error: ${err.message}</span>`;
+                });
+        }
+
+        function viewBillScan(catNo) {
+            window.open('api/books.php?action=get_bill_scan&catNo=' + catNo, '_blank', 'width=800,height=600');
+        }
+
+        function exportYearlyPurchases() {
+            fetch('api/books.php?action=yearly_purchases')
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success || !data.data || data.data.length === 0) {
+                        alert('No data to export');
+                        return;
+                    }
+                    let csv = 'Year,Total Books,Total Cost (₹),Total Price (₹),Bills Scanned\n';
+                    data.data.forEach(yr => {
+                        csv += `${yr.PurchaseYear},${yr.TotalBooks},${yr.TotalCost},${yr.TotalPrice},${yr.BillsScanned}\n`;
+                    });
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'yearly_purchases.csv';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                })
+                .catch(err => {
+                    alert('Error exporting: ' + err.message);
+                });
         }
 
         // Export function

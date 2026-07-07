@@ -329,6 +329,10 @@ try {
                 unset($book['Barcode']);
             }
 
+            $book['HasBillScan'] = !empty($book['BillScan']);
+            unset($book['BillScan']);
+            unset($book['BillScanMime']);
+
             sendJson(['success' => true, 'data' => $book]);
             break;
 
@@ -541,6 +545,20 @@ try {
                     }
                 }
 
+                // Handle bill scan upload
+                $billScanUploaded = false;
+                if (isset($_FILES['billScan']) && $_FILES['billScan']['error'] === UPLOAD_ERR_OK) {
+                    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+                    if (in_array($_FILES['billScan']['type'], $allowedTypes, true)) {
+                        $billData = file_get_contents($_FILES['billScan']['tmp_name']);
+                        if ($billData !== false && strlen($billData) <= 10 * 1024 * 1024) {
+                            $stmtBill = $pdo->prepare("UPDATE Books SET BillScan = ?, BillScanMime = ? WHERE CatNo = ?");
+                            $stmtBill->execute([$billData, $_FILES['billScan']['type'], $catNo]);
+                            $billScanUploaded = true;
+                        }
+                    }
+                }
+
                 $pdo->commit();
 
                 // Activity and Audit logs
@@ -704,6 +722,20 @@ try {
                 $data = $_REQUEST;
             }
 
+            // Compatibility normalization
+            $fieldMap = [
+                'bill_no' => 'BillNo', 'billno' => 'BillNo',
+                'bill_date' => 'BillDate', 'billdate' => 'BillDate',
+                'item_cost' => 'ItemCost', 'itemcost' => 'ItemCost',
+                'item_price' => 'ItemPrice', 'itemprice' => 'ItemPrice',
+                'source' => 'Source',
+            ];
+            foreach ($fieldMap as $from => $to) {
+                if (!isset($data[$to]) && isset($data[$from])) {
+                    $data[$to] = $data[$from];
+                }
+            }
+
             $catNo = $data['CatNo'] ?? 0;
 
             if (!$catNo) {
@@ -714,7 +746,8 @@ try {
                 UPDATE Books 
                 SET Title = ?, SubTitle = ?, Author1 = ?, Author2 = ?, Author3 = ?, 
                     Publisher = ?, Place = ?, Year = ?, Edition = ?, Vol = ?, Pages = ?, 
-                    ISBN = ?, Subject = ?, Language = ?
+                    ISBN = ?, Subject = ?, Language = ?, Format = ?,
+                    BillNo = ?, BillDate = ?, ItemPrice = ?, ItemCost = ?, Source = ?
                 WHERE CatNo = ?
             ");
             
@@ -733,8 +766,27 @@ try {
                 $data['ISBN'] ?? null,
                 $data['Subject'] ?? null,
                 $data['Language'] ?? 'English',
+                $data['Format'] ?? null,
+                $data['BillNo'] ?? null,
+                $data['BillDate'] ?? null,
+                $data['ItemPrice'] ?? null,
+                $data['ItemCost'] ?? null,
+                $data['Source'] ?? null,
                 $catNo
             ]);
+
+            // Handle bill scan upload on edit
+            if (isset($_FILES['billScan']) && $_FILES['billScan']['error'] === UPLOAD_ERR_OK) {
+                $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+                if (in_array($_FILES['billScan']['type'], $allowedTypes, true)) {
+                    $billData = file_get_contents($_FILES['billScan']['tmp_name']);
+                    if ($billData !== false && strlen($billData) <= 10 * 1024 * 1024) {
+                        $billStmt = $pdo->prepare("UPDATE Books SET BillScan = ?, BillScanMime = ? WHERE CatNo = ?");
+                        $billStmt->execute([$billData, $_FILES['billScan']['type'], $catNo]);
+                    }
+                }
+            }
+
             $adminId = $_SESSION['AdminID'] ?? null;
             logAudit($pdo, $adminId, 'BOOK_UPDATE', 'Books', $catNo, [
                 'updatedFields' => array_keys($data ?? [])
@@ -1209,6 +1261,113 @@ try {
             ]);
             break;
             
+        case 'upload_bill':
+            // Upload bill scan image for a book
+            if ($method !== 'POST') {
+                sendJson(['success' => false, 'message' => 'Method not allowed'], 405);
+            }
+
+            $catNo = $_POST['catNo'] ?? 0;
+            if (!$catNo) {
+                sendJson(['success' => false, 'message' => 'Catalog number is required'], 400);
+            }
+
+            if (!isset($_FILES['billScan']) || $_FILES['billScan']['error'] !== UPLOAD_ERR_OK) {
+                sendJson(['success' => false, 'message' => 'Bill scan file is required'], 400);
+            }
+
+            $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+            $fileType = $_FILES['billScan']['type'];
+            if (!in_array($fileType, $allowedTypes, true)) {
+                sendJson(['success' => false, 'message' => 'Invalid file type. Allowed: JPG, PNG, GIF, WebP, PDF'], 400);
+            }
+
+            $billData = file_get_contents($_FILES['billScan']['tmp_name']);
+            if ($billData === false || strlen($billData) > 10 * 1024 * 1024) {
+                sendJson(['success' => false, 'message' => 'File too large or unreadable (max 10MB)'], 400);
+            }
+
+            $stmt = $pdo->prepare("UPDATE Books SET BillScan = ?, BillScanMime = ? WHERE CatNo = ?");
+            $stmt->execute([$billData, $fileType, $catNo]);
+
+            logActivity($pdo, $_SESSION['admin_id'] ?? null, 'BILL_UPLOAD', "Uploaded bill scan for CatNo {$catNo}");
+
+            sendJson(['success' => true, 'message' => 'Bill scan uploaded successfully']);
+            break;
+
+        case 'get_bill_scan':
+            // Serve bill scan image for a book
+            $catNo = $_GET['catNo'] ?? 0;
+            if (!$catNo) {
+                sendJson(['success' => false, 'message' => 'Catalog number is required'], 400);
+            }
+
+            $stmt = $pdo->prepare("SELECT BillScan, BillScanMime FROM Books WHERE CatNo = ? AND BillScan IS NOT NULL");
+            $stmt->execute([$catNo]);
+            $row = $stmt->fetch();
+
+            if (!$row) {
+                sendJson(['success' => false, 'message' => 'No bill scan found for this book'], 404);
+            }
+
+            header('Content-Type: ' . ($row['BillScanMime'] ?: 'image/jpeg'));
+            header('Content-Disposition: inline; filename="bill_' . $catNo . '"');
+            header('Cache-Control: public, max-age=86400');
+            echo $row['BillScan'];
+            exit;
+
+        case 'yearly_purchases':
+            // Get yearly purchase data grouped by year
+            $stmt = $pdo->query("
+                SELECT
+                    YEAR(COALESCE(BillDate, DateAdded)) as PurchaseYear,
+                    COUNT(*) as TotalBooks,
+                    SUM(ItemCost) as TotalCost,
+                    SUM(ItemPrice) as TotalPrice,
+                    COUNT(CASE WHEN BillScan IS NOT NULL THEN 1 END) as BillsScanned
+                FROM Books
+                WHERE BillNo IS NOT NULL OR BillDate IS NOT NULL
+                GROUP BY PurchaseYear
+                ORDER BY PurchaseYear DESC
+            ");
+            $yearlyData = $stmt->fetchAll();
+
+            $totalBooks = 0;
+            $totalCost = 0;
+            foreach ($yearlyData as &$yr) {
+                $totalBooks += (int)$yr['TotalBooks'];
+                $totalCost += (float)$yr['TotalCost'];
+                $yr['TotalCost'] = (float)$yr['TotalCost'];
+                $yr['TotalPrice'] = (float)$yr['TotalPrice'];
+            }
+
+            sendJson([
+                'success' => true,
+                'data' => $yearlyData,
+                'totals' => ['totalBooks' => $totalBooks, 'totalCost' => $totalCost]
+            ]);
+            break;
+
+        case 'yearly_purchase_detail':
+            // Get book details for a specific purchase year
+            $year = $_GET['year'] ?? date('Y');
+
+            $stmt = $pdo->prepare("
+                SELECT
+                    CatNo, Title, Author1, Publisher,
+                    BillNo, BillDate, ItemPrice, ItemCost, Source,
+                    CASE WHEN BillScan IS NOT NULL THEN 1 ELSE 0 END as HasBillScan
+                FROM Books
+                WHERE YEAR(COALESCE(BillDate, DateAdded)) = ?
+                  AND (BillNo IS NOT NULL OR BillDate IS NOT NULL)
+                ORDER BY BillDate DESC, Title ASC
+            ");
+            $stmt->execute([$year]);
+            $books = $stmt->fetchAll();
+
+            sendJson(['success' => true, 'data' => $books]);
+            break;
+
         default:
             sendJson(['success' => false, 'message' => 'Invalid action'], 400);
     }

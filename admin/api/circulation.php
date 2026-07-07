@@ -175,6 +175,7 @@ try {
                 SELECT c.*, 
                        m.MemberName, m.Phone, m.Email, m.`Group`,
                        b.Title, b.Author1, b.Publisher,
+                       b.Format, b.DocumentType,
                        h.AccNo,
                        DATEDIFF(CURDATE(), c.DueDate) as DaysOverdue,
                        CASE 
@@ -206,30 +207,31 @@ try {
             break;
             
         case 'history':
-            // Get circulation history
+            // Get circulation history (only returned books)
             $memberNo = $_GET['memberNo'] ?? 0;
             $limit = $_GET['limit'] ?? 50;
+            
+            $conditions = ["c.Status = 'Returned'"];
+            $params = [];
+            
+            if ($memberNo) {
+                $conditions[] = "c.MemberNo = ?";
+                $params[] = $memberNo;
+            }
             
             $sql = "
                 SELECT c.*, 
                        m.MemberName,
-                       b.Title, b.Author1,
+                       b.Title, b.Author1, b.Format, b.DocumentType,
                        r.ReturnDate, r.FineAmount, r.`Condition`
                 FROM Circulation c
                 JOIN Member m ON c.MemberNo = m.MemberNo
                 JOIN Holding h ON c.AccNo = h.AccNo
                 JOIN Books b ON h.CatNo = b.CatNo
                 LEFT JOIN `Return` r ON c.CirculationID = r.CirculationID
+                WHERE " . implode(" AND ", $conditions) . "
+                ORDER BY c.IssueDate DESC LIMIT ?
             ";
-            
-            $params = [];
-            
-            if ($memberNo) {
-                $sql .= " WHERE c.MemberNo = ?";
-                $params[] = $memberNo;
-            }
-            
-            $sql .= " ORDER BY c.IssueDate DESC LIMIT ?";
             $params[] = (int)$limit;
             
             $stmt = $pdo->prepare($sql);

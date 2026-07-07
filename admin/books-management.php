@@ -1611,11 +1611,11 @@ if (!function_exists('generateQR')) {
                             <i class="fas fa-shopping-cart" style="margin-right:10px;"></i>Acquisition Details
                         </div>
                     
-                    <div class="form-row">
-                        <button type="button" class="btn btn-link" onclick="toggleAcquisitionSection()">
-                            <i class="fas fa-angle-down"></i> Toggle Acquisition Fields
-                        </button>
-                    </div>
+                        <div class="form-row">
+                            <button type="button" class="btn btn-link" onclick="toggleAcquisitionSection()">
+                                <i class="fas fa-angle-down"></i> Toggle Acquisition Fields
+                            </button>
+                        </div>
                     <div id="acquisitionSection" style="display:none; border:2px solid #d0d7de; padding:20px; margin-bottom:15px; border-radius:8px; background:linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
                         <div class="form-row">
                             <div class="form-group-modal">
@@ -1653,6 +1653,33 @@ if (!function_exists('generateQR')) {
                             <div class="form-group-modal">
                                 <label for="acqTotalCost"><i class="fas fa-rupee-sign"></i> Total Cost</label>
                                 <input type="number" id="acqTotalCost" name="TotalCost" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div style="margin-top:15px;border-top:1px solid #ddd;padding-top:15px;">
+                            <h4 style="color:#263c79;font-size:14px;margin-bottom:10px;"><i class="fas fa-file-invoice"></i> Bill Details</h4>
+                            <div class="form-row">
+                                <div class="form-group-modal">
+                                    <label for="acqBillNo"><i class="fas fa-receipt"></i> Bill No</label>
+                                    <input type="text" id="acqBillNo" name="BillNo" placeholder="Bill number">
+                                </div>
+                                <div class="form-group-modal">
+                                    <label for="acqBillDate"><i class="fas fa-calendar"></i> Bill Date</label>
+                                    <input type="date" id="acqBillDate" name="BillDate">
+                                </div>
+                                <div class="form-group-modal">
+                                    <label for="acqSource"><i class="fas fa-store"></i> Source</label>
+                                    <input type="text" id="acqSource" name="Source" placeholder="Vendor name">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group-modal">
+                                    <label for="acqItemCost"><i class="fas fa-rupee-sign"></i> Item Cost</label>
+                                    <input type="number" id="acqItemCost" name="ItemCost" min="0" step="0.01" placeholder="0.00">
+                                </div>
+                                <div class="form-group-modal">
+                                    <label for="billScanUpload"><i class="fas fa-file-image"></i> Bill Scan</label>
+                                    <input type="file" id="billScanUpload" name="billScan" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2515,6 +2542,16 @@ if (!function_exists('generateQR')) {
             fd.append('received_date', document.getElementById('acqReceivedDate')?.value || '');
             fd.append('quantity', document.getElementById('acqQuantity')?.value || '');
             fd.append('total_cost', document.getElementById('acqTotalCost')?.value || '');
+            // Bill/purchase fields
+            fd.append('bill_no', document.getElementById('acqBillNo')?.value || '');
+            fd.append('bill_date', document.getElementById('acqBillDate')?.value || '');
+            fd.append('source', document.getElementById('acqSource')?.value || '');
+            fd.append('item_cost', document.getElementById('acqItemCost')?.value || '');
+            // Bill scan file
+            const billScanFile = document.getElementById('billScanUpload')?.files?.[0];
+            if (billScanFile) {
+                fd.append('billScan', billScanFile);
+            }
 
             // Submit as form POST so PHP populates $_POST
             fetch(getApiPath('api/books.php?action=add'), {
@@ -2596,6 +2633,34 @@ if (!function_exists('generateQR')) {
                                             </div>
                                             <div class='form-row'>
                                                 <div class='form-group-modal'><label>Cat No</label><input type='text' name='CatNo' value='${escapeHtml(book.CatNo)}' readonly></div>
+                                            </div>
+                                            <div style='border:2px solid #d0d7de;padding:15px;margin-top:10px;border-radius:8px;background:#f8f9fa;'>
+                                                <h4 style='color:#263c79;font-size:14px;margin-bottom:10px;'><i class='fas fa-shopping-cart'></i> Purchase Details</h4>
+                                                <div class='form-row'>
+                                                    <div class='form-group-modal'><label>Bill No</label><input type='text' name='BillNo' value='${escapeHtml(book.BillNo)}' ${editable ? '' : 'readonly'}></div>
+                                                    <div class='form-group-modal'><label>Bill Date</label><input type='date' name='BillDate' value='${escapeHtml(book.BillDate)}' ${editable ? '' : 'readonly'}></div>
+                                                    <div class='form-group-modal'><label>Source</label><input type='text' name='Source' value='${escapeHtml(book.Source)}' ${editable ? '' : 'readonly'}></div>
+                                                </div>
+                                                <div class='form-row'>
+                                                    <div class='form-group-modal'><label>Item Price</label><input type='number' name='ItemPrice' step='0.01' value='${escapeHtml(book.ItemPrice)}' ${editable ? '' : 'readonly'}></div>
+                                                    <div class='form-group-modal'><label>Item Cost</label><input type='number' name='ItemCost' step='0.01' value='${escapeHtml(book.ItemCost)}' ${editable ? '' : 'readonly'}></div>
+                                                    <div class='form-group-modal'><label>Format</label>
+                                                        <select name='Format' ${editable ? '' : 'disabled'}>
+                                                            <option value='Book' ${book.Format === 'Book' ? 'selected' : ''}>Book</option>
+                                                            <option value='Journal' ${book.Format === 'Journal' ? 'selected' : ''}>Journal</option>
+                                                            <option value='Magazine' ${book.Format === 'Magazine' ? 'selected' : ''}>Magazine</option>
+                                                            <option value='Thesis' ${book.Format === 'Thesis' ? 'selected' : ''}>Thesis</option>
+                                                            <option value='Report' ${book.Format === 'Report' ? 'selected' : ''}>Report</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class='form-row'>
+                                                    <div class='form-group-modal'>
+                                                        <label>Bill Scan</label>
+                                                        ${book.HasBillScan ? `<a href='#' class='btn btn-sm btn-info' onclick='window.open(\"api/books.php?action=get_bill_scan&catNo=${book.CatNo}\",\"_blank\",\"width=800,height=600\");return false;'><i class='fas fa-file-image'></i> View Current</a> ` : '<span style="color:#999;font-size:12px;">No scan on file</span>'}
+                                                        ${editable ? `<input type='file' name='billScan' accept='image/jpeg,image/png,image/gif,image/webp,application/pdf' style='margin-top:5px;'>` : ''}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </form>`;
 

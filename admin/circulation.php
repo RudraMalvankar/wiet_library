@@ -996,7 +996,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                         </div>
                         <div class="form-group">
                             <label for="returnAccNo">Or Enter Accession Number</label>
-                            <input type="text" id="returnAccNo" class="form-control" placeholder="Enter accession number..." onchange="searchReturnBook()" aria-label="Return Accession Number" tabindex="0">
+                            <input type="text" id="returnAccNo" class="form-control" placeholder="Enter accession number..." onchange="searchReturnBook()" aria-label="Return Accession Number" tabindex="0" autofocus>
                             <button type="button" class="btn btn-primary" onclick="searchReturnBook()" style="margin-top: 10px;">
                                 <i class="fas fa-search"></i>
                                 Search Book
@@ -1151,7 +1151,8 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                     <thead>
                         <tr>
                             <th>Member</th>
-                            <th>Book Details</th>
+                            <th>Title</th>
+                            <th>Type</th>
                             <th>Accession No</th>
                             <th>Issue Date</th>
                             <th>Due Date</th>
@@ -1198,7 +1199,8 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                     <thead>
                         <tr>
                             <th>Member</th>
-                            <th>Book Details</th>
+                            <th>Title</th>
+                            <th>Type</th>
                             <th>Accession No</th>
                             <th>Issue Date</th>
                             <th>Return Date</th>
@@ -2070,6 +2072,8 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                         const status = daysLeft < 0 ? 'Overdue' :
                             daysLeft === 0 ? 'Due Today' : 'Active';
 
+                        const docType = circ.Format || circ.DocumentType || 'Book';
+                        const typeLabel = docType === 'Journal' || docType === 'JR' ? 'Journal' : 'Book';
                         tableHTML += `
                             <tr>
                                 <td>
@@ -2079,6 +2083,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                                 <td>
                                     <strong>${circ.Title}</strong>
                                 </td>
+                                <td><span class="status-badge" style="background:#e8eaf6;color:#283593;">${typeLabel}</span></td>
                                 <td>${circ.AccNo}</td>
                                 <td>${new Date(circ.IssueDate).toLocaleDateString('en-IN')}</td>
                                 <td>${new Date(circ.DueDate).toLocaleDateString('en-IN')}</td>
@@ -2096,13 +2101,13 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                         `;
                     });
                 } else {
-                    tableHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #6c757d;">No active circulations found</td></tr>';
+                    tableHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #6c757d;">No active circulations found</td></tr>';
                 }
 
                 document.getElementById('activeCirculationsTable').innerHTML = tableHTML;
             } catch (error) {
                 console.error('Error loading active circulations:', error);
-                document.getElementById('activeCirculationsTable').innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #dc3545;">Error loading data</td></tr>';
+                document.getElementById('activeCirculationsTable').innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #dc3545;">Error loading data</td></tr>';
             }
         }
 
@@ -2116,6 +2121,8 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
 
                 if (result.success && result.data && result.data.length > 0) {
                     result.data.forEach(ret => {
+                        const docType = ret.Format || ret.DocumentType || 'Book';
+                        const typeLabel = docType === 'Journal' || docType === 'JR' ? 'Journal' : 'Book';
                         tableHTML += `
                             <tr>
                                 <td>
@@ -2125,6 +2132,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                                 <td>
                                     <strong>${ret.Title}</strong>
                                 </td>
+                                <td><span class="status-badge" style="background:#e8eaf6;color:#283593;">${typeLabel}</span></td>
                                 <td>${ret.AccNo}</td>
                                 <td>${new Date(ret.IssueDate).toLocaleDateString('en-IN')}</td>
                                 <td>${new Date(ret.ReturnDate).toLocaleDateString('en-IN')}</td>
@@ -2135,13 +2143,13 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
                         `;
                     });
                 } else {
-                    tableHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #6c757d;">No return history found</td></tr>';
+                    tableHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #6c757d;">No return history found</td></tr>';
                 }
 
                 document.getElementById('returnHistoryTable').innerHTML = tableHTML;
             } catch (error) {
                 console.error('Error loading return history:', error);
-                document.getElementById('returnHistoryTable').innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #dc3545;">Error loading data</td></tr>';
+                document.getElementById('returnHistoryTable').innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #dc3545;">Error loading data</td></tr>';
             }
         }
 
@@ -2510,7 +2518,7 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             document.getElementById('returnScanningOverlay').style.display = 'none';
         }
 
-        function handleReturnScanResult(scannedData) {
+        async function handleReturnScanResult(scannedData) {
             console.log('Return scan result:', scannedData);
 
             let accNo = scannedData.trim();
@@ -2531,7 +2539,9 @@ $admin_name = $_SESSION['admin_name'] ?? 'Admin User';
             document.getElementById('returnAccNo').value = accNo;
             const camContainer = document.getElementById('returnVideo').closest('.camera-container');
             if (camContainer) showScanBanner(camContainer, accNo);
-            searchReturnBook();
+            await searchReturnBook();
+            document.getElementById('returnAccNo').focus();
+            document.getElementById('returnAccNo').select();
             stopReturnScan();
         }
 
